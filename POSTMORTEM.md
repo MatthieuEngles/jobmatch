@@ -2,6 +2,32 @@
 
 ## 📅 Sessions
 
+### 2025-12-22 (4) - Refonte UI Landing Page et Profil
+**Contexte:** Améliorer l'interface utilisateur de la landing page et de la page profil
+
+**Réalisations:**
+- Landing page dynamique avec animations CSS (fadeInUp, float, pulse, slideIn)
+- Hero section plein écran (100vh) sans scroll
+- Navbar conditionnelle : masquée si déconnecté, visible si connecté
+- Cartes de "match preview" animées dans le hero
+- Stats animées avec gradient (10K+ offres, 95% précision, 30s pour matcher)
+- Page profil avec sidebar menu (photo, données perso, CVs, LM, pitch, succès, hobbies)
+- Site non-scrollable (overflow: hidden sur body)
+- Ajustement itératif des tailles pour tenir dans le viewport
+
+**Problèmes rencontrés:**
+- Migration Django manquante → `makemigrations accounts` pour créer 0001_initial.py
+- Lignes trop longues dans migration (flake8 E501) → split help_text avec parenthèses
+- Django 5+ logout nécessite POST → form avec csrf_token au lieu de lien
+
+**Décisions techniques:**
+- **CSS-only animations** : pas de JS pour les animations, tout en CSS
+- **Template blocks conditionnels** : `{% block navbar %}` avec `{{ block.super }}` pour héritage sélectif
+- **`{% block main_attrs %}`** : permet de customiser les attributs de `<main>` par template
+- **clamp() pour responsive** : `font-size: clamp(2.8rem, 5.5vw, 4rem)` adapte la taille au viewport
+
+---
+
 ### 2025-12-22 (3) - Configuration multi-environnement
 **Contexte:** Permettre au service GUI de tourner en local, Docker dev et Cloud Run prod
 
@@ -85,12 +111,16 @@
 - POC structuré en 4 domaines : Gestion Compte (DE:0), Import CV (DE:1), Ingestion Offres (DE:2), Smart Match (DE:2)
 - Priorités MoSCoW définies dans les User Stories
 - Mode vibecoding en équipe nécessite un périmètre clair et des règles strictes
+- Django 5+ : logout doit être en POST (plus de GET)
+- Template blocks Django : `{{ block.super }}` pour hériter conditionnellement
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
 - Gentleman Agreement à signer avant de continuer
 - **Vibecoding** : ne jamais modifier les zones de l'équipe classique (offre-ingestion, matching)
 - Toujours confirmer avant de modifier fichiers partagés (docker-compose, .env, interfaces)
+- **Migrations auto-générées** : peuvent avoir des lignes trop longues (flake8 E501), nécessite reformatage manuel
+- **overflow: hidden** sur body empêche tout scroll, s'assurer que le contenu tient dans le viewport
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -99,6 +129,9 @@
 - `.claude/settings.json` pour définir les règles de vibecoding
 - Préfixe de commit `[CortexForge]` pour identifier les commits vibecoding
 - Architecture microservices avec dossiers séparés par domaine
+- **CSS clamp()** pour des tailles responsive sans media queries
+- **Template blocks conditionnels** avec `{% if user.is_authenticated %}{{ block.super }}{% endif %}`
+- **Variables CSS** (`:root`) pour cohérence des couleurs/styles
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python
@@ -108,6 +141,8 @@
 - [x] Dockerfile GUI
 - [x] Configuration multi-environnement (local/dev/prod)
 - [x] CI/CD Cloud Run (cloudbuild.yaml)
+- [x] Refonte UI landing page (hero, animations, navbar conditionnelle)
+- [x] Page profil avec sidebar menu
 - [ ] Gentleman Agreement à rédiger et signer
 - [ ] Présentation GitHub à faire (Matthieu)
 - [ ] État de l'art scientifique (données, algos, SaaS existants, limites)
@@ -117,3 +152,5 @@
 - [ ] Créer projet GCloud + Cloud SQL + Cloud Storage
 - [ ] Définir les interfaces partagées (schemas CV, offres)
 - [ ] Intégrer l'upload de CV dans la GUI
+- [ ] Implémenter les sections du profil (CVs, LM, pitch, succès, hobbies)
+- [ ] Upload photo de profil

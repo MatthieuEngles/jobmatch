@@ -319,6 +319,162 @@
         color: white;
     }
 
+    /* Tabs for Parcours */
+    .tabs-container {
+        margin-bottom: 24px;
+    }
+
+    .tabs-nav {
+        display: flex;
+        gap: 8px;
+        border-bottom: 2px solid var(--border);
+        padding-bottom: 0;
+    }
+
+    .tab-btn {
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--gray);
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+
+    .tab-btn:hover {
+        color: var(--primary);
+    }
+
+    .tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+
+    .tab-btn svg {
+        width: 18px;
+        height: 18px;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    .tab-content {
+        display: none;
+        padding-top: 24px;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Documents Section */
+    .documents-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    .document-category {
+        background: var(--light);
+        border-radius: 16px;
+        padding: 24px;
+        border: 1px solid var(--border);
+    }
+
+    .document-category-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .document-category-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .document-category-icon.cv {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+    }
+
+    .document-category-icon.lm {
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+    }
+
+    .document-category-icon svg {
+        width: 24px;
+        height: 24px;
+        color: white;
+    }
+
+    .document-category-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--dark);
+        margin: 0 0 4px 0;
+    }
+
+    .document-category-desc {
+        font-size: 0.85rem;
+        color: var(--gray);
+        margin: 0;
+    }
+
+    .document-list {
+        min-height: 80px;
+        margin-bottom: 16px;
+    }
+
+    .document-empty {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        border: 2px dashed var(--border);
+    }
+
+    .document-empty p {
+        color: var(--gray);
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .btn-add-document {
+        width: 100%;
+        background: white;
+        color: var(--primary);
+        padding: 12px 20px;
+        border-radius: 12px;
+        border: 1px solid var(--primary);
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-add-document:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    @media (max-width: 768px) {
+        .documents-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
     /* Responsive */
     @media (max-width: 992px) {
         .profile-layout {
@@ -372,17 +528,11 @@
                     </svg>
                     Donnees personnelles
                 </a>
-                <a href="#cv" class="menu-item" data-section="cv">
+                <a href="#parcours" class="menu-item" data-section="parcours">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
-                    Mes CV
-                </a>
-                <a href="#cover-letter" class="menu-item" data-section="cover-letter">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    Lettres de motivation
+                    Parcours professionnel
                 </a>
                 <a href="#pitch" class="menu-item" data-section="pitch">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -401,6 +551,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Hobbies & personnel
+                </a>
+                <a href="#documents" class="menu-item" data-section="documents">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                    </svg>
+                    Mes documents
                 </a>
 
                 <div class="menu-divider"></div>
@@ -455,58 +611,97 @@
             </div>
         </section>
 
-        <!-- Section: Mes CV -->
-        <section id="cv" class="content-section" style="display: none;">
+        <!-- Section: Parcours professionnel -->
+        <section id="parcours" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
                     <div>
-                        <h2 class="content-title">Mes CV</h2>
-                        <p class="content-subtitle">Importez et gerez vos differents CV</p>
+                        <h2 class="content-title">Parcours professionnel</h2>
+                        <p class="content-subtitle">Gerez vos experiences, competences et formations</p>
                     </div>
                 </div>
 
-                <div class="placeholder-section">
-                    <div class="placeholder-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                <div class="tabs-container">
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" data-tab="experiences">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Experiences
+                        </button>
+                        <button class="tab-btn" data-tab="competences">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            Competences
+                        </button>
+                        <button class="tab-btn" data-tab="formations">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+                            </svg>
+                            Formations
+                        </button>
                     </div>
-                    <h3 class="placeholder-title">Aucun CV importe</h3>
-                    <p class="placeholder-desc">Importez votre CV pour permettre a notre algorithme de vous matcher avec les meilleures offres</p>
-                    <button class="btn-add">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Importer un CV
-                    </button>
-                </div>
-            </div>
-        </section>
 
-        <!-- Section: Lettres de motivation -->
-        <section id="cover-letter" class="content-section" style="display: none;">
-            <div class="content-card">
-                <div class="content-header">
-                    <div>
-                        <h2 class="content-title">Lettres de motivation</h2>
-                        <p class="content-subtitle">Creez et gerez vos lettres de motivation</p>
+                    <!-- Tab: Experiences -->
+                    <div id="tab-experiences" class="tab-content active">
+                        <div class="placeholder-section">
+                            <div class="placeholder-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h3 class="placeholder-title">Aucune experience ajoutee</h3>
+                            <p class="placeholder-desc">Ajoutez vos experiences professionnelles ou importez un CV pour les extraire automatiquement</p>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter une experience
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="placeholder-section">
-                    <div class="placeholder-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
+                    <!-- Tab: Competences -->
+                    <div id="tab-competences" class="tab-content">
+                        <div class="placeholder-section">
+                            <div class="placeholder-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                            </div>
+                            <h3 class="placeholder-title">Aucune competence ajoutee</h3>
+                            <p class="placeholder-desc">Ajoutez vos competences techniques et soft skills</p>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter une competence
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="placeholder-title">Aucune lettre de motivation</h3>
-                    <p class="placeholder-desc">Creez des modeles de lettres que vous pourrez personnaliser pour chaque candidature</p>
-                    <button class="btn-add">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Creer une lettre
-                    </button>
+
+                    <!-- Tab: Formations -->
+                    <div id="tab-formations" class="tab-content">
+                        <div class="placeholder-section">
+                            <div class="placeholder-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                                </svg>
+                            </div>
+                            <h3 class="placeholder-title">Aucune formation ajoutee</h3>
+                            <p class="placeholder-desc">Ajoutez vos diplomes et certifications</p>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter une formation
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -594,11 +789,78 @@
                 </div>
             </div>
         </section>
+
+        <!-- Section: Mes documents -->
+        <section id="documents" class="content-section" style="display: none;">
+            <div class="content-card">
+                <div class="content-header">
+                    <div>
+                        <h2 class="content-title">Mes documents</h2>
+                        <p class="content-subtitle">Importez et gerez vos CV et lettres de motivation</p>
+                    </div>
+                </div>
+
+                <div class="documents-grid">
+                    <!-- CV Section -->
+                    <div class="document-category">
+                        <div class="document-category-header">
+                            <div class="document-category-icon cv">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="document-category-title">Curriculum Vitae</h3>
+                                <p class="document-category-desc">Importez vos CV pour le matching automatique</p>
+                            </div>
+                        </div>
+                        <div class="document-list">
+                            <div class="document-empty">
+                                <p>Aucun CV importe</p>
+                            </div>
+                        </div>
+                        <button class="btn-add-document">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Importer un CV
+                        </button>
+                    </div>
+
+                    <!-- Lettres de motivation Section -->
+                    <div class="document-category">
+                        <div class="document-category-header">
+                            <div class="document-category-icon lm">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="document-category-title">Lettres de motivation</h3>
+                                <p class="document-category-desc">Gerez vos modeles de lettres</p>
+                            </div>
+                        </div>
+                        <div class="document-list">
+                            <div class="document-empty">
+                                <p>Aucune lettre importee</p>
+                            </div>
+                        </div>
+                        <button class="btn-add-document">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Importer une lettre
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Menu navigation
     const menuItems = document.querySelectorAll('.menu-item[data-section]');
     const sections = document.querySelectorAll('.content-section');
 
@@ -614,6 +876,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show section
             sections.forEach(s => s.style.display = 'none');
             document.getElementById(sectionId).style.display = 'block';
+        });
+    });
+
+    // Tabs navigation (for Parcours professionnel)
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+
+            // Update tab buttons
+            tabBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            // Show tab content
+            tabContents.forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
         });
     });
 });

@@ -1,3 +1,6 @@
+# Shared interfaces (install in editable mode for dev)
+-e ../../shared
+
 # FastAPI framework
 fastapi==0.115.6
 uvicorn[standard]==0.32.1

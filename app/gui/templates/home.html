@@ -21,7 +21,7 @@
         --light: #f8fafc;
     }
 
-    /* Hero Section */
+    /* Hero section styles */
     .hero {
         height: 100vh;
         background: linear-gradient(135deg, var(--dark) 0%, #1e293b 50%, var(--primary-dark) 100%);
@@ -95,7 +95,7 @@
         100% { background-position: 60px 60px; }
     }
 
-    /* Floating Elements */
+    /* Floating background elements */
     .floating-shapes {
         position: absolute;
         top: 0;
@@ -145,7 +145,7 @@
         50% { transform: translateY(-30px) rotate(10deg); }
     }
 
-    /* Hero Content */
+    /* Hero content styles */
     .hero-content {
         position: relative;
         z-index: 10;
@@ -215,7 +215,7 @@
         }
     }
 
-    /* CTA Buttons */
+    /* Call-to-action buttons */
     .hero-cta {
         display: flex;
         gap: 16px;
@@ -274,7 +274,7 @@
         color: white;
     }
 
-    /* Stats Row */
+    /* Statistics row */
     .hero-stats {
         display: flex;
         gap: 32px;
@@ -302,7 +302,7 @@
         font-size: 0.85rem;
     }
 
-    /* Hero Visual */
+    /* Hero visual card */
     .hero-visual {
         position: relative;
         animation: fadeInUp 0.6s ease-out 0.5s both;
@@ -381,7 +381,7 @@
         margin-top: 10px;
     }
 
-    /* Welcome Card for logged in users */
+    /* Welcome card for authenticated users */
     .welcome-section {
         height: calc(100vh - 80px);
         display: flex;
@@ -498,7 +498,7 @@
         transition: transform 0.3s ease;
     }
 
-    /* Responsive */
+    /* Responsive breakpoints */
     @media (max-width: 768px) {
         .hero-stats {
             flex-direction: column;
@@ -522,7 +522,7 @@
 
 {% block content %}
 {% if user.is_authenticated %}
-    <!-- Logged In View -->
+    <!-- Authenticated user view -->
     <div class="welcome-section">
         <div class="container">
             <div class="welcome-header">
@@ -588,9 +588,9 @@
     </div>
 
 {% else %}
-    <!-- Landing Page -->
+    <!-- Public landing page -->
 
-    <!-- Hero Section -->
+    <!-- Hero section -->
     <section class="hero">
         <div class="floating-shapes">
             <div class="shape shape-1"></div>
@@ -598,7 +598,7 @@
             <div class="shape shape-3"></div>
         </div>
 
-        <!-- Navbar integree -->
+        <!-- Integrated navbar -->
         <nav class="hero-navbar">
             <div class="container d-flex justify-content-between align-items-center">
                 <a href="{% url 'home' %}" class="brand">JobMatch</a>

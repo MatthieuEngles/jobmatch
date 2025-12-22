@@ -39,7 +39,34 @@ def profile_view(request):
             return redirect("accounts:profile")
     else:
         form = UserProfileForm(instance=request.user)
-    return render(request, "accounts/profile.html", {"form": form})
+
+    # Get extracted lines grouped by content_type for career path display
+    user = request.user
+    experiences = user.extracted_lines.filter(
+        content_type="experience", is_active=True
+    ).order_by("order", "-created_at")
+    skills_hard = user.extracted_lines.filter(
+        content_type="skill_hard", is_active=True
+    ).order_by("order", "-created_at")
+    skills_soft = user.extracted_lines.filter(
+        content_type="skill_soft", is_active=True
+    ).order_by("order", "-created_at")
+    educations = user.extracted_lines.filter(
+        content_type="education", is_active=True
+    ).order_by("order", "-created_at")
+    certifications = user.extracted_lines.filter(
+        content_type="certification", is_active=True
+    ).order_by("order", "-created_at")
+
+    context = {
+        "form": form,
+        "experiences": experiences,
+        "skills_hard": skills_hard,
+        "skills_soft": skills_soft,
+        "educations": educations,
+        "certifications": certifications,
+    }
+    return render(request, "accounts/profile.html", context)
 
 
 @login_required

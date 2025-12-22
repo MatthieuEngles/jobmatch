@@ -92,3 +92,4 @@ temp/
 .claude
 .claude/*
 .claude/settings.json
+CLAUDE.md

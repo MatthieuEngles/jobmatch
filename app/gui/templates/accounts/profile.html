@@ -22,7 +22,7 @@
         overflow: hidden;
     }
 
-    /* Sidebar */
+    /* Sidebar styles */
     .profile-sidebar {
         width: 280px;
         flex-shrink: 0;
@@ -113,7 +113,7 @@
         font-size: 0.875rem;
     }
 
-    /* Menu */
+    /* Navigation menu */
     .profile-menu {
         padding: 16px 0;
     }
@@ -161,7 +161,7 @@
         background: #fef2f2;
     }
 
-    /* Content */
+    /* Main content area */
     .profile-content {
         flex: 1;
         min-width: 0;
@@ -197,7 +197,7 @@
         margin-top: 4px;
     }
 
-    /* Form Styles */
+    /* Form styles */
     .form-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -262,7 +262,7 @@
         box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
     }
 
-    /* Placeholder sections */
+    /* Empty state placeholder sections */
     .placeholder-section {
         text-align: center;
         padding: 60px 40px;
@@ -319,7 +319,7 @@
         color: white;
     }
 
-    /* Tabs for Parcours */
+    /* Career path tabs */
     .tabs-container {
         margin-bottom: 24px;
     }
@@ -370,7 +370,123 @@
         display: block;
     }
 
-    /* Documents Section */
+    /* Extracted line items display */
+    .extracted-items {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .extracted-item {
+        background: var(--light);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 20px;
+        transition: all 0.2s ease;
+    }
+
+    .extracted-item:hover {
+        border-color: var(--primary);
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+    }
+
+    .extracted-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .extracted-item-content {
+        font-size: 0.95rem;
+        color: var(--dark);
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+    .extracted-item-source {
+        font-size: 0.8rem;
+        color: var(--gray);
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .extracted-item-source svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .btn-toggle-active {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        color: var(--gray);
+        transition: color 0.2s ease;
+    }
+
+    .btn-toggle-active:hover {
+        color: var(--primary);
+    }
+
+    /* Skills grid layout */
+    .skills-section {
+        margin-bottom: 24px;
+    }
+
+    .skills-section-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+    }
+
+    .skills-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .skill-tag {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 0.9rem;
+        color: var(--dark);
+        transition: all 0.2s ease;
+    }
+
+    .skill-tag:hover {
+        border-color: var(--primary);
+        background: var(--light);
+    }
+
+    .skill-tag.hard {
+        border-left: 3px solid var(--primary);
+    }
+
+    .skill-tag.soft {
+        border-left: 3px solid #22c55e;
+    }
+
+    .tab-content-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .item-count {
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
+
+    /* Documents section styles */
     .documents-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -475,7 +591,7 @@
         }
     }
 
-    /* Responsive */
+    /* Responsive breakpoints */
     @media (max-width: 992px) {
         .profile-layout {
             flex-direction: column;
@@ -498,7 +614,7 @@
 
 {% block content %}
 <div class="profile-layout">
-    <!-- Sidebar -->
+    <!-- Profile sidebar with photo and navigation -->
     <aside class="profile-sidebar">
         <div class="profile-card">
             <div class="profile-header">
@@ -571,9 +687,9 @@
         </div>
     </aside>
 
-    <!-- Content -->
+    <!-- Main content area -->
     <main class="profile-content">
-        <!-- Section: Donnees personnelles -->
+        <!-- Section: Personal data -->
         <section id="personal" class="content-section">
             <div class="content-card">
                 <div class="content-header">
@@ -611,7 +727,7 @@
             </div>
         </section>
 
-        <!-- Section: Parcours professionnel -->
+        <!-- Section: Career path -->
         <section id="parcours" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
@@ -645,8 +761,32 @@
                         </button>
                     </div>
 
-                    <!-- Tab: Experiences -->
+                    <!-- Tab: Work experiences -->
                     <div id="tab-experiences" class="tab-content active">
+                        {% if experiences %}
+                        <div class="tab-content-header">
+                            <span class="item-count">{{ experiences|length }} experience{{ experiences|length|pluralize }}</span>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter
+                            </button>
+                        </div>
+                        <div class="extracted-items">
+                            {% for exp in experiences %}
+                            <div class="extracted-item">
+                                <div class="extracted-item-content">{{ exp.content }}</div>
+                                <div class="extracted-item-source">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    {{ exp.source_cv.original_filename }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
                         <div class="placeholder-section">
                             <div class="placeholder-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -662,10 +802,45 @@
                                 Ajouter une experience
                             </button>
                         </div>
+                        {% endif %}
                     </div>
 
-                    <!-- Tab: Competences -->
+                    <!-- Tab: Skills -->
                     <div id="tab-competences" class="tab-content">
+                        {% if skills_hard or skills_soft %}
+                        <div class="tab-content-header">
+                            <span class="item-count">{{ skills_hard|length|add:skills_soft|length }} competence{{ skills_hard|length|add:skills_soft|length|pluralize }}</span>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter
+                            </button>
+                        </div>
+
+                        {% if skills_hard %}
+                        <div class="skills-section">
+                            <h4 class="skills-section-title">Competences techniques</h4>
+                            <div class="skills-grid">
+                                {% for skill in skills_hard %}
+                                <span class="skill-tag hard">{{ skill.content }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if skills_soft %}
+                        <div class="skills-section">
+                            <h4 class="skills-section-title">Soft skills</h4>
+                            <div class="skills-grid">
+                                {% for skill in skills_soft %}
+                                <span class="skill-tag soft">{{ skill.content }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% else %}
                         <div class="placeholder-section">
                             <div class="placeholder-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -681,10 +856,61 @@
                                 Ajouter une competence
                             </button>
                         </div>
+                        {% endif %}
                     </div>
 
-                    <!-- Tab: Formations -->
+                    <!-- Tab: Education -->
                     <div id="tab-formations" class="tab-content">
+                        {% if educations or certifications %}
+                        <div class="tab-content-header">
+                            <span class="item-count">{{ educations|length|add:certifications|length }} formation{{ educations|length|add:certifications|length|pluralize }}</span>
+                            <button class="btn-add">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter
+                            </button>
+                        </div>
+
+                        {% if educations %}
+                        <div class="skills-section">
+                            <h4 class="skills-section-title">Diplomes</h4>
+                            <div class="extracted-items">
+                                {% for edu in educations %}
+                                <div class="extracted-item">
+                                    <div class="extracted-item-content">{{ edu.content }}</div>
+                                    <div class="extracted-item-source">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        {{ edu.source_cv.original_filename }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if certifications %}
+                        <div class="skills-section">
+                            <h4 class="skills-section-title">Certifications</h4>
+                            <div class="extracted-items">
+                                {% for cert in certifications %}
+                                <div class="extracted-item">
+                                    <div class="extracted-item-content">{{ cert.content }}</div>
+                                    <div class="extracted-item-source">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        {{ cert.source_cv.original_filename }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% else %}
                         <div class="placeholder-section">
                             <div class="placeholder-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -701,12 +927,13 @@
                                 Ajouter une formation
                             </button>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Section: Mon pitch -->
+        <!-- Section: Elevator pitch -->
         <section id="pitch" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
@@ -734,7 +961,7 @@
             </div>
         </section>
 
-        <!-- Section: Succes professionnels -->
+        <!-- Section: Professional achievements -->
         <section id="achievements" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
@@ -762,7 +989,7 @@
             </div>
         </section>
 
-        <!-- Section: Hobbies -->
+        <!-- Section: Hobbies and personal interests -->
         <section id="hobbies" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
@@ -790,7 +1017,7 @@
             </div>
         </section>
 
-        <!-- Section: Mes documents -->
+        <!-- Section: My documents (CV and cover letters) -->
         <section id="documents" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
@@ -801,7 +1028,7 @@
                 </div>
 
                 <div class="documents-grid">
-                    <!-- CV Section -->
+                    <!-- CV upload section -->
                     <div class="document-category">
                         <div class="document-category-header">
                             <div class="document-category-icon cv">
@@ -827,7 +1054,7 @@
                         </button>
                     </div>
 
-                    <!-- Lettres de motivation Section -->
+                    <!-- Cover letters section -->
                     <div class="document-category">
                         <div class="document-category-header">
                             <div class="document-category-icon lm">
@@ -860,7 +1087,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Menu navigation
+    // Sidebar menu navigation
     const menuItems = document.querySelectorAll('.menu-item[data-section]');
     const sections = document.querySelectorAll('.content-section');
 
@@ -869,17 +1096,17 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const sectionId = this.getAttribute('data-section');
 
-            // Update menu
+            // Update active menu item
             menuItems.forEach(m => m.classList.remove('active'));
             this.classList.add('active');
 
-            // Show section
+            // Display selected section
             sections.forEach(s => s.style.display = 'none');
             document.getElementById(sectionId).style.display = 'block';
         });
     });
 
-    // Tabs navigation (for Parcours professionnel)
+    // Tab navigation for career path section
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -887,11 +1114,11 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
 
-            // Update tab buttons
+            // Update active tab button
             tabBtns.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
 
-            // Show tab content
+            // Display selected tab content
             tabContents.forEach(c => c.classList.remove('active'));
             document.getElementById('tab-' + tabId).classList.add('active');
         });

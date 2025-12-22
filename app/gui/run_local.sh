@@ -37,8 +37,10 @@ else:
 " 2>/dev/null || true
 
 # Run server
+PORT=${PORT:-8000}
+
 echo ""
-echo "Starting server at http://localhost:8000"
-echo "Admin: http://localhost:8000/admin (admin@jobmatch.local / admin)"
+echo "Starting server at http://localhost:$PORT"
+echo "Admin: http://localhost:$PORT/admin (admin@jobmatch.local / admin)"
 echo ""
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:$PORT

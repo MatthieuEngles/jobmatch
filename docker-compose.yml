@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  gui:
+    build: ./app/gui
+    ports:
+      - "8080:8080"
+    environment:
+      - CV_INGESTION_URL=http://cv-ingestion:8081
+      - MATCHING_URL=http://matching:8083
+    depends_on:
+      - cv-ingestion
+      - matching
+    networks:
+      - jobmatch-network
+
+  cv-ingestion:
+    build: ./app/cv-ingestion
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - jobmatch-network
+
+  offre-ingestion:
+    build: ./app/offre-ingestion
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - FRANCE_TRAVAIL_API_KEY=${FRANCE_TRAVAIL_API_KEY}
+    networks:
+      - jobmatch-network
+
+  matching:
+    build: ./app/matching
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - cv-ingestion
+      - offre-ingestion
+    networks:
+      - jobmatch-network
+
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
+      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobmatch-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - jobmatch-network
+
+networks:
+  jobmatch-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

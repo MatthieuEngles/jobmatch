@@ -35,8 +35,8 @@
     ]
   },
   "git": {
-    "branch_prefix": "vibecode/matthieu-",
-    "commit_prefix": "[vibecode]",
+    "branch_prefix": "cortexforge/matthieu-",
+    "commit_prefix": "[CortexForge]",
     "protected_branches": ["main", "master", "dev", "develop"],
     "auto_pull_before_session": true
   },

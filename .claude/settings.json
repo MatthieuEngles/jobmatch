@@ -1,0 +1,77 @@
+{
+  "vibecoding": {
+    "enabled": true,
+    "developer": "Matthieu",
+    "assistant": "Claude"
+  },
+  "permissions": {
+    "allowed_paths": [
+      "src/account/**",
+      "src/cv-import/**",
+      "src/frontend/**",
+      "src/shared/types/**",
+      "src/shared/utils/**",
+      "tests/account/**",
+      "tests/cv-import/**",
+      "tests/frontend/**",
+      "docs/**",
+      "POSTMORTEM.md",
+      "PITCH.md",
+      "README.md",
+      ".claude/**"
+    ],
+    "forbidden_paths": [
+      "src/ingestion/**",
+      "src/matching/**",
+      "tests/ingestion/**",
+      "tests/matching/**"
+    ],
+    "shared_paths_caution": [
+      "src/shared/interfaces/**",
+      "src/shared/constants/**",
+      "package.json",
+      "docker-compose.yml",
+      ".env*"
+    ]
+  },
+  "git": {
+    "branch_prefix": "vibecode/matthieu-",
+    "commit_prefix": "[vibecode]",
+    "protected_branches": ["main", "master", "dev", "develop"],
+    "auto_pull_before_session": true
+  },
+  "workflow": {
+    "confirm_before_edit_shared": true,
+    "confirm_before_new_dependency": true,
+    "update_postmortem_before_compact": true,
+    "read_postmortem_on_session_start": true
+  },
+  "team": {
+    "members": [
+      {
+        "name": "Matthieu",
+        "mode": "vibecoding",
+        "domains": ["account", "cv-import", "frontend", "ux"]
+      },
+      {
+        "name": "Clément",
+        "mode": "classic",
+        "domains": []
+      },
+      {
+        "name": "Mohamed",
+        "mode": "classic",
+        "domains": []
+      },
+      {
+        "name": "Maxime",
+        "mode": "classic",
+        "domains": ["rgpd", "documentation"]
+      }
+    ]
+  },
+  "notes": {
+    "forbidden_paths_reason": "Ces dossiers sont développés par l'équipe en mode classique. Ne jamais modifier sans accord explicite.",
+    "shared_paths_reason": "Ces fichiers impactent toute l'équipe. Demander confirmation avant modification."
+  }
+}

@@ -1,6 +1,6 @@
 # Calling France Travail Offres d'Emploi API
 
-## 1. Create an account and application on France Travail.io website, to get your credentials. 
+## 1. Create an account and application on France Travail.io website, to get your credentials.
 
 Then create your .env file with ```CLIENT_ID``` and ```CLIENT_KEY``` you got.
 

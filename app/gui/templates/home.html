@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}JobMatch - Trouvez le job qui vous correspond{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <h1 class="display-4 mb-4">Bienvenue sur JobMatch</h1>
+        <p class="lead mb-4">
+            Trouvez les offres d'emploi qui correspondent parfaitement à votre profil.
+            Notre algorithme intelligent analyse votre CV et vous propose les meilleures opportunités.
+        </p>
+
+        {% if user.is_authenticated %}
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Bonjour {{ user.first_name|default:user.username }} !</h5>
+                    <p class="card-text">Commencez par compléter votre profil et importer votre CV.</p>
+                    <a href="{% url 'accounts:profile' %}" class="btn btn-primary">Mon profil</a>
+                </div>
+            </div>
+        {% else %}
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{% url 'accounts:register' %}" class="btn btn-primary btn-lg">Créer un compte</a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-outline-primary btn-lg">Se connecter</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

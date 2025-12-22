@@ -2,7 +2,29 @@
 
 ## 📅 Sessions
 
-### 2025-12-22 - Initialisation projet + Architecture microservices
+### 2025-12-22 (2) - Service GUI Django
+**Contexte:** Implémentation du service GUI avec Django
+
+**Réalisations:**
+- Choix framework : Django (malgré architecture microservices, pour batteries incluses)
+- Création projet Django dans `app/gui/`
+- App `accounts` avec custom User model :
+  - Inscription, connexion, déconnexion
+  - Profil utilisateur (préférences emploi : salaire, disponibilité, remote)
+  - Suppression compte (RGPD)
+- Templates Bootstrap 5 (base.html, home, login, register, profile)
+- Configuration PostgreSQL via variables d'environnement
+- Dockerfile pour le service GUI
+- User Stories POC couvertes : US001, US002, US005, US006, US007, US008
+
+**Décisions techniques:**
+- **Django vs FastAPI** : Django choisi pour auth intégrée et admin
+- **Custom User Model** : email comme USERNAME_FIELD
+- **Bootstrap 5 via CDN** : rapidité de développement pour POC
+
+---
+
+### 2025-12-22 (1) - Initialisation projet + Architecture microservices
 **Contexte:** Démarrage du projet JobMatch - plateforme de matching CV/offres d'emploi
 
 **Réalisations:**
@@ -59,9 +81,12 @@
 - [x] Choix de la stack technique → architecture microservices Python
 - [x] Créer branche feature et commit structure microservices
 - [x] Documentation pre-commit (docs/pre_commit_101.md)
+- [x] Service GUI Django (accounts app)
+- [x] Dockerfile GUI
 - [ ] Gentleman Agreement à rédiger et signer
 - [ ] Présentation GitHub à faire (Matthieu)
 - [ ] État de l'art scientifique (données, algos, SaaS existants, limites)
 - [ ] Se renseigner sur la RGPD (Maxime)
-- [ ] Ajouter Dockerfile par service
+- [ ] Migrations Django + test local
 - [ ] Définir les interfaces partagées (schemas CV, offres)
+- [ ] Intégrer l'upload de CV dans la GUI

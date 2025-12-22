@@ -7,6 +7,17 @@ on:
     branches: [dev, main]
 
 jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Check if source is dev
+        run: |
+          if [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "❌ Seules les PR depuis 'dev' sont autorisées vers 'main'"
+            exit 1
+          fi
+          echo "✅ PR depuis 'dev' autorisée"
   lint:
     name: Lint (Ruff)
     runs-on: ubuntu-latest

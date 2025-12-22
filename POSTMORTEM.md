@@ -2,6 +2,84 @@
 
 ## 📅 Sessions
 
+### 2025-12-22 (8) - Tests intégration cv-ingestion + Package shared installable
+**Contexte:** Tester cv-ingestion avec serveur Ollama distant et rendre le package shared installable
+
+**Réalisations:**
+- **Script de test d'intégration** (`scripts/test_integration.py`) :
+  - Test extraction PDF (pdfplumber)
+  - Test analyse LLM avec Ollama distant (`llm.molp.fr`)
+  - Testé avec plusieurs modèles : llama3.1:8b, gpt-oss:20b, gemma3:4b
+  - Sortie vers `data_test/output.txt` avec résultats complets
+  - Extraction réussie : 22-45 lignes selon le modèle
+
+- **Package shared installable** (`shared/`) :
+  - Structure `shared/src/shared/` pour package pip standard
+  - `pyproject.toml` avec setuptools
+  - Installation via `pip install -e ../../shared` dans requirements.txt
+  - Plus besoin de PYTHONPATH pour les imports
+  - Microservices vraiment indépendants
+
+- **Interfaces partagées créées** :
+  - `shared.constants.ContentType` : enum pour CV et offres
+  - `shared.interfaces.ExtractedLine` : ligne extraite avec type et ordre
+  - `shared.interfaces.CVData` : données CV avec helpers (skills_hard, experiences, etc.)
+  - `shared.interfaces.ServiceHealth` : health check standard
+
+**Problèmes rencontrés:**
+- **ModuleNotFoundError: No module named 'shared'** lors du lancement serveur
+  - Cause : PYTHONPATH non configuré
+  - Solution : transformer shared en package pip installable
+- **Structure package incorrecte** : hatchling vs setuptools
+  - Solution : utiliser setuptools avec structure `src/shared/`
+
+**Décisions techniques:**
+- **Package pip installable** plutôt que PYTHONPATH : vraie indépendance des microservices
+- **Mode éditable** (`-e`) : modifications shared reflétées sans réinstallation
+- **Helpers dans CVData** : `skills_hard`, `experiences`, `get_by_type()` pour faciliter l'usage
+
+---
+
+### 2025-12-22 (7) - Microservice cv-ingestion + Migration Ruff
+**Contexte:** Implémenter le microservice cv-ingestion et migrer les outils de linting vers Ruff
+
+**Réalisations:**
+- **Microservice cv-ingestion complet** :
+  - FastAPI sur port 8081 (standalone, pas Django)
+  - Extraction PDF (pdfplumber + PyMuPDF)
+  - Extraction DOCX (python-docx)
+  - LLM provider-agnostic avec Factory Pattern :
+    - `OpenAIProvider` (OpenAI + OpenAI-compatible APIs)
+    - `AnthropicProvider` (Claude)
+    - `OllamaProvider` (local, utilise API compatible OpenAI)
+  - Configuration via env vars : LLM_TYPE, LLM_ENDPOINT, LLM_API_KEY, LLM_MODEL
+  - Endpoint POST /extract avec validation fichier
+  - Dockerfile et .env.example
+
+- **Migration pre-commit vers Ruff** :
+  - Remplacement de black, isort, flake8, mypy par Ruff
+  - Configuration dans pyproject.toml (line-length=120, Python 3.12)
+  - Règles activées : E, W, F, I, B, C4, UP, SIM
+  - CI mis à jour avec job lint Ruff dédié
+  - Documentation pre_commit_101.md mise à jour
+
+**Problèmes rencontrés:**
+- **Bandit B104** : "Possible binding to all interfaces" sur `0.0.0.0`
+  - Solution : `# nosec B104 - Docker container` (faux positif pour conteneur)
+- **Ruff B904** : "raise ... from err" dans except clause
+  - Solution : `raise HTTPException(...) from e`
+- **mypy bloquait le CI** pour membres sans assistant de code
+  - Solution : migration complète vers Ruff (plus simple, plus rapide)
+
+**Décisions techniques:**
+- **cv-ingestion isolé** : microservice indépendant, ne partage pas la DB Django
+- **Factory Pattern LLM** : permet de changer de provider sans modifier le code métier
+- **Ruff plutôt que black+isort+flake8+mypy** : 1 outil au lieu de 4, 10-100x plus rapide
+- **bandit conservé** : Ruff ne fait pas l'analyse sécurité
+- **gitleaks conservé** : détection des secrets
+
+---
+
 ### 2025-12-22 (6) - Convention de langue (code EN / UI FR)
 **Contexte:** Standardiser les conventions de langue dans le projet
 
@@ -170,6 +248,11 @@
 - Template blocks Django : `{{ block.super }}` pour hériter conditionnellement
 - **CLAUDE.md** est le bon endroit pour les conventions de style (pas settings.json)
 - Séparation langue : code EN pour maintenabilité internationale, UI FR pour les utilisateurs
+- **Ruff** remplace 4 outils Python (black, isort, flake8, mypy) et est 10-100x plus rapide
+- **Factory Pattern** pour LLM providers : permet de switcher OpenAI/Anthropic/Ollama sans changer le code
+- **Microservices isolés** : ne partagent pas de DB, communiquent uniquement par API
+- **Package pip installable** pour shared : `pip install -e ../../shared` dans requirements.txt
+- **Structure package Python** : `shared/src/shared/` avec setuptools pour imports propres
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -178,6 +261,10 @@
 - Toujours confirmer avant de modifier fichiers partagés (docker-compose, .env, interfaces)
 - **Migrations auto-générées** : peuvent avoir des lignes trop longues (flake8 E501), nécessite reformatage manuel
 - **overflow: hidden** sur body empêche tout scroll, s'assurer que le contenu tient dans le viewport
+- **Bandit B104** : `host="0.0.0.0"` génère un warning, ajouter `# nosec B104` pour les conteneurs Docker
+- **Ruff B904** : dans un `except`, utiliser `raise ... from e` ou `raise ... from None`
+- **Import shared sans pip install** : ne pas oublier d'installer le package avant de lancer les microservices
+- **Structure package** : bien utiliser `src/package/` pour que setuptools trouve les modules
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -189,6 +276,9 @@
 - **CSS clamp()** pour des tailles responsive sans media queries
 - **Template blocks conditionnels** avec `{% if user.is_authenticated %}{{ block.super }}{% endif %}`
 - **Variables CSS** (`:root`) pour cohérence des couleurs/styles
+- **Factory Pattern** pour providers interchangeables (LLM, DB, etc.)
+- **pydantic-settings** pour config via env vars avec validation
+- **Ruff avec --fix** dans pre-commit : auto-correction des erreurs simples
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python
@@ -204,6 +294,9 @@
 - [x] Connexion vue profil aux ExtractedLine
 - [x] Spécification cv-ingestion (docs/cv_ingestion_spec.md)
 - [x] Convention de langue (CLAUDE.md) : code EN, UI FR
+- [x] **Microservice cv-ingestion Phase 1** : FastAPI, extraction PDF/DOCX, LLM provider-agnostic
+- [x] **Migration Ruff** : remplacement black/isort/flake8/mypy par Ruff
+- [x] **Documentation pre-commit mise à jour** avec Ruff
 - [ ] Gentleman Agreement à rédiger et signer
 - [ ] Présentation GitHub à faire (Matthieu)
 - [ ] État de l'art scientifique (données, algos, SaaS existants, limites)
@@ -211,8 +304,11 @@
 - [ ] Tester `run_local.sh`
 - [ ] Tester `docker-compose.dev.yml`
 - [ ] Créer projet GCloud + Cloud SQL + Cloud Storage
-- [ ] Définir les interfaces partagées (schemas CV, offres)
-- [ ] **Implémenter cv-ingestion Phase 1** : extraction PDF, analyse LLM, création ExtractedLine
+- [x] Définir les interfaces partagées (schemas CV, offres) → shared package
+- [x] **Tester cv-ingestion** avec un vrai CV PDF → script test_integration.py
 - [ ] Intégrer l'upload de CV dans la GUI (section "Mes documents")
 - [ ] Implémenter les sections du profil (LM, pitch, succès, hobbies)
 - [ ] Upload photo de profil
+- [ ] **Connecter GUI → cv-ingestion** : appel API après upload CV
+- [ ] **Test API cv-ingestion** : lancer serveur FastAPI et tester endpoint /extract
+- [ ] Installer shared dans les autres microservices (offre-ingestion, matching, gui)

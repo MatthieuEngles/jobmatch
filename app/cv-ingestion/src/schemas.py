@@ -1,30 +1,15 @@
-"""Pydantic schemas for API request/response models."""
+"""Pydantic schemas for API request/response models.
 
-from enum import Enum
+Re-exports shared interfaces and adds service-specific schemas.
+"""
 
 from pydantic import BaseModel, Field
 
+# Re-export shared interfaces
+from shared.constants import ContentType
+from shared.interfaces import ExtractedLine
 
-class ContentType(str, Enum):
-    """Types of content that can be extracted from a CV."""
-
-    SUMMARY = "summary"
-    EXPERIENCE = "experience"
-    EDUCATION = "education"
-    SKILL_HARD = "skill_hard"
-    SKILL_SOFT = "skill_soft"
-    LANGUAGE = "language"
-    CERTIFICATION = "certification"
-    INTEREST = "interest"
-    OTHER = "other"
-
-
-class ExtractedLine(BaseModel):
-    """A single extracted line from the CV."""
-
-    content_type: ContentType
-    content: str
-    order: int = 0
+__all__ = ["ContentType", "ExtractedLine", "ExtractionResponse", "ExtractionRequest", "HealthResponse"]
 
 
 class ExtractionResponse(BaseModel):

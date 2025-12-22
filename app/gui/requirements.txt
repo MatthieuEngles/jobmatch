@@ -1,4 +1,17 @@
+# Django
 django>=5.0
+
+# Database
 psycopg2-binary>=2.9
+
+# Server
 gunicorn>=21.0
+
+# Static files
+whitenoise>=6.6
+
+# Environment
 python-dotenv>=1.0
+
+# Google Cloud Storage (prod)
+django-storages[google]>=1.14

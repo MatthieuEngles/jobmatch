@@ -2,6 +2,29 @@
 
 ## 📅 Sessions
 
+### 2025-12-22 (3) - Configuration multi-environnement
+**Contexte:** Permettre au service GUI de tourner en local, Docker dev et Cloud Run prod
+
+**Réalisations:**
+- Settings Django avec `ENV_MODE` (local/dev/prod)
+- Mode local : `run_local.sh` avec SQLite
+- Mode Docker dev : `docker-compose.dev.yml` avec PostgreSQL + hot-reload
+- Mode Docker prod : `Dockerfile.prod` multi-stage optimisé
+- CI/CD GCloud : `cloudbuild.yaml` pour Cloud Run
+- Support Cloud SQL via Unix socket
+- Support Cloud Storage pour les uploads (media)
+- WhiteNoise pour les fichiers statiques
+- README.md avec documentation des 3 modes
+
+**Décisions techniques:**
+- **Cloud Run** (serverless) plutôt que GKE (Kubernetes) pour simplifier
+- **Cloud SQL PostgreSQL** pour la prod
+- **Cloud Storage** pour les uploads CV
+- **Multi-stage build** pour image prod légère
+- **WhiteNoise** pour servir les static files sans nginx
+
+---
+
 ### 2025-12-22 (2) - Service GUI Django
 **Contexte:** Implémentation du service GUI avec Django
 
@@ -83,10 +106,14 @@
 - [x] Documentation pre-commit (docs/pre_commit_101.md)
 - [x] Service GUI Django (accounts app)
 - [x] Dockerfile GUI
+- [x] Configuration multi-environnement (local/dev/prod)
+- [x] CI/CD Cloud Run (cloudbuild.yaml)
 - [ ] Gentleman Agreement à rédiger et signer
 - [ ] Présentation GitHub à faire (Matthieu)
 - [ ] État de l'art scientifique (données, algos, SaaS existants, limites)
 - [ ] Se renseigner sur la RGPD (Maxime)
-- [ ] Migrations Django + test local
+- [ ] Tester `run_local.sh`
+- [ ] Tester `docker-compose.dev.yml`
+- [ ] Créer projet GCloud + Cloud SQL + Cloud Storage
 - [ ] Définir les interfaces partagées (schemas CV, offres)
 - [ ] Intégrer l'upload de CV dans la GUI

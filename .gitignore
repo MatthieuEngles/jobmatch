@@ -93,3 +93,9 @@ temp/
 .claude/*
 .claude/settings.json
 CLAUDE.md
+
+# Python version
+.python-version
+
+# Data
+data/

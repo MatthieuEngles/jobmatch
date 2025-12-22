@@ -1,9 +1,10 @@
-import requests
 import json
-import sys
 import os
+import sys
 
+import requests
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
@@ -11,7 +12,7 @@ load_dotenv()
 # CONFIGURATION VIA VARIABLES D'ENVIRONNEMENT
 # ============================================================
 
-# URLs fixes 
+# URLs fixes
 TOKEN_URL = os.getenv("TOKEN_URL")
 API_URL = os.getenv("API_URL")
 
@@ -42,19 +43,12 @@ token_payload = {
     "grant_type": "client_credentials",
     "client_id": CLIENT_ID,
     "client_secret": CLIENT_SECRET,
-    "scope": SCOPE
+    "scope": SCOPE,
 }
 
-token_headers = {
-    "Content-Type": "application/x-www-form-urlencoded"
-}
+token_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-token_response = requests.post(
-    TOKEN_URL,
-    data=token_payload,
-    headers=token_headers,
-    timeout=15
-)
+token_response = requests.post(TOKEN_URL, data=token_payload, headers=token_headers, timeout=15)
 
 if token_response.status_code != 200:
     print("Erreur lors de la récupération du token OAuth2")
@@ -67,21 +61,11 @@ access_token = token_response.json()["access_token"]
 # 2) APPEL DE L'API OFFRES D'EMPLOI
 # ============================================================
 
-api_headers = {
-    "Authorization": f"Bearer {access_token}",
-    "Accept": "application/json"
-}
+api_headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
 
-api_params = {
-    "range": RANGE
-}
+api_params = {"range": RANGE}
 
-api_response = requests.get(
-    API_URL,
-    headers=api_headers,
-    params=api_params,
-    timeout=30
-)
+api_response = requests.get(API_URL, headers=api_headers, params=api_params, timeout=30)
 
 # 200 = OK / 206 = Partial Content (pagination)
 if api_response.status_code not in (200, 206):

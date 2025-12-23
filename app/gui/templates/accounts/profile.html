@@ -3,6 +3,8 @@
 {% block title %}Mon profil - JobMatch{% endblock %}
 
 {% block extra_css %}
+<!-- Cropper.js CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 <style>
     :root {
         --primary: #4f46e5;
@@ -161,6 +163,438 @@
         background: #fef2f2;
     }
 
+    /* Candidate profile selector */
+    .candidate-profile-selector {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .candidate-profile-selector label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--gray);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .candidate-profile-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .candidate-profile-select {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        background: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .candidate-profile-select:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .profile-action-btn {
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .profile-action-btn:hover {
+        border-color: var(--primary);
+        background: var(--light);
+    }
+
+    .profile-action-btn svg {
+        width: 16px;
+        height: 16px;
+        color: var(--gray);
+    }
+
+    .profile-action-btn:hover svg {
+        color: var(--primary);
+    }
+
+    .profile-action-btn.danger:hover {
+        border-color: #dc2626;
+        background: #fef2f2;
+    }
+
+    .profile-action-btn.danger:hover svg {
+        color: #dc2626;
+    }
+
+    /* Item checkbox for profile selection */
+    .extracted-item {
+        position: relative;
+    }
+
+    .extracted-item.deselected,
+    .skill-tag.deselected {
+        opacity: 0.4;
+        background: #f0f0f0 !important;
+    }
+
+    /* Profile modal */
+    .profile-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .profile-modal-overlay.show {
+        display: flex;
+    }
+
+    .profile-modal {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .profile-modal h3 {
+        margin: 0 0 20px;
+        font-size: 1.25rem;
+        color: var(--dark);
+    }
+
+    .profile-modal-field {
+        margin-bottom: 16px;
+    }
+
+    .profile-modal-field label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 6px;
+    }
+
+    .profile-modal-field input,
+    .profile-modal-field textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+    }
+
+    .profile-modal-field textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .profile-modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+
+    .profile-modal-btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .profile-modal-btn.cancel {
+        background: var(--light);
+        border: 1px solid var(--border);
+        color: var(--dark);
+    }
+
+    .profile-modal-btn.cancel:hover {
+        background: #e5e5e5;
+    }
+
+    .profile-modal-btn.confirm {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        color: white;
+    }
+
+    .profile-modal-btn.confirm:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    /* Photo modal */
+    .photo-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 1001;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .photo-modal-overlay.show {
+        display: flex;
+    }
+
+    .photo-modal {
+        background: white;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 420px;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+    }
+
+    .photo-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .photo-modal-header h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        color: var(--dark);
+    }
+
+    .photo-modal-close {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        color: var(--gray);
+        transition: color 0.2s;
+    }
+
+    .photo-modal-close:hover {
+        color: var(--dark);
+    }
+
+    .photo-modal-body {
+        padding: 24px;
+    }
+
+    .photo-preview-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .photo-preview {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 4px solid var(--border);
+    }
+
+    .photo-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .photo-preview-placeholder {
+        color: var(--gray);
+    }
+
+    .photo-upload-zone {
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--gray);
+    }
+
+    .photo-upload-zone:hover,
+    .photo-upload-zone.dragover {
+        border-color: var(--primary);
+        background: rgba(79, 70, 229, 0.05);
+        color: var(--primary);
+    }
+
+    .photo-upload-zone svg {
+        margin-bottom: 8px;
+    }
+
+    .photo-upload-text {
+        font-size: 0.95rem;
+        font-weight: 500;
+        margin: 0 0 4px;
+    }
+
+    .photo-upload-hint {
+        font-size: 0.8rem;
+        margin: 0;
+        opacity: 0.7;
+    }
+
+    .photo-progress {
+        margin-top: 16px;
+    }
+
+    .photo-progress-bar {
+        height: 6px;
+        background: var(--light);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .photo-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    .photo-progress-text {
+        font-size: 0.85rem;
+        color: var(--gray);
+        text-align: center;
+        margin: 8px 0 0;
+    }
+
+    .photo-modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding: 16px 24px;
+        background: var(--light);
+        border-top: 1px solid var(--border);
+    }
+
+    .photo-modal-btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .photo-modal-btn.cancel {
+        background: white;
+        border: 1px solid var(--border);
+        color: var(--dark);
+    }
+
+    .photo-modal-btn.cancel:hover {
+        background: #f5f5f5;
+    }
+
+    .photo-modal-btn.delete {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        margin-right: auto;
+    }
+
+    .photo-modal-btn.delete:hover {
+        background: #fee2e2;
+    }
+
+    .photo-modal-btn.confirm {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        color: white;
+    }
+
+    .photo-modal-btn.confirm:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    /* Cropper container */
+    .photo-crop-container {
+        width: 100%;
+        height: 300px;
+        background: #1a1a2e;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .photo-crop-container img {
+        display: block;
+        max-width: 100%;
+    }
+
+    .photo-crop-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 12px;
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
+
+    /* Cropper.js custom styles */
+    .cropper-view-box,
+    .cropper-face {
+        border-radius: 50%;
+    }
+
+    .cropper-view-box {
+        box-shadow: 0 0 0 1px #39f;
+        outline: 0;
+    }
+
+    .cropper-face {
+        background-color: inherit !important;
+    }
+
+    .cropper-dashed,
+    .cropper-point.point-se,
+    .cropper-point.point-sw,
+    .cropper-point.point-nw,
+    .cropper-point.point-ne,
+    .cropper-line {
+        display: none !important;
+    }
+
+    .cropper-modal {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
     /* Main content area */
     .profile-content {
         flex: 1;
@@ -260,6 +694,249 @@
     .btn-save:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
+    }
+
+    /* Form sections */
+    .form-section {
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .form-section:last-of-type {
+        border-bottom: none;
+        margin-bottom: 16px;
+    }
+
+    .form-section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--dark);
+        margin-bottom: 16px;
+    }
+
+    .form-hint {
+        font-size: 0.8rem;
+        color: var(--gray);
+    }
+
+    /* Social links */
+    .social-link-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--light);
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
+
+    .link-type-badge {
+        background: var(--primary);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .link-url {
+        flex: 1;
+        color: var(--primary);
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .link-url:hover {
+        text-decoration: underline;
+    }
+
+    .btn-delete-link {
+        background: none;
+        border: none;
+        color: #dc2626;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .btn-delete-link:hover {
+        background: #fef2f2;
+    }
+
+    .empty-links-message {
+        color: var(--gray);
+        font-style: italic;
+        padding: 16px;
+        text-align: center;
+    }
+
+    .add-link-form {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .add-link-form .link-type-select {
+        width: 140px;
+        flex-shrink: 0;
+    }
+
+    .add-link-form input {
+        flex: 1;
+    }
+
+    .btn-add-link {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-add-link:hover {
+        background: var(--primary-dark);
+    }
+
+    /* Contract checkboxes */
+    .contract-checkboxes {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .contract-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 10px 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.2s;
+    }
+
+    .contract-checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+    }
+
+    .contract-checkbox-label:hover {
+        border-color: var(--primary);
+        background: rgba(79, 70, 229, 0.05);
+    }
+
+    .contract-checkbox-label:has(input:checked) {
+        border-color: var(--primary);
+        background: rgba(79, 70, 229, 0.1);
+    }
+
+    /* Salary slider */
+    .salary-slider-container {
+        background: var(--light);
+        padding: 24px;
+        border-radius: 16px;
+    }
+
+    .salary-display {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .salary-label {
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .salary-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .salary-slider-wrapper {
+        position: relative;
+        height: 8px;
+        margin: 30px 0;
+    }
+
+    .slider-track {
+        position: absolute;
+        width: 100%;
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 4px;
+        top: 0;
+    }
+
+    .slider-range {
+        position: absolute;
+        height: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border-radius: 4px;
+        top: 0;
+    }
+
+    .salary-slider {
+        position: absolute;
+        width: 100%;
+        height: 8px;
+        background: transparent;
+        pointer-events: none;
+        -webkit-appearance: none;
+        top: 0;
+    }
+
+    .salary-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 24px;
+        height: 24px;
+        background: white;
+        border: 3px solid var(--primary);
+        border-radius: 50%;
+        cursor: pointer;
+        pointer-events: all;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transition: all 0.2s;
+    }
+
+    .salary-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .salary-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        background: white;
+        border: 3px solid var(--primary);
+        border-radius: 50%;
+        cursor: pointer;
+        pointer-events: all;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .salary-bounds {
+        display: flex;
+        justify-content: space-between;
+        color: var(--gray);
+        font-size: 0.85rem;
     }
 
     /* Empty state placeholder sections */
@@ -632,6 +1309,89 @@
 
     .skill-tag .toggle-switch input:checked + .toggle-slider:before {
         transform: translateX(14px);
+    }
+
+    /* Interests/Hobbies grid styles */
+    .interests-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .interest-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        transition: all 0.2s ease;
+    }
+
+    .interest-item:hover {
+        border-color: var(--primary);
+        background: var(--light);
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+    }
+
+    .interest-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #ec4899, #f43f5e);
+        border-radius: 8px;
+        color: white;
+    }
+
+    .interest-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .interest-content {
+        flex: 1;
+        font-size: 0.95rem;
+        color: var(--dark);
+        font-weight: 500;
+    }
+
+    .interest-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .interest-item .toggle-switch {
+        width: 36px;
+        height: 20px;
+    }
+
+    .interest-item .toggle-slider:before {
+        height: 14px;
+        width: 14px;
+    }
+
+    .interest-item .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(16px);
+    }
+
+    .interests-source {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--gray);
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+    }
+
+    .interests-source svg {
+        color: var(--gray);
     }
 
     .tab-content-header {
@@ -1129,7 +1889,7 @@
                             {{ user.first_name|first|default:user.email|first|upper }}
                         {% endif %}
                     </div>
-                    <button type="button" class="photo-upload-btn" title="Changer la photo">
+                    <button type="button" class="photo-upload-btn" title="Changer la photo" onclick="openPhotoModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1138,6 +1898,35 @@
                 </div>
                 <div class="profile-name">{{ user.first_name }} {{ user.last_name }}</div>
                 <div class="profile-email">{{ user.email }}</div>
+            </div>
+
+            <!-- Candidate profile selector -->
+            <div class="candidate-profile-selector">
+                <label>Profil de candidature</label>
+                <div class="candidate-profile-row">
+                    <select class="candidate-profile-select" id="candidateProfileSelect" onchange="switchCandidateProfile(this.value)">
+                        {% for profile in candidate_profiles %}
+                            <option value="{{ profile.id }}" data-description="{{ profile.description|default:'' }}" {% if profile.id == current_profile.id %}selected{% endif %}>
+                                {{ profile.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="profile-action-btn" onclick="openProfileModal('create')" title="Nouveau profil">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                    <button type="button" class="profile-action-btn" onclick="openProfileModal('edit')" title="Modifier le profil">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                    </button>
+                    <button type="button" class="profile-action-btn danger" onclick="deleteCandidateProfile()" title="Supprimer le profil">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <nav class="profile-menu">
@@ -1178,15 +1967,6 @@
                     Mes documents
                 </a>
 
-                <div class="menu-divider"></div>
-
-                <a href="{% url 'accounts:settings' %}" class="menu-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Gerer mon compte
-                </a>
             </nav>
         </div>
     </aside>
@@ -1203,20 +1983,143 @@
                     </div>
                 </div>
 
-                <form method="post">
+                <form method="post" id="personal-form">
                     {% csrf_token %}
-                    <div class="form-grid">
-                        {% for field in form %}
-                            <div class="form-group {% if field.name == 'email' %}full-width{% endif %}">
-                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                {{ field }}
-                                {% if field.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in field.errors %}{{ error }}{% endfor %}
-                                    </div>
-                                {% endif %}
+
+                    <!-- Basic info section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Informations de base</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="id_first_name" class="form-label">Prenom</label>
+                                {{ form.first_name }}
                             </div>
-                        {% endfor %}
+                            <div class="form-group">
+                                <label for="id_last_name" class="form-label">Nom</label>
+                                {{ form.last_name }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" value="{{ user.email }}" disabled>
+                                <small class="form-hint">Modifiable dans les parametres du compte</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_phone" class="form-label">Telephone</label>
+                                {{ form.phone }}
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="id_location" class="form-label">Localisation</label>
+                                {{ form.location }}
+                                <small class="form-hint">Ex: Paris, Lyon, Nantes...</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Social links section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Liens professionnels</h3>
+                        <div id="social-links-container">
+                            {% for link in social_links %}
+                            <div class="social-link-row" data-link-id="{{ link.id }}">
+                                <span class="link-type-badge">{{ link.get_link_type_display }}</span>
+                                <a href="{{ link.url }}" target="_blank" class="link-url">{{ link.url }}</a>
+                                <button type="button" class="btn-delete-link" onclick="deleteSocialLink({{ link.id }})">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            {% empty %}
+                            <p class="empty-links-message" id="empty-links-message">Aucun lien ajoute</p>
+                            {% endfor %}
+                        </div>
+                        <div class="add-link-form">
+                            <select id="new-link-type" class="form-control link-type-select">
+                                {% for value, label in social_link_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="url" id="new-link-url" class="form-control" placeholder="https://...">
+                            <button type="button" class="btn-add-link" onclick="addSocialLink()">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Ajouter
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Professional preferences section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Preferences professionnelles</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="id_seniority" class="form-label">Seniorite</label>
+                                {{ form.seniority }}
+                            </div>
+                            <div class="form-group">
+                                <label for="id_availability" class="form-label">Disponibilite</label>
+                                {{ form.availability }}
+                            </div>
+                            <div class="form-group">
+                                <label for="id_remote_preference" class="form-label">Preference teletravail</label>
+                                {{ form.remote_preference }}
+                            </div>
+                            <div class="form-group">
+                                <label for="id_mobility" class="form-label">Mobilite geographique</label>
+                                {{ form.mobility }}
+                            </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Type de contrat recherche</label>
+                                <div class="contract-checkboxes">
+                                    {% for choice in form.contract_types %}
+                                    <label class="contract-checkbox-label">
+                                        {{ choice.tag }}
+                                        <span>{{ choice.choice_label }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Salary section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Pretentions salariales</h3>
+                        <div class="salary-slider-container">
+                            <div class="salary-display">
+                                <span class="salary-label">Fourchette:</span>
+                                <span class="salary-value" id="salary-display-value">
+                                    {% if user.salary_min and user.salary_max %}
+                                        {{ user.salary_min }}k€ - {{ user.salary_max }}k€ brut/an
+                                    {% else %}
+                                        Non defini
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="salary-slider-wrapper">
+                                <input type="range" id="salary-slider-min" class="salary-slider" min="20" max="150" value="{{ user.salary_min|default:40 }}" step="5">
+                                <input type="range" id="salary-slider-max" class="salary-slider" min="20" max="150" value="{{ user.salary_max|default:60 }}" step="5">
+                                <div class="slider-track"></div>
+                                <div class="slider-range" id="slider-range"></div>
+                            </div>
+                            <div class="salary-bounds">
+                                <span>20k€</span>
+                                <span>150k€</span>
+                            </div>
+                            <!-- Hidden inputs for form submission -->
+                            <input type="hidden" name="salary_min" id="id_salary_min" value="{{ user.salary_min|default:'' }}">
+                            <input type="hidden" name="salary_max" id="id_salary_max" value="{{ user.salary_max|default:'' }}">
+                        </div>
+                    </div>
+
+                    <!-- Personal notes section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Notes personnelles</h3>
+                        <div class="form-group full-width">
+                            {{ form.personal_notes }}
+                            <small class="form-hint">Informations complementaires que vous souhaitez partager</small>
+                        </div>
                     </div>
 
                     <div class="mt-4">
@@ -1279,7 +2182,7 @@
                         </div>
                         <div class="extracted-items">
                             {% for exp in experiences %}
-                            <div class="extracted-item{% if not exp.is_active %} inactive{% endif %}" data-line-id="{{ exp.id }}">
+                            <div class="extracted-item" data-line-id="{{ exp.id }}">
                                 {% if exp.entity or exp.position or exp.dates %}
                                 <div class="extracted-item-header">
                                     <span class="item-entity">{{ exp.entity|default:"" }}</span>
@@ -1303,8 +2206,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </button>
-                                        <label class="toggle-switch" title="{% if exp.is_active %}Actif{% else %}Inactif{% endif %}">
-                                            <input type="checkbox" class="toggle-active" data-line-id="{{ exp.id }}" {% if exp.is_active %}checked{% endif %}>
+                                        <label class="toggle-switch" title="Inclure dans ce profil">
+                                            <input type="checkbox" class="toggle-profile-item" data-line-id="{{ exp.id }}" checked>
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </div>
@@ -1349,7 +2252,7 @@
                             <h4 class="skills-section-title">Competences techniques</h4>
                             <div class="skills-grid">
                                 {% for skill in skills_hard %}
-                                <div class="skill-tag hard{% if not skill.is_active %} inactive{% endif %}" data-line-id="{{ skill.id }}">
+                                <div class="skill-tag hard" data-line-id="{{ skill.id }}">
                                     <span class="skill-tag-content">{{ skill.content }}</span>
                                     <div class="skill-tag-actions">
                                         <button class="btn-edit-item" data-line-id="{{ skill.id }}" title="Modifier">
@@ -1357,8 +2260,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </button>
-                                        <label class="toggle-switch" title="{% if skill.is_active %}Actif{% else %}Inactif{% endif %}">
-                                            <input type="checkbox" class="toggle-active" data-line-id="{{ skill.id }}" {% if skill.is_active %}checked{% endif %}>
+                                        <label class="toggle-switch" title="Inclure dans ce profil">
+                                            <input type="checkbox" class="toggle-profile-item" data-line-id="{{ skill.id }}" checked>
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </div>
@@ -1373,7 +2276,7 @@
                             <h4 class="skills-section-title">Soft skills</h4>
                             <div class="skills-grid">
                                 {% for skill in skills_soft %}
-                                <div class="skill-tag soft{% if not skill.is_active %} inactive{% endif %}" data-line-id="{{ skill.id }}">
+                                <div class="skill-tag soft" data-line-id="{{ skill.id }}">
                                     <span class="skill-tag-content">{{ skill.content }}</span>
                                     <div class="skill-tag-actions">
                                         <button class="btn-edit-item" data-line-id="{{ skill.id }}" title="Modifier">
@@ -1381,8 +2284,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </button>
-                                        <label class="toggle-switch" title="{% if skill.is_active %}Actif{% else %}Inactif{% endif %}">
-                                            <input type="checkbox" class="toggle-active" data-line-id="{{ skill.id }}" {% if skill.is_active %}checked{% endif %}>
+                                        <label class="toggle-switch" title="Inclure dans ce profil">
+                                            <input type="checkbox" class="toggle-profile-item" data-line-id="{{ skill.id }}" checked>
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </div>
@@ -1429,7 +2332,7 @@
                             <h4 class="skills-section-title">Diplomes</h4>
                             <div class="extracted-items">
                                 {% for edu in educations %}
-                                <div class="extracted-item{% if not edu.is_active %} inactive{% endif %}" data-line-id="{{ edu.id }}">
+                                <div class="extracted-item" data-line-id="{{ edu.id }}">
                                     {% if edu.entity or edu.position or edu.dates %}
                                     <div class="extracted-item-header">
                                         <span class="item-entity">{{ edu.entity|default:"" }}</span>
@@ -1453,8 +2356,8 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
                                             </button>
-                                            <label class="toggle-switch" title="{% if edu.is_active %}Actif{% else %}Inactif{% endif %}">
-                                                <input type="checkbox" class="toggle-active" data-line-id="{{ edu.id }}" {% if edu.is_active %}checked{% endif %}>
+                                            <label class="toggle-switch" title="Inclure dans ce profil">
+                                                <input type="checkbox" class="toggle-profile-item" data-line-id="{{ edu.id }}" checked>
                                                 <span class="toggle-slider"></span>
                                             </label>
                                         </div>
@@ -1470,7 +2373,7 @@
                             <h4 class="skills-section-title">Certifications</h4>
                             <div class="extracted-items">
                                 {% for cert in certifications %}
-                                <div class="extracted-item{% if not cert.is_active %} inactive{% endif %}" data-line-id="{{ cert.id }}">
+                                <div class="extracted-item" data-line-id="{{ cert.id }}">
                                     <div class="extracted-item-content">{{ cert.content }}</div>
                                     <div class="extracted-item-footer">
                                         <div class="extracted-item-source">
@@ -1485,8 +2388,8 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
                                             </button>
-                                            <label class="toggle-switch" title="{% if cert.is_active %}Actif{% else %}Inactif{% endif %}">
-                                                <input type="checkbox" class="toggle-active" data-line-id="{{ cert.id }}" {% if cert.is_active %}checked{% endif %}>
+                                            <label class="toggle-switch" title="Inclure dans ce profil">
+                                                <input type="checkbox" class="toggle-profile-item" data-line-id="{{ cert.id }}" checked>
                                                 <span class="toggle-slider"></span>
                                             </label>
                                         </div>
@@ -1526,7 +2429,7 @@
                 <div class="content-header">
                     <div>
                         <h2 class="content-title">Mon pitch</h2>
-                        <p class="content-subtitle">Preparez votre presentation en 30 secondes et 3 minutes</p>
+                        <p class="content-subtitle">Boostez votre presentation avec notre IA</p>
                     </div>
                 </div>
 
@@ -1554,7 +2457,7 @@
                 <div class="content-header">
                     <div>
                         <h2 class="content-title">Succes professionnels</h2>
-                        <p class="content-subtitle">Listez vos accomplissements et reussites professionnelles</p>
+                        <p class="content-subtitle">Laissez-vous guider par notre consultant IA pour formaliser vos succes</p>
                     </div>
                 </div>
 
@@ -1586,21 +2489,57 @@
                     </div>
                 </div>
 
+                {% if interests %}
+                <div class="tab-content-header">
+                    <span class="item-count">{{ interests|length }} centre{{ interests|length|pluralize }} d'interet</span>
+                    <button class="btn-add">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Ajouter
+                    </button>
+                </div>
+                <div class="interests-grid">
+                    {% for interest in interests %}
+                    <div class="interest-item" data-line-id="{{ interest.id }}">
+                        <div class="interest-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                        </div>
+                        <span class="interest-content">{{ interest.content }}</span>
+                        <div class="interest-actions">
+                            <label class="toggle-switch" title="Inclure dans ce profil">
+                                <input type="checkbox" class="toggle-profile-item" data-line-id="{{ interest.id }}" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="interests-source">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Centres d'interet extraits de vos CV
+                </div>
+                {% else %}
                 <div class="placeholder-section">
                     <div class="placeholder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <h3 class="placeholder-title">Aucun hobby ajoute</h3>
-                    <p class="placeholder-desc">Ajoutez vos passions et activites personnelles</p>
+                    <h3 class="placeholder-title">Aucun centre d'interet ajoute</h3>
+                    <p class="placeholder-desc">Importez un CV contenant vos hobbies ou ajoutez-les manuellement</p>
                     <button class="btn-add">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
-                        Ajouter un hobby
+                        Ajouter un centre d'interet
                     </button>
                 </div>
+                {% endif %}
             </div>
         </section>
 
@@ -1752,7 +2691,477 @@
     </div>
 </div>
 
+<!-- Candidate Profile Modal -->
+<div class="profile-modal-overlay" id="profileModal">
+    <div class="profile-modal">
+        <h3 id="profileModalTitle">Nouveau profil</h3>
+        <div class="profile-modal-field">
+            <label for="profileTitleInput">Titre du profil</label>
+            <input type="text" id="profileTitleInput" placeholder="Ex: Data Scientist, Tech Lead...">
+        </div>
+        <div class="profile-modal-field">
+            <label for="profileDescInput">Description (optionnel)</label>
+            <textarea id="profileDescInput" placeholder="Description du type de poste vise..."></textarea>
+        </div>
+        <div class="profile-modal-actions">
+            <button type="button" class="profile-modal-btn cancel" onclick="closeProfileModal()">Annuler</button>
+            <button type="button" class="profile-modal-btn confirm" onclick="saveProfile()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Upload Modal -->
+<div class="photo-modal-overlay" id="photoModal">
+    <div class="photo-modal">
+        <div class="photo-modal-header">
+            <h3 id="photoModalTitle">Photo de profil</h3>
+            <button type="button" class="photo-modal-close" onclick="closePhotoModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="photo-modal-body">
+            <!-- Step 1: Current photo & upload zone -->
+            <div id="photoStep1">
+                <!-- Current photo preview -->
+                <div class="photo-preview-container">
+                    <div class="photo-preview" id="photoPreview">
+                        {% if user.photo %}
+                            <img src="{{ user.photo.url }}" alt="Photo de profil" id="previewImg">
+                        {% else %}
+                            <div class="photo-preview-placeholder" id="previewPlaceholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Upload zone -->
+                <div class="photo-upload-zone" id="photoDropzone">
+                    <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p class="photo-upload-text">Cliquez ou glissez une photo ici</p>
+                    <p class="photo-upload-hint">JPG, PNG ou WebP - Max 5 Mo</p>
+                </div>
+            </div>
+
+            <!-- Step 2: Crop editor -->
+            <div id="photoStep2" style="display: none;">
+                <div class="photo-crop-container">
+                    <img id="photoCropImage" src="" alt="Image to crop">
+                </div>
+                <div class="photo-crop-hint">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Faites glisser pour repositionner, utilisez la molette pour zoomer
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="photo-progress" id="photoProgress" style="display: none;">
+                <div class="photo-progress-bar">
+                    <div class="photo-progress-fill" id="photoProgressFill"></div>
+                </div>
+                <p class="photo-progress-text">Envoi en cours...</p>
+            </div>
+        </div>
+
+        <!-- Footer Step 1 -->
+        <div class="photo-modal-footer" id="photoFooter1">
+            {% if user.photo %}
+            <button type="button" class="photo-modal-btn delete" id="btnDeletePhoto" onclick="deletePhoto()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Supprimer
+            </button>
+            {% endif %}
+            <button type="button" class="photo-modal-btn cancel" onclick="closePhotoModal()">Fermer</button>
+        </div>
+
+        <!-- Footer Step 2 (Crop) -->
+        <div class="photo-modal-footer" id="photoFooter2" style="display: none;">
+            <button type="button" class="photo-modal-btn cancel" onclick="cancelCrop()">Annuler</button>
+            <button type="button" class="photo-modal-btn confirm" onclick="applyCrop()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Appliquer
+            </button>
+        </div>
+    </div>
+</div>
+
+{{ profile_selections|json_script:"profile-selections-data" }}
+
+<!-- Cropper.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
 <script>
+// Current profile state
+let currentProfileId = {{ current_profile.id }};
+let profileSelections = JSON.parse(document.getElementById('profile-selections-data').textContent);
+let profileModalMode = 'create'; // 'create' or 'edit'
+
+// Photo cropper instance
+let photoCropper = null;
+
+// CSRF token helper
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+// ============== Social Links Management ==============
+function addSocialLink() {
+    const linkType = document.getElementById('new-link-type').value;
+    const url = document.getElementById('new-link-url').value;
+
+    if (!url) {
+        alert('Veuillez entrer une URL');
+        return;
+    }
+
+    fetch('{% url "accounts:social_link_add" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ link_type: linkType, url: url }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove empty message if present
+            const emptyMsg = document.getElementById('empty-links-message');
+            if (emptyMsg) emptyMsg.remove();
+
+            // Add new link row
+            const container = document.getElementById('social-links-container');
+            const linkRow = document.createElement('div');
+            linkRow.className = 'social-link-row';
+            linkRow.setAttribute('data-link-id', data.link.id);
+            linkRow.innerHTML = `
+                <span class="link-type-badge">${data.link.link_type_display}</span>
+                <a href="${data.link.url}" target="_blank" class="link-url">${data.link.url}</a>
+                <button type="button" class="btn-delete-link" onclick="deleteSocialLink(${data.link.id})">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            `;
+            container.appendChild(linkRow);
+
+            // Clear input
+            document.getElementById('new-link-url').value = '';
+        } else {
+            alert(data.error || 'Erreur lors de l\'ajout du lien');
+        }
+    })
+    .catch(error => {
+        console.error('Error adding link:', error);
+        alert('Erreur lors de l\'ajout du lien');
+    });
+}
+
+function deleteSocialLink(linkId) {
+    if (!confirm('Supprimer ce lien ?')) return;
+
+    fetch(`/accounts/social-link/${linkId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the row
+            const row = document.querySelector(`[data-link-id="${linkId}"]`);
+            if (row) row.remove();
+
+            // Show empty message if no links left
+            const container = document.getElementById('social-links-container');
+            if (container.children.length === 0) {
+                const emptyMsg = document.createElement('p');
+                emptyMsg.className = 'empty-links-message';
+                emptyMsg.id = 'empty-links-message';
+                emptyMsg.textContent = 'Aucun lien ajoute';
+                container.appendChild(emptyMsg);
+            }
+        } else {
+            alert(data.error || 'Erreur lors de la suppression');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting link:', error);
+        alert('Erreur lors de la suppression');
+    });
+}
+
+// ============== Salary Slider ==============
+function initSalarySlider() {
+    const sliderMin = document.getElementById('salary-slider-min');
+    const sliderMax = document.getElementById('salary-slider-max');
+    const sliderRange = document.getElementById('slider-range');
+    const displayValue = document.getElementById('salary-display-value');
+    const hiddenMin = document.getElementById('id_salary_min');
+    const hiddenMax = document.getElementById('id_salary_max');
+
+    if (!sliderMin || !sliderMax) return;
+
+    function updateSlider() {
+        let minVal = parseInt(sliderMin.value);
+        let maxVal = parseInt(sliderMax.value);
+
+        // Prevent crossover
+        if (minVal > maxVal) {
+            if (this === sliderMin) {
+                minVal = maxVal;
+                sliderMin.value = minVal;
+            } else {
+                maxVal = minVal;
+                sliderMax.value = maxVal;
+            }
+        }
+
+        // Update display
+        displayValue.textContent = `${minVal}k€ - ${maxVal}k€ brut/an`;
+
+        // Update hidden inputs
+        hiddenMin.value = minVal;
+        hiddenMax.value = maxVal;
+
+        // Update range highlight
+        const percent1 = ((minVal - 20) / (150 - 20)) * 100;
+        const percent2 = ((maxVal - 20) / (150 - 20)) * 100;
+        sliderRange.style.left = percent1 + '%';
+        sliderRange.style.width = (percent2 - percent1) + '%';
+    }
+
+    sliderMin.addEventListener('input', updateSlider);
+    sliderMax.addEventListener('input', updateSlider);
+
+    // Initialize
+    updateSlider.call(sliderMin);
+}
+
+// Initialize salary slider on page load
+document.addEventListener('DOMContentLoaded', initSalarySlider);
+
+// Switch candidate profile
+function switchCandidateProfile(profileId) {
+    fetch('{% url "accounts:profile_switch" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ profile_id: parseInt(profileId) }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentProfileId = data.profile_id;
+            // Load selections for new profile
+            loadProfileSelections(profileId);
+        } else {
+            alert(data.error || 'Erreur lors du changement de profil');
+        }
+    })
+    .catch(error => {
+        console.error('Error switching profile:', error);
+        alert('Erreur lors du changement de profil');
+    });
+}
+
+// Load profile selections and update checkboxes
+function loadProfileSelections(profileId) {
+    fetch(`/accounts/candidate-profile/${profileId}/selections/`, {
+        headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            profileSelections = data.selections;
+            updateCheckboxesFromSelections();
+        }
+    })
+    .catch(error => console.error('Error loading selections:', error));
+}
+
+// Update all toggles based on current selections
+function updateCheckboxesFromSelections() {
+    document.querySelectorAll('.toggle-profile-item').forEach(toggle => {
+        const lineId = parseInt(toggle.dataset.lineId);
+        const isSelected = profileSelections[lineId] !== false; // Default to true
+        toggle.checked = isSelected;
+        updateItemVisual(lineId, isSelected);
+    });
+}
+
+// Update visual state of an item
+function updateItemVisual(lineId, isSelected) {
+    const item = document.querySelector(`[data-line-id="${lineId}"]`);
+    if (item) {
+        if (isSelected) {
+            item.classList.remove('deselected');
+        } else {
+            item.classList.add('deselected');
+        }
+    }
+}
+
+// Toggle profile item selection
+function toggleProfileItem(lineId, toggle) {
+    const isSelected = toggle.checked;
+    fetch(`/accounts/candidate-profile/${currentProfileId}/item/${lineId}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            profileSelections[lineId] = data.is_selected;
+            updateItemVisual(lineId, data.is_selected);
+            // Sync toggle state with server response
+            toggle.checked = data.is_selected;
+        } else {
+            // Revert toggle on error
+            toggle.checked = !isSelected;
+            alert(data.error || 'Erreur');
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling item:', error);
+        toggle.checked = !isSelected;
+    });
+}
+
+// Open profile modal
+function openProfileModal(mode) {
+    profileModalMode = mode;
+    const modal = document.getElementById('profileModal');
+    const titleEl = document.getElementById('profileModalTitle');
+    const titleInput = document.getElementById('profileTitleInput');
+    const descInput = document.getElementById('profileDescInput');
+
+    if (mode === 'create') {
+        titleEl.textContent = 'Nouveau profil';
+        titleInput.value = '';
+        descInput.value = '';
+    } else {
+        titleEl.textContent = 'Modifier le profil';
+        const select = document.getElementById('candidateProfileSelect');
+        const selectedOption = select.options[select.selectedIndex];
+        titleInput.value = selectedOption.text;
+        descInput.value = selectedOption.dataset.description || '';
+    }
+
+    modal.classList.add('show');
+    titleInput.focus();
+}
+
+// Close profile modal
+function closeProfileModal() {
+    document.getElementById('profileModal').classList.remove('show');
+}
+
+// Save profile (create or update)
+function saveProfile() {
+    const title = document.getElementById('profileTitleInput').value.trim();
+    const description = document.getElementById('profileDescInput').value.trim();
+
+    if (!title) {
+        alert('Le titre est requis');
+        return;
+    }
+
+    const url = profileModalMode === 'create'
+        ? '{% url "accounts:profile_create" %}'
+        : `/accounts/candidate-profile/${currentProfileId}/update/`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ title, description }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeProfileModal();
+            // Reload page to update dropdown
+            window.location.reload();
+        } else {
+            alert(data.error || 'Erreur');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving profile:', error);
+        alert('Erreur lors de la sauvegarde');
+    });
+}
+
+// Delete candidate profile
+function deleteCandidateProfile() {
+    const select = document.getElementById('candidateProfileSelect');
+    const profileTitle = select.options[select.selectedIndex].text;
+
+    if (profileTitle === 'Complet') {
+        alert('Le profil "Complet" ne peut pas etre supprime');
+        return;
+    }
+
+    if (!confirm(`Supprimer le profil "${profileTitle}" ?`)) {
+        return;
+    }
+
+    fetch(`/accounts/candidate-profile/${currentProfileId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.error || 'Erreur');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting profile:', error);
+        alert('Erreur lors de la suppression');
+    });
+}
+
+// Close modal when clicking outside
+const profileModalEl = document.getElementById('profileModal');
+if (profileModalEl) {
+    profileModalEl.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeProfileModal();
+        }
+    });
+}
+
+// Initialize selections on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateCheckboxesFromSelections();
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     // Sidebar menu navigation
     const menuItems = document.querySelectorAll('.menu-item[data-section]');
@@ -1826,61 +3235,69 @@ document.addEventListener('DOMContentLoaded', function() {
     let pollTimer = null;
 
     // Open modal
-    uploadBtn.addEventListener('click', function() {
-        uploadModal.classList.add('active');
-        resetUploadState();
-    });
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', function() {
+            uploadModal.classList.add('active');
+            resetUploadState();
+        });
+    }
 
     // Close modal
-    closeBtn.addEventListener('click', function() {
-        uploadModal.classList.remove('active');
-        if (pollTimer) {
-            clearTimeout(pollTimer);
-            pollTimer = null;
-        }
-    });
-
-    // Close on outside click
-    uploadModal.addEventListener('click', function(e) {
-        if (e.target === uploadModal) {
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
             uploadModal.classList.remove('active');
             if (pollTimer) {
                 clearTimeout(pollTimer);
                 pollTimer = null;
             }
-        }
-    });
+        });
+    }
+
+    // Close on outside click
+    if (uploadModal) {
+        uploadModal.addEventListener('click', function(e) {
+            if (e.target === uploadModal) {
+                uploadModal.classList.remove('active');
+                if (pollTimer) {
+                    clearTimeout(pollTimer);
+                    pollTimer = null;
+                }
+            }
+        });
+    }
 
     // Click on dropzone opens file picker
-    dropzone.addEventListener('click', function() {
-        fileInput.click();
-    });
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', function() {
+            fileInput.click();
+        });
 
-    // Drag and drop handlers
-    dropzone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-    });
+        // Drag and drop handlers
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
 
-    dropzone.addEventListener('dragleave', function() {
-        dropzone.classList.remove('dragover');
-    });
+        dropzone.addEventListener('dragleave', function() {
+            dropzone.classList.remove('dragover');
+        });
 
-    dropzone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFileUpload(files[0]);
-        }
-    });
+        dropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
 
-    // File input change
-    fileInput.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            handleFileUpload(this.files[0]);
-        }
-    });
+        // File input change
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFileUpload(this.files[0]);
+            }
+        });
+    }
 
     function resetUploadState() {
         progressDiv.classList.remove('active');
@@ -2069,106 +3486,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: this.getAttribute('data-cv-id'),
                 name: this.getAttribute('data-cv-name')
             };
-            deleteNameText.innerHTML = `<strong>${cvToDelete.name}</strong><br>Cette action supprimera egalement toutes les donnees extraites de ce CV.`;
-            deleteModal.classList.add('active');
+            if (deleteNameText) {
+                deleteNameText.innerHTML = `<strong>${cvToDelete.name}</strong><br>Cette action supprimera egalement toutes les donnees extraites de ce CV.`;
+            }
+            if (deleteModal) {
+                deleteModal.classList.add('active');
+            }
         });
     });
 
     // Cancel delete
-    cancelDeleteBtn.addEventListener('click', function() {
-        deleteModal.classList.remove('active');
-        cvToDelete = null;
-    });
+    if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', function() {
+            if (deleteModal) deleteModal.classList.remove('active');
+            cvToDelete = null;
+        });
+    }
 
     // Close on outside click
-    deleteModal.addEventListener('click', function(e) {
-        if (e.target === deleteModal) {
-            deleteModal.classList.remove('active');
-            cvToDelete = null;
-        }
-    });
+    if (deleteModal) {
+        deleteModal.addEventListener('click', function(e) {
+            if (e.target === deleteModal) {
+                deleteModal.classList.remove('active');
+                cvToDelete = null;
+            }
+        });
+    }
 
     // Confirm delete
-    confirmDeleteBtn.addEventListener('click', function() {
-        if (!cvToDelete) return;
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            if (!cvToDelete) return;
 
-        confirmDeleteBtn.disabled = true;
-        confirmDeleteBtn.textContent = 'Suppression...';
+            confirmDeleteBtn.disabled = true;
+            confirmDeleteBtn.textContent = 'Suppression...';
 
-        fetch('/accounts/cv/delete/' + cvToDelete.id + '/', {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Remove the CV item from the DOM
-                const cvItem = document.querySelector(`.document-item[data-cv-id="${cvToDelete.id}"]`);
-                if (cvItem) {
-                    cvItem.remove();
-                }
-                // Check if list is empty and show empty message
-                const cvList = document.getElementById('cv-list');
-                if (cvList && cvList.querySelectorAll('.document-item').length === 0) {
-                    cvList.innerHTML = '<div class="document-empty"><p>Aucun CV importe</p></div>';
-                }
-                deleteModal.classList.remove('active');
-                // Reload page to update extracted lines display, staying on documents section
-                window.location.hash = 'documents';
-                window.location.reload();
-            } else {
-                alert(data.error || 'Erreur lors de la suppression.');
-                confirmDeleteBtn.disabled = false;
-                confirmDeleteBtn.textContent = 'Supprimer';
-            }
-        })
-        .catch(error => {
-            console.error('Delete error:', error);
-            alert('Erreur de connexion au serveur.');
-            confirmDeleteBtn.disabled = false;
-            confirmDeleteBtn.textContent = 'Supprimer';
-        });
-    });
-
-    // ExtractedLine toggle active functionality
-    document.querySelectorAll('.toggle-active').forEach(toggle => {
-        toggle.addEventListener('change', function() {
-            const lineId = this.getAttribute('data-line-id');
-            const isChecked = this.checked;
-            const itemElement = this.closest('.extracted-item, .skill-tag');
-
-            fetch('/accounts/line/toggle/' + lineId + '/', {
-                method: 'POST',
+            fetch('/accounts/cv/delete/' + cvToDelete.id + '/', {
+                method: 'DELETE',
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Content-Type': 'application/json'
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Update visual state
-                    if (data.is_active) {
-                        itemElement.classList.remove('inactive');
-                    } else {
-                        itemElement.classList.add('inactive');
+                    // Remove the CV item from the DOM
+                    const cvItem = document.querySelector(`.document-item[data-cv-id="${cvToDelete.id}"]`);
+                    if (cvItem) {
+                        cvItem.remove();
                     }
-                    // Update toggle title
-                    this.closest('.toggle-switch').title = data.is_active ? 'Actif' : 'Inactif';
+                    // Check if list is empty and show empty message
+                    const cvList = document.getElementById('cv-list');
+                    if (cvList && cvList.querySelectorAll('.document-item').length === 0) {
+                        cvList.innerHTML = '<div class="document-empty"><p>Aucun CV importe</p></div>';
+                    }
+                    if (deleteModal) deleteModal.classList.remove('active');
+                    // Reload page to update extracted lines display, staying on documents section
+                    window.location.hash = 'documents';
+                    window.location.reload();
                 } else {
-                    // Revert toggle on error
-                    this.checked = !isChecked;
-                    alert(data.error || 'Erreur lors de la modification.');
+                    alert(data.error || 'Erreur lors de la suppression.');
+                    confirmDeleteBtn.disabled = false;
+                    confirmDeleteBtn.textContent = 'Supprimer';
                 }
             })
             .catch(error => {
-                console.error('Toggle error:', error);
-                // Revert toggle on error
-                this.checked = !isChecked;
+                console.error('Delete error:', error);
                 alert('Erreur de connexion au serveur.');
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.textContent = 'Supprimer';
             });
+        });
+    }
+
+    // Profile item toggle functionality
+    document.querySelectorAll('.toggle-profile-item').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const lineId = parseInt(this.getAttribute('data-line-id'));
+            toggleProfileItem(lineId, this);
         });
     });
 
@@ -2182,6 +3577,315 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Fonctionnalité d\'édition à venir');
         });
     });
+
+    // Photo upload functionality
+    const photoModal = document.getElementById('photoModal');
+    const photoDropzone = document.getElementById('photoDropzone');
+    const photoFileInput = document.getElementById('photoFileInput');
+    const photoPreview = document.getElementById('photoPreview');
+    const photoProgress = document.getElementById('photoProgress');
+    const photoProgressFill = document.getElementById('photoProgressFill');
+
+    if (photoDropzone) {
+        // Click to select file
+        photoDropzone.addEventListener('click', function() {
+            photoFileInput.click();
+        });
+
+        // Drag and drop
+        photoDropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        photoDropzone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+
+        photoDropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handlePhotoFile(files[0]);
+            }
+        });
+    }
+
+    if (photoFileInput) {
+        photoFileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handlePhotoFile(this.files[0]);
+            }
+        });
+    }
+
+    // Close photo modal on outside click
+    if (photoModal) {
+        photoModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePhotoModal();
+            }
+        });
+    }
 });
+
+// Photo modal functions
+function openPhotoModal() {
+    const modal = document.getElementById('photoModal');
+    if (modal) {
+        // Reset to step 1
+        showPhotoStep(1);
+        modal.classList.add('show');
+    }
+}
+
+function closePhotoModal() {
+    const modal = document.getElementById('photoModal');
+    if (modal) {
+        modal.classList.remove('show');
+        // Destroy cropper if exists
+        if (photoCropper) {
+            photoCropper.destroy();
+            photoCropper = null;
+        }
+        // Reset file input
+        const fileInput = document.getElementById('photoFileInput');
+        if (fileInput) fileInput.value = '';
+    }
+}
+
+function showPhotoStep(step) {
+    const step1 = document.getElementById('photoStep1');
+    const step2 = document.getElementById('photoStep2');
+    const footer1 = document.getElementById('photoFooter1');
+    const footer2 = document.getElementById('photoFooter2');
+    const title = document.getElementById('photoModalTitle');
+
+    if (step === 1) {
+        step1.style.display = 'block';
+        step2.style.display = 'none';
+        footer1.style.display = 'flex';
+        footer2.style.display = 'none';
+        title.textContent = 'Photo de profil';
+    } else {
+        step1.style.display = 'none';
+        step2.style.display = 'block';
+        footer1.style.display = 'none';
+        footer2.style.display = 'flex';
+        title.textContent = 'Recadrer la photo';
+    }
+}
+
+function handlePhotoFile(file) {
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+        alert('Format non supporte. Utilisez JPG, PNG ou WebP.');
+        return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('La photo ne doit pas depasser 5 Mo');
+        return;
+    }
+
+    // Load image and show cropper
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const cropImage = document.getElementById('photoCropImage');
+        cropImage.src = e.target.result;
+
+        // Show step 2
+        showPhotoStep(2);
+
+        // Initialize cropper after image loads
+        cropImage.onload = function() {
+            // Destroy previous cropper if exists
+            if (photoCropper) {
+                photoCropper.destroy();
+            }
+
+            // Create new cropper with circular crop view
+            photoCropper = new Cropper(cropImage, {
+                aspectRatio: 1,
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                cropBoxMovable: false,
+                cropBoxResizable: false,
+                toggleDragModeOnDblclick: false,
+                minContainerWidth: 250,
+                minContainerHeight: 250,
+                background: false,
+                guides: false,
+                center: false,
+                highlight: false,
+            });
+        };
+    };
+    reader.readAsDataURL(file);
+}
+
+function cancelCrop() {
+    // Destroy cropper
+    if (photoCropper) {
+        photoCropper.destroy();
+        photoCropper = null;
+    }
+    // Reset file input
+    const fileInput = document.getElementById('photoFileInput');
+    if (fileInput) fileInput.value = '';
+    // Go back to step 1
+    showPhotoStep(1);
+}
+
+function applyCrop() {
+    if (!photoCropper) return;
+
+    // Get cropped canvas
+    const canvas = photoCropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+    });
+
+    if (!canvas) {
+        alert('Erreur lors du recadrage');
+        return;
+    }
+
+    // Convert to blob and upload
+    canvas.toBlob(function(blob) {
+        uploadPhoto(blob);
+    }, 'image/jpeg', 0.9);
+}
+
+function uploadPhoto(blob) {
+    const progress = document.getElementById('photoProgress');
+    const progressFill = document.getElementById('photoProgressFill');
+
+    // Show progress, hide step 2 content
+    document.getElementById('photoStep2').style.display = 'none';
+    document.getElementById('photoFooter2').style.display = 'none';
+    progress.style.display = 'block';
+    progressFill.style.width = '30%';
+
+    const formData = new FormData();
+    formData.append('photo', blob, 'profile.jpg');
+
+    fetch('{% url "accounts:photo_upload" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: formData,
+    })
+    .then(response => {
+        progressFill.style.width = '70%';
+        return response.json();
+    })
+    .then(data => {
+        progressFill.style.width = '100%';
+
+        if (data.success) {
+            // Destroy cropper
+            if (photoCropper) {
+                photoCropper.destroy();
+                photoCropper = null;
+            }
+
+            // Update the sidebar photo
+            const sidebarPhoto = document.querySelector('.profile-photo');
+            if (sidebarPhoto) {
+                sidebarPhoto.innerHTML = `<img src="${data.photo_url}" alt="Photo de profil">`;
+            }
+
+            // Update preview in modal step 1
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = `<img src="${data.photo_url}" alt="Photo de profil" id="previewImg">`;
+
+            // Show delete button if not present
+            const footer1 = document.getElementById('photoFooter1');
+            if (footer1 && !document.getElementById('btnDeletePhoto')) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.id = 'btnDeletePhoto';
+                deleteBtn.className = 'photo-modal-btn delete';
+                deleteBtn.onclick = deletePhoto;
+                deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg> Supprimer`;
+                footer1.insertBefore(deleteBtn, footer1.firstChild);
+            }
+
+            setTimeout(() => {
+                progress.style.display = 'none';
+                progressFill.style.width = '0%';
+                // Go back to step 1
+                showPhotoStep(1);
+            }, 500);
+        } else {
+            alert(data.error || 'Erreur lors de l\'envoi de la photo');
+            progress.style.display = 'none';
+            progressFill.style.width = '0%';
+            showPhotoStep(2);
+        }
+    })
+    .catch(error => {
+        console.error('Upload error:', error);
+        alert('Erreur de connexion au serveur');
+        progress.style.display = 'none';
+        progressFill.style.width = '0%';
+        showPhotoStep(2);
+    });
+}
+
+function deletePhoto() {
+    if (!confirm('Supprimer votre photo de profil ?')) {
+        return;
+    }
+
+    fetch('{% url "accounts:photo_delete" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update sidebar photo with initial
+            const sidebarPhoto = document.querySelector('.profile-photo');
+            const userInitial = '{{ user.first_name|first|default:user.email|first|upper }}';
+            if (sidebarPhoto) {
+                sidebarPhoto.innerHTML = userInitial;
+            }
+
+            // Update preview with placeholder
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = `<div class="photo-preview-placeholder" id="previewPlaceholder">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+            </div>`;
+
+            // Remove delete button
+            const deleteBtn = document.getElementById('btnDeletePhoto');
+            if (deleteBtn) {
+                deleteBtn.remove();
+            }
+        } else {
+            alert(data.error || 'Erreur lors de la suppression');
+        }
+    })
+    .catch(error => {
+        console.error('Delete error:', error);
+        alert('Erreur de connexion au serveur');
+    });
+}
 </script>
 {% endblock %}

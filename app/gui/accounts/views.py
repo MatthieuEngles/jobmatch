@@ -243,13 +243,26 @@ def cv_status_view(request, task_id):
             lines_created = 0
 
             for idx, line_data in enumerate(extracted_lines):
-                ExtractedLine.objects.create(
-                    user=request.user,
-                    source_cv=cv,
-                    content_type=line_data.get("content_type", "other"),
-                    content=line_data.get("content", ""),
-                    order=line_data.get("order", idx),
-                )
+                # Build line data with optional structured fields
+                line_kwargs = {
+                    "user": request.user,
+                    "source_cv": cv,
+                    "content_type": line_data.get("content_type", "other"),
+                    "content": line_data.get("content", ""),
+                    "order": line_data.get("order", idx),
+                }
+
+                # Add structured fields for experience/education if present
+                if line_data.get("entity"):
+                    line_kwargs["entity"] = line_data["entity"]
+                if line_data.get("dates"):
+                    line_kwargs["dates"] = line_data["dates"]
+                if line_data.get("position"):
+                    line_kwargs["position"] = line_data["position"]
+                if line_data.get("description"):
+                    line_kwargs["description"] = line_data["description"]
+
+                ExtractedLine.objects.create(**line_kwargs)
                 lines_created += 1
 
             # Update CV status

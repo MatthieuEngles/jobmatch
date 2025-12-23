@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LLM_ENDPOINT: str = ""  # Custom endpoint URL (for local/proxy)
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MAX_TOKENS: int = 8192  # Max tokens for LLM response
 
     # Processing limits
     MAX_FILE_SIZE_MB: int = 10

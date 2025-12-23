@@ -95,7 +95,7 @@ class OpenAIProvider(LLMProvider):
             ],
             response_format={"type": "json_object"},
             temperature=0.1,
-            max_tokens=4096,
+            max_tokens=settings.LLM_MAX_TOKENS,
         )
         return response.choices[0].message.content
 
@@ -123,7 +123,7 @@ class OpenAIProvider(LLMProvider):
                 {"role": "user", "content": content},
             ],
             temperature=0.1,
-            max_tokens=4096,
+            max_tokens=settings.LLM_MAX_TOKENS,
         )
         return response.choices[0].message.content
 
@@ -172,7 +172,7 @@ class AnthropicProvider(LLMProvider):
     def analyze(self, system_prompt: str, user_prompt: str) -> str:
         response = self.client.messages.create(
             model=self._model,
-            max_tokens=4096,
+            max_tokens=settings.LLM_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -200,7 +200,7 @@ class AnthropicProvider(LLMProvider):
 
         response = self.client.messages.create(
             model=self._model,
-            max_tokens=4096,
+            max_tokens=settings.LLM_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": content}],
         )
@@ -436,13 +436,23 @@ def parse_llm_response(response_text: str) -> list[ExtractedLine]:
 
     # If response starts with markdown code block, extract JSON
     if json_text.startswith("```"):
+        # Try to find complete code block first
         match = re.search(r"```(?:json)?\s*([\s\S]*?)```", json_text)
         if match:
             json_text = match.group(1).strip()
+        else:
+            # Handle incomplete/truncated markdown block (no closing ```)
+            match = re.search(r"```(?:json)?\s*([\s\S]*)", json_text)
+            if match:
+                json_text = match.group(1).strip()
+                logger.warning("LLM response appears truncated (no closing ```)")
 
     try:
         data = json.loads(json_text)
     except json.JSONDecodeError as e:
+        # Log the problematic JSON for debugging
+        logger.error(f"Failed to parse JSON. First 500 chars: {json_text[:500]}")
+        logger.error(f"Last 200 chars: {json_text[-200:] if len(json_text) > 200 else json_text}")
         raise ValueError(f"Invalid JSON from LLM: {e}") from e
 
     extracted_lines = data.get("extracted_lines", [])
@@ -452,6 +462,7 @@ def parse_llm_response(response_text: str) -> list[ExtractedLine]:
 
     result = []
     valid_types = {ct.value for ct in ContentType}
+    structured_types = {ContentType.EXPERIENCE.value, ContentType.EDUCATION.value}
 
     for item in extracted_lines:
         content_type = item.get("content_type", "other")
@@ -469,13 +480,26 @@ def parse_llm_response(response_text: str) -> list[ExtractedLine]:
         if not isinstance(order, int):
             order = 0
 
-        result.append(
-            ExtractedLine(
-                content_type=ContentType(content_type),
-                content=content,
-                order=order,
-            )
-        )
+        # Build base line data
+        line_data = {
+            "content_type": ContentType(content_type),
+            "content": content,
+            "order": order,
+        }
+
+        # Extract structured fields for experience/education
+        if content_type in structured_types:
+            entity = item.get("entity", "").strip() if item.get("entity") else None
+            dates = item.get("dates", "").strip() if item.get("dates") else None
+            position = item.get("position", "").strip() if item.get("position") else None
+            description = item.get("description", "").strip() if item.get("description") else None
+
+            line_data["entity"] = entity if entity else None
+            line_data["dates"] = dates if dates else None
+            line_data["position"] = position if position else None
+            line_data["description"] = description if description else None
+
+        result.append(ExtractedLine(**line_data))
 
     logger.info(f"Parsed {len(result)} extracted lines from LLM response")
     return result

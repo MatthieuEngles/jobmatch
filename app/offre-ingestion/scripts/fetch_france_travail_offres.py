@@ -48,7 +48,9 @@ token_payload = {
 
 token_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-token_response = requests.post(TOKEN_URL, data=token_payload, headers=token_headers, timeout=15)
+token_response = requests.post(
+    TOKEN_URL, data=token_payload, headers=token_headers, timeout=15
+)
 
 if token_response.status_code != 200:
     print("Erreur lors de la récupération du token OAuth2")

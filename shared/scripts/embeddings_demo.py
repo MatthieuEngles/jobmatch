@@ -13,8 +13,12 @@ from __future__ import annotations
 import sys
 from typing import Sequence
 
-# Allow running the script from repo root without installing package
-sys.path.insert(0, "shared/src")
+# Allow running the script directly or via `python -m shared.scripts.embeddings_demo`
+from pathlib import Path
+_repo_root = Path(__file__).resolve().parents[2]
+_src_path = str(_repo_root / "src")
+if _src_path not in sys.path:
+    sys.path.insert(0, _src_path)
 
 import numpy as np
 

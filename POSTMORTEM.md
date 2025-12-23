@@ -2,6 +2,47 @@
 
 ## 📅 Sessions
 
+### 2025-12-23 (13) - Fix LLM Config Form + Page Pricing + Responsive 4K
+**Contexte:** Corriger le formulaire LLM config, remplacer la modal pricing par une page dédiée, et rendre le site responsive pour grands écrans
+
+**Réalisations:**
+- **Fix formulaire LLM Config** :
+  - Problème : erreur "Erreur lors de la mise à jour" quand on sauvegarde la config LLM
+  - Cause : `PasswordInput` widget ne préserve pas la valeur de l'API key au re-render
+  - Solution : `clean()` vérifie si une clé existe déjà, `save()` préserve la clé existante si champ vide
+  - Placeholder "Laisser vide pour conserver l'actuelle" + help text si clé configurée
+
+- **Regroupement sections Account Settings** :
+  - Fusion Identité + Email + Mot de passe dans une seule carte "Mon compte"
+  - Subsections avec titres h3 et séparateurs horizontaux
+  - CSS `.subsection`, `.subsection-title`, `.subsection-divider`
+
+- **Page Pricing dédiée** (`/accounts/pricing/`) :
+  - Remplace la modal qui ne fonctionnait pas (problème de blocks Django)
+  - Template `pricing.html` avec grille de 5 plans
+  - Vue `pricing_view` simple sans login requis
+  - Boutons "Voir les offres" redirigent vers cette page
+
+- **Responsive grands écrans (4K)** :
+  - CSS variables `--base-font-size` qui augmente avec la taille d'écran
+  - Breakpoints : 1440px (18px), 1920px (20px), 2560px (24px), 3840px (28px)
+  - Containers s'élargissent proportionnellement
+  - Templates utilisent `min()` CSS pour limiter la largeur
+
+**Problèmes rencontrés:**
+- **Modal ne s'affichait pas** : blocks `{% block modals %}` et `{% block extra_js %}` pas rendus
+  - Cause : problème de rendu des blocks Django dans le container Docker
+  - Solution : abandonner la modal, créer une page dédiée (plus simple et fiable)
+- **Pre-commit hooks unstage les fichiers** : trailing whitespace modifie les fichiers
+  - Solution : `git add -A && git commit` pour re-stage après modification par hook
+
+**Décisions techniques:**
+- **Page dédiée vs Modal** : plus fiable, meilleure UX, URL partageable
+- **CSS variables pour responsive** : `rem` hérite de `html { font-size }`, tout scale automatiquement
+- **Préservation API key** : pattern Django pour champs password qui ne doivent pas être réinitialisés
+
+---
+
 ### 2025-12-23 (12) - LLM Config Fallback + Sélecteur d'abonnement + Modal Pricing
 **Contexte:** Améliorer la gestion de la config LLM et ajouter un sélecteur d'abonnement avec comparaison des plans
 
@@ -548,6 +589,21 @@ git add -A && git commit -m "message"
 - `.claude/settings.json` pour définir les règles de vibecoding
 - Préfixe de commit `[CortexForge]` pour identifier les commits vibecoding
 - Architecture microservices avec dossiers séparés par domaine
+
+### Workflow Git complet (feature branch → PR → merge)
+```bash
+# 1. Avant commit : lint et format
+ruff check --fix . && ruff format .
+
+# 2. Commit
+git add -A && git commit -m "[CortexForge] message"
+
+# 3. Push et créer PR sur GitHub
+git push -u origin feature/ma-branche
+
+# 4. Après merge de la PR : retour sur dev et cleanup
+git checkout dev && git pull && git branch -d feature/ma-branche
+```
 - **CSS clamp()** pour des tailles responsive sans media queries
 - **Template blocks conditionnels** avec `{% if user.is_authenticated %}{{ block.super }}{% endif %}`
 - **Variables CSS** (`:root`) pour cohérence des couleurs/styles

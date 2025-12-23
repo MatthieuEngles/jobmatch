@@ -398,9 +398,38 @@
 
     .extracted-item-header {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-start;
         margin-bottom: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gray);
+    }
+
+    .extracted-item-header .item-entity {
+        color: var(--primary);
+    }
+
+    .extracted-item-header .item-dates {
+        color: var(--gray);
+    }
+
+    .extracted-item-header .item-dates::before {
+        content: "|";
+        margin-right: 8px;
+        color: var(--border);
+    }
+
+    .extracted-item-header .item-position {
+        color: var(--dark);
+    }
+
+    .extracted-item-header .item-position::before {
+        content: "|";
+        margin-right: 8px;
+        color: var(--border);
     }
 
     .extracted-item-content {
@@ -1251,7 +1280,16 @@
                         <div class="extracted-items">
                             {% for exp in experiences %}
                             <div class="extracted-item{% if not exp.is_active %} inactive{% endif %}" data-line-id="{{ exp.id }}">
+                                {% if exp.entity or exp.position or exp.dates %}
+                                <div class="extracted-item-header">
+                                    <span class="item-entity">{{ exp.entity|default:"" }}</span>
+                                    {% if exp.dates %}<span class="item-dates">{{ exp.dates }}</span>{% endif %}
+                                    {% if exp.position %}<span class="item-position">{{ exp.position }}</span>{% endif %}
+                                </div>
+                                <div class="extracted-item-content">{{ exp.description|default:exp.content }}</div>
+                                {% else %}
                                 <div class="extracted-item-content">{{ exp.content }}</div>
+                                {% endif %}
                                 <div class="extracted-item-footer">
                                     <div class="extracted-item-source">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1392,7 +1430,16 @@
                             <div class="extracted-items">
                                 {% for edu in educations %}
                                 <div class="extracted-item{% if not edu.is_active %} inactive{% endif %}" data-line-id="{{ edu.id }}">
+                                    {% if edu.entity or edu.position or edu.dates %}
+                                    <div class="extracted-item-header">
+                                        <span class="item-entity">{{ edu.entity|default:"" }}</span>
+                                        {% if edu.dates %}<span class="item-dates">{{ edu.dates }}</span>{% endif %}
+                                        {% if edu.position %}<span class="item-position">{{ edu.position }}</span>{% endif %}
+                                    </div>
+                                    <div class="extracted-item-content">{{ edu.description|default:edu.content }}</div>
+                                    {% else %}
                                     <div class="extracted-item-content">{{ edu.content }}</div>
+                                    {% endif %}
                                     <div class="extracted-item-footer">
                                         <div class="extracted-item-source">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

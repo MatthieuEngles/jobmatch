@@ -177,8 +177,8 @@ class ExtractedLine(models.Model):
     """
     Central model. Each line represents a unit of information extracted from a CV.
     Granularity by type:
-    - experience: 1 position = 1 line (complete text block)
-    - education: 1 diploma = 1 line
+    - experience: 1 position = 1 line (with structured data: entity, dates, position, description)
+    - education: 1 diploma = 1 line (with structured data: entity, dates, position, description)
     - skill_hard/skill_soft: 1 skill = 1 line
     - language: 1 language = 1 line
     - certification: 1 certification = 1 line
@@ -202,6 +202,32 @@ class ExtractedLine(models.Model):
         db_index=True,
     )
     content = models.TextField()
+
+    # Structured fields for experience/education
+    entity = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Company/school/organization name",
+    )
+    dates = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Date range (e.g., '2020-2023', 'Jan 2020 - Present')",
+    )
+    position = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Job title or diploma name",
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Description of responsibilities/achievements or field of study",
+    )
+
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -230,6 +256,26 @@ class ExtractedLine(models.Model):
         """Mark the line as modified by user. Call when content is manually edited."""
         self.modified_by_user = True
         self.save(update_fields=["modified_by_user", "modified_at"])
+
+    def is_structured(self):
+        """Check if this line has structured data (experience/education)."""
+        return self.entity is not None or self.position is not None
+
+    def get_display_title(self):
+        """Get a display title for the line (position for experience/education, content for others)."""
+        if self.position:
+            return self.position
+        return self.content[:50] + "..." if len(self.content) > 50 else self.content
+
+    def get_display_subtitle(self):
+        """Get a display subtitle (entity + dates for experience/education)."""
+        if self.entity and self.dates:
+            return f"{self.entity} ({self.dates})"
+        elif self.entity:
+            return self.entity
+        elif self.dates:
+            return self.dates
+        return None
 
 
 class UserLLMConfig(models.Model):

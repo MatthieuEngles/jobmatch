@@ -590,6 +590,16 @@ git add -A && git commit -m "message"
 - Préfixe de commit `[CortexForge]` pour identifier les commits vibecoding
 - Architecture microservices avec dossiers séparés par domaine
 
+## Dépannage git
+- Pour bien recréer la dépendance entre les branches main et dev, il faut bien mettre à jour la baranche main puis écraser la branche dev en resettant l'historique de la branche dev avec les commandes suivantes :
+
+```bash
+# Se placer sur la branche dev
+git checkout dev
+# Ecraser l'historique de la branche dev avec celui de la branche main
+git reset --hard main
+``` 
+
 ### Workflow Git complet (feature branch → PR → merge)
 ```bash
 # 1. Avant commit : lint et format

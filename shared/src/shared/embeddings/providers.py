@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence, Callable
 import importlib
-import types
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
@@ -12,6 +11,7 @@ Embedder = Callable[[Sequence[str]], Embedding]
 
 
 # -------------------- Utilities ------------------------------------------
+
 
 def _validate_embeddings(arr: np.ndarray) -> np.ndarray:
     if not isinstance(arr, np.ndarray):
@@ -65,7 +65,7 @@ def create_sentence_transformers_embedder(
             raise ValueError("Input texts must not be empty")
 
         # Encode; many versions accept device and convert_to_numpy
-        encode_kwargs = dict(batch_size=batch_size, convert_to_numpy=True)
+        encode_kwargs = {"batch_size": batch_size, "convert_to_numpy": True}
         # Some versions accept device in encode; we'll try to pass it but tolerate failure
         try:
             embeddings = model_obj.encode(list(texts), device=device, **encode_kwargs)
@@ -123,9 +123,7 @@ def create_vec2vec_embedder(
                 embed_fn = client.encode
 
     if embed_fn is None:
-        raise RuntimeError(
-            "Could not find an 'embed' or 'encode' callable in the 'vec2vec' module/client."
-        )
+        raise RuntimeError("Could not find an 'embed' or 'encode' callable in the 'vec2vec' module/client.")
 
     def _embed(texts: Sequence[str]) -> np.ndarray:
         if not texts:

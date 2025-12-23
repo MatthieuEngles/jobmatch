@@ -4,8 +4,8 @@ import types
 import numpy as np
 import pytest
 
-from .embeddings import TextSimilarity
 from . import providers
+from .embeddings import TextSimilarity
 
 
 def test_sentence_transformers_embedder_mock(monkeypatch):

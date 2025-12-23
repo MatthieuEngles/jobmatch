@@ -1,4 +1,4 @@
-from .embeddings import TextSimilarity, Embedding, Embedder
+from .embeddings import Embedder, Embedding, TextSimilarity
 from .providers import (
     create_embedder,
     create_sentence_transformers_embedder,

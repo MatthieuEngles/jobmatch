@@ -165,7 +165,8 @@ def test_joint_similarity_empty_input_raises(similarity):
 
 
 def test_provider_integration_with_sentence_transformers(monkeypatch):
-    import sys, types
+    import sys
+    import types
 
     # Fake simple SentenceTransformer implementation
     class FakeModel:
@@ -188,7 +189,8 @@ def test_provider_integration_with_sentence_transformers(monkeypatch):
 
 
 def test_provider_integration_with_vec2vec(monkeypatch):
-    import sys, types
+    import sys
+    import types
 
     def _fake_embed(texts, batch_size=None):
         return np.vstack([[len(t)] for t in texts]).astype(np.float64)

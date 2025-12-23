@@ -8,23 +8,27 @@ It will run a small demo using a cheap built-in `simple_embedder` and, if
 `sentence-transformers` is installed, will also run the same demo using a
 real embedding model (`all-MiniLM-L6-v2` by default).
 """
+
 from __future__ import annotations
 
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 # Allow running the script directly or via `python -m shared.scripts.embeddings_demo`
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from shared.embeddings import Embedder, Embedding, TextSimilarity
+
+# Ensure the project's `src/` directory is importable when running the
+# script directly or via `python -m shared.scripts.embeddings_demo`.
 _repo_root = Path(__file__).resolve().parents[2]
 _src_path = str(_repo_root / "src")
 if _src_path not in sys.path:
     sys.path.insert(0, _src_path)
-
-import numpy as np
-
-from shared.embeddings import TextSimilarity
-from shared.embeddings import Embedding, Embedder
-from shared.embeddings import create_sentence_transformers_embedder
 
 
 def simple_embedder(texts: Sequence[str]) -> Embedding:
@@ -48,10 +52,10 @@ def print_joint(sim: TextSimilarity, a: Sequence[str], b: Sequence[str]) -> None
 
 
 def run_demo(embedder: Embedder, title: str) -> None:
-    print("""
+    print(f"""
 =====================================
 Demo using: {title}
-=====================================""".format(title=title))
+=====================================""")
 
     sim = TextSimilarity(embedder)
 
@@ -65,14 +69,17 @@ Demo using: {title}
 
 
 def main() -> None:
+    # Import project-local symbols after ensuring `src/` is on sys.path
+    from shared.embeddings import (
+        create_sentence_transformers_embedder,
+    )
+
     print("Simple embedder (length-based):")
     run_demo(simple_embedder, "simple_embedder (len)")
 
     # Try to run with sentence-transformers if available
     try:
-        st_embedder = create_sentence_transformers_embedder(
-            model="all-MiniLM-L6-v2", normalize=True
-        )
+        st_embedder = create_sentence_transformers_embedder(model="all-MiniLM-L6-v2", normalize=True)
     except Exception as exc:  # ImportError or other config errors
         print("Skipping sentence-transformers demo (not available):", exc)
     else:

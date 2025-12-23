@@ -7,10 +7,11 @@ repository root (e.g., `python -m shared.scripts.embeddings_demo`).
 Note: this is intentionally minimal and only mutates `__path__` and
 `sys.path` to point at the `src` layout. It avoids importing heavy modules.
 """
+
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 __all__ = []
 

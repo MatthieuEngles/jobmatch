@@ -15,8 +15,8 @@ git commit -m "mon message"
 │  ─────────────────────  │
 │  ✓ trailing-whitespace  │
 │  ✓ check-yaml           │
-│  ✓ black (formatting)   │
-│  ✗ flake8 (erreur!)     │
+│  ✓ ruff (lint+format)   │
+│  ✗ bandit (erreur!)     │
 └─────────────────────────┘
        │
        ▼
@@ -35,13 +35,29 @@ git commit -m "mon message"
 | **check-added-large-files** | Bloque les fichiers > 1MB | Non |
 | **check-merge-conflict** | Détecte les marqueurs de conflit | Non |
 | **detect-private-key** | Bloque les clés privées | Non |
-| **no-commit-to-branch** | Interdit commit sur main/dev | Non |
-| **black** | Formate le code Python | Oui |
-| **isort** | Trie les imports Python | Oui |
-| **flake8** | Vérifie le style Python (PEP8) | Non |
-| **mypy** | Vérifie les types Python | Non |
+| **no-commit-to-branch** | Interdit commit sur main | Non |
+| **ruff** | Lint Python (remplace flake8, isort, pylint) | Oui |
+| **ruff-format** | Formate le code Python (remplace black) | Oui |
 | **bandit** | Détecte les failles de sécurité | Non |
 | **gitleaks** | Détecte les secrets (API keys, passwords) | Non |
+
+## Ruff - L'outil Python tout-en-un
+
+Ruff remplace plusieurs outils (black, isort, flake8, pylint) en un seul, beaucoup plus rapide.
+
+```bash
+# Vérifier les erreurs de linting
+ruff check .
+
+# Vérifier le formatage
+ruff format --check .
+
+# Corriger automatiquement le linting
+ruff check --fix .
+
+# Formater le code
+ruff format .
+```
 
 ## Commandes utiles
 
@@ -53,7 +69,8 @@ pre-commit install
 pre-commit run --all-files
 
 # Exécuter un hook spécifique
-pre-commit run black --all-files
+pre-commit run ruff --all-files
+pre-commit run ruff-format --all-files
 
 # Mettre à jour les versions des hooks
 pre-commit autoupdate
@@ -79,7 +96,7 @@ git commit -m "[CortexForge] Ajout feature X"
 #    - Si OK → commit créé
 #    - Si KO → commit bloqué, corriger et réessayer
 
-# 4. Si black/isort ont auto-corrigé des fichiers :
+# 4. Si ruff a auto-corrigé des fichiers :
 git add .
 git commit -m "[CortexForge] Ajout feature X"  # réessayer
 ```
@@ -89,13 +106,19 @@ git commit -m "[CortexForge] Ajout feature X"  # réessayer
 ```bash
 $ git commit -m "test"
 
-black....................................................................Failed
-- hook id: black
+ruff.....................................................................Failed
+- hook id: ruff
 - files were modified by this hook
 
-reformatted app/gui/src/main.py
+Found 3 errors (3 fixed, 0 remaining).
 
-# Black a reformaté le fichier automatiquement
+ruff format..............................................................Failed
+- hook id: ruff-format
+- files were modified by this hook
+
+1 file reformatted
+
+# Ruff a corrigé les fichiers automatiquement
 # Il suffit de re-add et re-commit :
 
 $ git add .
@@ -106,10 +129,11 @@ $ git commit -m "test"
 ## Configuration
 
 Le fichier `.pre-commit-config.yaml` à la racine du projet définit tous les hooks.
+La configuration Ruff est dans `pyproject.toml`.
 
 Tu peux :
 - Ajouter/supprimer des hooks
-- Changer les arguments (ex: `--max-line-length=120`)
+- Changer les règles Ruff dans `pyproject.toml`
 - Exclure des fichiers avec `exclude: '^tests/'`
 
 ## Installation pour les nouveaux développeurs

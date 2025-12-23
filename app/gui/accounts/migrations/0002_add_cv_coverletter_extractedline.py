@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0001_initial"),
     ]
@@ -153,9 +152,7 @@ class Migration(migrations.Migration):
                         fields=["user", "is_active"],
                         name="accounts_ex_user_id_3aafea_idx",
                     ),
-                    models.Index(
-                        fields=["source_cv"], name="accounts_ex_source__6710e9_idx"
-                    ),
+                    models.Index(fields=["source_cv"], name="accounts_ex_source__6710e9_idx"),
                 ],
             },
         ),

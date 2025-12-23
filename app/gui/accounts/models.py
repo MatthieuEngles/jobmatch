@@ -10,6 +10,15 @@ EXTRACTION_STATUS_CHOICES = [
     ("failed", "Echec"),
 ]
 
+# Choices for subscription tiers
+SUBSCRIPTION_TIER_CHOICES = [
+    ("free", "Gratuit"),
+    ("basic", "Basic"),
+    ("premium", "Premium"),
+    ("headhunter", "Head Hunter"),
+    ("enterprise", "Entreprise"),
+]
+
 # Choices for ExtractedLine content type
 CONTENT_TYPE_CHOICES = [
     ("summary", "Resume / Accroche"),
@@ -31,6 +40,13 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Subscription tier
+    subscription_tier = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_TIER_CHOICES,
+        default="free",
+    )
 
     # Job search preferences
     is_job_seeker = models.BooleanField(default=True)
@@ -116,6 +132,7 @@ class CV(models.Model):
         default="pending",
     )
     extracted_at = models.DateTimeField(null=True, blank=True)
+    task_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     class Meta:
         verbose_name = "CV"
@@ -160,8 +177,8 @@ class ExtractedLine(models.Model):
     """
     Central model. Each line represents a unit of information extracted from a CV.
     Granularity by type:
-    - experience: 1 position = 1 line (complete text block)
-    - education: 1 diploma = 1 line
+    - experience: 1 position = 1 line (with structured data: entity, dates, position, description)
+    - education: 1 diploma = 1 line (with structured data: entity, dates, position, description)
     - skill_hard/skill_soft: 1 skill = 1 line
     - language: 1 language = 1 line
     - certification: 1 certification = 1 line
@@ -185,6 +202,32 @@ class ExtractedLine(models.Model):
         db_index=True,
     )
     content = models.TextField()
+
+    # Structured fields for experience/education
+    entity = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Company/school/organization name",
+    )
+    dates = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Date range (e.g., '2020-2023', 'Jan 2020 - Present')",
+    )
+    position = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Job title or diploma name",
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Description of responsibilities/achievements or field of study",
+    )
+
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -213,3 +256,73 @@ class ExtractedLine(models.Model):
         """Mark the line as modified by user. Call when content is manually edited."""
         self.modified_by_user = True
         self.save(update_fields=["modified_by_user", "modified_at"])
+
+    def is_structured(self):
+        """Check if this line has structured data (experience/education)."""
+        return self.entity is not None or self.position is not None
+
+    def get_display_title(self):
+        """Get a display title for the line (position for experience/education, content for others)."""
+        if self.position:
+            return self.position
+        return self.content[:50] + "..." if len(self.content) > 50 else self.content
+
+    def get_display_subtitle(self):
+        """Get a display subtitle (entity + dates for experience/education)."""
+        if self.entity and self.dates:
+            return f"{self.entity} ({self.dates})"
+        elif self.entity:
+            return self.entity
+        elif self.dates:
+            return self.dates
+        return None
+
+
+class UserLLMConfig(models.Model):
+    """
+    Custom LLM configuration for power users.
+    Allows users to use their own LLM API instead of the server default.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="llm_config",
+    )
+    is_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable custom LLM configuration",
+    )
+    llm_endpoint = models.URLField(
+        blank=True,
+        help_text="Custom LLM API endpoint (e.g., https://api.openai.com/v1)",
+    )
+    llm_model = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Model name (e.g., gpt-4o, claude-3-sonnet)",
+    )
+    llm_api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="API key (stored encrypted in production)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuration LLM utilisateur"
+        verbose_name_plural = "Configurations LLM utilisateurs"
+
+    def __str__(self):
+        return f"LLM Config for {self.user.email}"
+
+    def get_config_dict(self):
+        """Return config as dict for cv-ingestion service."""
+        if not self.is_enabled:
+            return None
+        return {
+            "endpoint": self.llm_endpoint,
+            "model": self.llm_model,
+            "api_key": self.llm_api_key,
+        }

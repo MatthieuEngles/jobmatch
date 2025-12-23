@@ -13,13 +13,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_MODE = os.environ.get("ENV_MODE", "local")
 
 # Security
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "django-insecure-dev-only-change-in-production"
-)
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only-change-in-production")
 DEBUG = os.environ.get("DEBUG", "True").lower() == "true"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(
-    ","
-)
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
 
 # CSRF trusted origins for Cloud Run
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
@@ -92,9 +88,7 @@ else:
 
     # Cloud SQL connection via Unix socket (Cloud Run)
     if os.environ.get("CLOUD_SQL_CONNECTION_NAME"):
-        DATABASES["default"][
-            "HOST"
-        ] = f"/cloudsql/{os.environ.get('CLOUD_SQL_CONNECTION_NAME')}"
+        DATABASES["default"]["HOST"] = f"/cloudsql/{os.environ.get('CLOUD_SQL_CONNECTION_NAME')}"
 
 
 # Password validation
@@ -150,6 +144,10 @@ LOGIN_URL = "/accounts/login/"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Microservices URLs
+CV_INGESTION_URL = os.environ.get("CV_INGESTION_URL", "http://localhost:8081")
 
 
 # Logging

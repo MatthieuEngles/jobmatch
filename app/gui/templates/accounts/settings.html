@@ -5,9 +5,21 @@
 {% block extra_css %}
 <style>
     .settings-container {
-        max-width: 800px;
+        max-width: min(800px, 90vw);
         margin: 0 auto;
         padding: 2rem 1rem;
+    }
+
+    @media (min-width: 1920px) {
+        .settings-container {
+            max-width: min(1000px, 60vw);
+        }
+    }
+
+    @media (min-width: 2560px) {
+        .settings-container {
+            max-width: min(1200px, 50vw);
+        }
     }
 
     .settings-header {

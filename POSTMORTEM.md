@@ -558,6 +558,7 @@ git add -A && git commit -m "message"
 - **Prompts en fichiers .txt** : faciles à éditer, versionner, et itérer sans toucher au code Python
 - **Détection auto PDF texte/image** : heuristique simple (min chars) avant de choisir la méthode d'extraction
 - **Vision LLM + OCR fallback** : robustesse maximale pour tous types de PDF
+- **Pre-commit workflow** : `ruff check --fix . && ruff format .` avant chaque commit pour auto-fix et formatage
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python

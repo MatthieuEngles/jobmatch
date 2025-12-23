@@ -124,3 +124,23 @@ class TextSimilarity:
         best_b_to_a = sim_matrix.max(axis=0)
 
         return float((best_a_to_b.mean() + best_b_to_a.mean()) / 2.0)
+
+
+if __name__ == "__main__":
+    # Simple demo
+    def simple_embedder(texts: Sequence[str]) -> Embedding:
+        return np.array([[len(t)] for t in texts], dtype=np.float64)
+
+    similarity = TextSimilarity(simple_embedder)
+
+    text1 = "hello world"
+    text2 = "hello"
+
+    sim_score = similarity.similarity(text1, text2)
+    print(f"Similarity between '{text1}' and '{text2}': {sim_score}")
+
+    set1 = ["hello world", "foo bar"]
+    set2 = ["hello", "bar baz"]
+
+    joint_score = similarity.joint_similarity(set1, set2)
+    print(f"Joint similarity between sets {set1} and {set2}: {joint_score}")

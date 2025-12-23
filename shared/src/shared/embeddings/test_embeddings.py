@@ -157,3 +157,49 @@ def test_joint_similarity_empty_input_raises(similarity):
 
     with pytest.raises(ValueError):
         similarity.joint_similarity(["test"], [])
+
+
+# ---------------------------------------------------------------------
+# Provider integration (mocked)
+# ---------------------------------------------------------------------
+
+
+def test_provider_integration_with_sentence_transformers(monkeypatch):
+    import sys, types
+
+    # Fake simple SentenceTransformer implementation
+    class FakeModel:
+        def __init__(self, model_name):
+            self.model_name = model_name
+
+        def encode(self, texts, batch_size=None, device=None, convert_to_numpy=True):
+            return np.array([[len(t)] for t in texts], dtype=np.float64)
+
+    st_mod = types.ModuleType("sentence_transformers")
+    st_mod.SentenceTransformer = FakeModel
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st_mod)
+
+    from .providers import create_sentence_transformers_embedder
+
+    embedder = create_sentence_transformers_embedder(model="fake", normalize=True)
+    sim = TextSimilarity(embedder)
+
+    assert pytest.approx(sim.similarity("abc", "abc")) == 1.0
+
+
+def test_provider_integration_with_vec2vec(monkeypatch):
+    import sys, types
+
+    def _fake_embed(texts, batch_size=None):
+        return np.vstack([[len(t)] for t in texts]).astype(np.float64)
+
+    v2v_mod = types.ModuleType("vec2vec")
+    v2v_mod.embed = _fake_embed
+    monkeypatch.setitem(sys.modules, "vec2vec", v2v_mod)
+
+    from .providers import create_vec2vec_embedder
+
+    embedder = create_vec2vec_embedder()
+    sim = TextSimilarity(embedder)
+
+    assert pytest.approx(sim.similarity("x", "x")) == 1.0

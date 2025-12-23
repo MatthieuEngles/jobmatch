@@ -1,6 +1,3 @@
-# Shared interfaces (install in editable mode for dev)
--e ../../shared
-
 # FastAPI framework
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
@@ -9,6 +6,11 @@ python-multipart==0.0.18
 # PDF extraction
 pdfplumber==0.11.4
 PyMuPDF==1.25.1
+pdf2image==1.17.0
+
+# OCR fallback
+pytesseract==0.3.13
+Pillow==11.0.0
 
 # DOCX extraction
 python-docx==1.1.2

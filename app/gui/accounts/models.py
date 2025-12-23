@@ -10,6 +10,15 @@ EXTRACTION_STATUS_CHOICES = [
     ("failed", "Echec"),
 ]
 
+# Choices for subscription tiers
+SUBSCRIPTION_TIER_CHOICES = [
+    ("free", "Gratuit"),
+    ("basic", "Basic"),
+    ("premium", "Premium"),
+    ("headhunter", "Head Hunter"),
+    ("enterprise", "Entreprise"),
+]
+
 # Choices for ExtractedLine content type
 CONTENT_TYPE_CHOICES = [
     ("summary", "Resume / Accroche"),
@@ -31,6 +40,13 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Subscription tier
+    subscription_tier = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_TIER_CHOICES,
+        default="free",
+    )
 
     # Job search preferences
     is_job_seeker = models.BooleanField(default=True)
@@ -116,6 +132,7 @@ class CV(models.Model):
         default="pending",
     )
     extracted_at = models.DateTimeField(null=True, blank=True)
+    task_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     class Meta:
         verbose_name = "CV"
@@ -213,3 +230,53 @@ class ExtractedLine(models.Model):
         """Mark the line as modified by user. Call when content is manually edited."""
         self.modified_by_user = True
         self.save(update_fields=["modified_by_user", "modified_at"])
+
+
+class UserLLMConfig(models.Model):
+    """
+    Custom LLM configuration for power users.
+    Allows users to use their own LLM API instead of the server default.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="llm_config",
+    )
+    is_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable custom LLM configuration",
+    )
+    llm_endpoint = models.URLField(
+        blank=True,
+        help_text="Custom LLM API endpoint (e.g., https://api.openai.com/v1)",
+    )
+    llm_model = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Model name (e.g., gpt-4o, claude-3-sonnet)",
+    )
+    llm_api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="API key (stored encrypted in production)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuration LLM utilisateur"
+        verbose_name_plural = "Configurations LLM utilisateurs"
+
+    def __str__(self):
+        return f"LLM Config for {self.user.email}"
+
+    def get_config_dict(self):
+        """Return config as dict for cv-ingestion service."""
+        if not self.is_enabled:
+            return None
+        return {
+            "endpoint": self.llm_endpoint,
+            "model": self.llm_model,
+            "api_key": self.llm_api_key,
+        }

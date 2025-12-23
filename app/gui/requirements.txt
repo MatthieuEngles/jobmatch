@@ -15,3 +15,6 @@ python-dotenv>=1.0
 
 # Google Cloud Storage (prod)
 django-storages[google]>=1.14
+
+# HTTP client for microservices
+requests>=2.31

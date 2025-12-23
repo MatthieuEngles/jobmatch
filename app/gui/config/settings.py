@@ -146,6 +146,10 @@ LOGIN_URL = "/accounts/login/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
+# Microservices URLs
+CV_INGESTION_URL = os.environ.get("CV_INGESTION_URL", "http://localhost:8081")
+
+
 # Logging
 LOGGING = {
     "version": 1,

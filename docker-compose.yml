@@ -2,22 +2,28 @@ version: '3.8'
 
 services:
   gui:
-    build: ./app/gui
+    build:
+      context: .
+      dockerfile: app/gui/Dockerfile
     ports:
-      - "8080:8080"
+      - "${GUI_PORT:-8085}:8080"
     environment:
-      - CV_INGESTION_URL=http://cv-ingestion:8081
-      - MATCHING_URL=http://matching:8083
+      - CV_INGESTION_URL=${CV_INGESTION_URL}
+      - MATCHING_URL=${MATCHING_URL}
     depends_on:
       - cv-ingestion
-      - matching
+      - db
     networks:
       - jobmatch-network
 
   cv-ingestion:
-    build: ./app/cv-ingestion
+    build:
+      context: .
+      dockerfile: app/cv-ingestion/Dockerfile
     ports:
-      - "8081:8081"
+      - "${CV_INGESTION_PORT:-8081}:8081"
+    env_file:
+      - app/cv-ingestion/.env
     environment:
       - DATABASE_URL=${DATABASE_URL}
     networks:
@@ -26,7 +32,7 @@ services:
   offre-ingestion:
     build: ./app/offre-ingestion
     ports:
-      - "8082:8082"
+      - "${OFFRE_INGESTION_PORT:-8082}:8082"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - FRANCE_TRAVAIL_API_KEY=${FRANCE_TRAVAIL_API_KEY}
@@ -36,9 +42,11 @@ services:
   matching:
     build: ./app/matching
     ports:
-      - "8083:8083"
+      - "${MATCHING_PORT:-8083}:8083"
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - CV_INGESTION_URL=${CV_INGESTION_URL}
+      - OFFRE_INGESTION_URL=${OFFRE_INGESTION_URL}
     depends_on:
       - cv-ingestion
       - offre-ingestion
@@ -48,7 +56,7 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5433}:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
@@ -61,7 +69,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - jobmatch-network
 

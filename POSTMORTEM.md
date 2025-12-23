@@ -2,6 +2,228 @@
 
 ## 📅 Sessions
 
+### 2025-12-23 (12) - LLM Config Fallback + Sélecteur d'abonnement + Modal Pricing
+**Contexte:** Améliorer la gestion de la config LLM et ajouter un sélecteur d'abonnement avec comparaison des plans
+
+**Réalisations:**
+- **LLM Config Fallback environnement** :
+  - Si l'utilisateur n'a pas configuré son LLM, le système utilise les variables d'environnement
+  - Classe `LLMConfig` dans `analyzer.py` pour passer une config optionnelle
+  - `get_llm_provider(config: LLMConfig | None)` : utilise config custom si fournie, sinon env vars
+  - `analyze_cv_text()` et `analyze_cv_images()` acceptent un paramètre `llm_config` optionnel
+  - Endpoint `/extract/async` accepte des Form fields : `llm_endpoint`, `llm_model`, `llm_api_key`
+
+- **Transmission config LLM GUI → cv-ingestion** :
+  - `cv_upload_view` envoie la config LLM de l'utilisateur si activée ET si abonnement Premium+
+  - Vérification `user.subscription_tier not in ("free", "basic")` avant envoi
+  - Données transmises via multipart form data
+
+- **Sélecteur d'abonnement** dans Account Settings :
+  - 5 plans : Free (0€), Basic (9€), Premium (29€), Head Hunter (49€), Enterprise (99€)
+  - Radio buttons stylisés avec prix et descriptions
+  - Handler `form_type == "subscription"` pour mise à jour du tier
+
+- **Modal Pricing "Voir les offres"** :
+  - Bouton gradient "Voir les offres" sur la carte abonnement
+  - Modal plein écran avec comparaison des 5 plans
+  - Tableau des fonctionnalités : CVs, Offres, Analyses LLM, Support, etc.
+  - Checkmarks verts / croix rouges pour chaque fonctionnalité
+  - Prix affichés pour chaque plan
+
+- **Restriction LLM Config par abonnement** :
+  - Section LLM Config visible uniquement pour Premium, Head Hunter, Enterprise
+  - Message explicatif pour Free/Basic : "disponible à partir du plan Premium"
+  - Section grisée (opacity: 0.6) pour plans non éligibles
+
+**Problèmes rencontrés:**
+- **File not read error** : tentative d'édition sans lecture préalable
+  - Solution : toujours lire le fichier avant de l'éditer
+
+**Décisions techniques:**
+- **Form fields plutôt que JSON body** : compatible avec multipart/form-data pour upload fichier
+- **Config optionnelle avec fallback** : pattern robuste, pas de breaking change
+- **Restriction par tier** : vérification côté serveur ET côté template
+- **Modal CSS natif** : pas de dépendance JS externe, animation simple
+
+---
+
+### 2025-12-23 (11) - Page Gestion Compte + LLM Config + Export RGPD
+**Contexte:** Remplacer "Supprimer mon compte" par une page complète de gestion du compte utilisateur
+
+**Réalisations:**
+- **Page Account Settings** (`/accounts/settings/`) :
+  - Sections : Identité, Email, Mot de passe, Abonnement, Config LLM, Export données, Suppression compte
+  - Multi-formulaires sur une page (pattern `form_type` hidden field)
+  - Messages de succès/erreur par section
+  - Danger zone en rouge pour suppression compte
+
+- **Modèles ajoutés** :
+  - `SUBSCRIPTION_TIER_CHOICES` : Free, Basic, Premium, Head Hunter, Enterprise
+  - `subscription_tier` field sur User (default="free")
+  - `UserLLMConfig` model (OneToOne avec User) :
+    - `is_enabled`, `llm_endpoint`, `llm_model`, `llm_api_key`
+    - Permet aux utilisateurs d'utiliser leur propre LLM
+
+- **Formulaires créés** :
+  - `AccountIdentityForm` : prénom, nom
+  - `AccountEmailForm` : changement email avec vérification unicité
+  - `AccountPasswordForm` : mot de passe actuel + nouveau + confirmation
+  - `UserLLMConfigForm` : activation + endpoint + modèle + API key
+
+- **Export RGPD** (`/accounts/export/`) :
+  - Endpoint `export_data_view`
+  - Export JSON complet : profil, CVs, lignes extraites, lettres motivation, config LLM
+  - Clé API exclue de l'export pour sécurité
+  - Téléchargement fichier `jobmatch_data_{user_id}.json`
+
+- **UI/UX** :
+  - Sidebar profil : "Supprimer mon compte" → "Gérer mon compte" avec icône engrenage
+  - Template `settings.html` avec design cohérent (cards, gradients)
+  - Formulaires stylisés Bootstrap 5
+
+- **Migration 0004** : `add_subscription_and_llm_config`
+
+**Problèmes rencontrés:**
+- **File not read error** : outil Edit échoue si fichier non lu préalablement
+  - Solution : toujours lire le fichier avant de l'éditer
+- **docker-compose KeyError 'ContainerConfig'** (récurrent)
+  - Solution : `docker-compose down` complet avant `up`
+
+**Décisions techniques:**
+- **Multi-form pattern** : un seul template, plusieurs formulaires indépendants via `form_type`
+- **Re-login après password change** : `login(request, user)` après `form.save()` pour éviter déconnexion
+- **get_or_create pour LLM config** : crée automatiquement la config si inexistante
+- **OneToOneField avec related_name** : `user.llm_config` pour accès direct
+- **API key non exportée** : sécurité RGPD (données sensibles exclues)
+
+---
+
+### 2025-12-23 (10) - Vision LLM + Prompts externalisés + Toggle/Edit UI
+**Contexte:** Améliorer cv-ingestion pour supporter les PDF image (scannés) via Vision LLM, externaliser les prompts, et ajouter des contrôles UI sur les lignes extraites
+
+**Réalisations:**
+- **Support Vision LLM** dans cv-ingestion :
+  - Méthode `supports_vision()` sur `LLMProvider` base class
+  - Méthode `analyze_images()` pour traiter les images avec Vision LLM
+  - Support OpenAI (GPT-4V, GPT-4o), Anthropic (Claude 3/4), Ollama (LLaVA)
+  - Nouvelle fonction `analyze_cv_images()` exportée
+
+- **Extraction PDF intelligente** :
+  - `is_text_based_pdf()` : détection auto texte vs image (heuristique: min 100 chars total, 50 chars/page)
+  - `extract_pdf_content()` : retourne `PDFContent(is_text_based, text, images)`
+  - `convert_pdf_to_images()` : PDF → PNG via pdf2image/poppler
+  - `ocr_images()` : fallback OCR via Tesseract si Vision LLM non disponible
+  - Logique dans main.py : texte → LLM texte, image → Vision LLM ou OCR fallback
+
+- **Prompts externalisés** :
+  - Dossier `src/prompts/` avec fichiers .txt séparés
+  - `cv_extraction_text.txt` : prompt pour extraction texte
+  - `cv_extraction_vision.txt` : prompt pour extraction images
+  - `__init__.py` avec `load_prompt()`, `get_cv_text_prompt()`, `get_cv_vision_prompt()`
+  - Prompts traduits en français
+  - Règle expériences : 1 mission = 1 entrée (découpage si trop long)
+
+- **UI Toggle/Edit sur ExtractedLines** :
+  - Toggle switch actif/inactif (vert/rouge) sur chaque ligne extraite
+  - Bouton édition (pictogramme crayon)
+  - Endpoint `line/toggle/<int:line_id>/` avec `extracted_line_toggle_view`
+  - JavaScript pour appels API et mise à jour visuelle
+  - `resumeProcessingCVs()` pour reprendre le polling des CVs "En cours" au chargement
+
+- **Dépendances ajoutées** :
+  - requirements.txt : `pdf2image`, `pytesseract`, `Pillow`
+  - Dockerfile : `poppler-utils`, `tesseract-ocr`, `tesseract-ocr-fra`, `tesseract-ocr-eng`
+
+**Problèmes rencontrés:**
+- **CV stuck "En cours..."** après page reload
+  - Cause : polling interrompu par le reload avant réception du status "completed"
+  - Solution : `resumeProcessingCVs()` qui reprend le polling pour les CVs avec `data-status="processing"`
+- **docker-compose KeyError 'ContainerConfig'**
+  - Cause : bug docker-compose avec rebuild
+  - Solution : `docker-compose stop && rm -f && up` au lieu de `up -d` direct
+
+**Décisions techniques:**
+- **Vision LLM natif plutôt qu'OCR seul** : meilleure qualité d'extraction, compréhension du layout
+- **OCR en fallback** : Tesseract si le provider LLM ne supporte pas la vision
+- **Prompts en fichiers .txt** : facilite l'itération et le versioning des prompts
+- **Découpage expériences** : 1 mission = 1 entrée pour granularité fine dans le matching
+- **Prompt en français** : le LLM comprend mieux le contexte des CVs français
+
+---
+
+### 2025-12-22 (9) - Intégration GUI ↔ cv-ingestion + Polling asynchrone + Suppression CV
+**Contexte:** Connecter la GUI Django au microservice cv-ingestion en mode Docker, implémenter le polling asynchrone pour les traitements longs, et ajouter la suppression des CVs
+
+**Réalisations:**
+- **Configuration Docker multi-service** :
+  - docker-compose.yml : context root pour accès au package shared
+  - app/cv-ingestion/Dockerfile : copie shared/ et install pip
+  - app/gui/Dockerfile : adapté pour context root
+  - env_file dans docker-compose pour charger app/cv-ingestion/.env
+  - Ports exposés via variables : GUI_PORT=8085, DB_PORT=5433
+
+- **Configuration environnement** :
+  - `.env` root avec config commune (DATABASE_URL, ports, URLs inter-services)
+  - `.envrc` pour direnv (charge tous les .env du projet)
+  - `app/cv-ingestion/.env` : LLM_TYPE=ollama, LLM_ENDPOINT=http://ollama.molp.fr/v1
+
+- **Polling asynchrone cv-ingestion** (pattern async/polling) :
+  - `task_store.py` : store en mémoire thread-safe (TaskStatus enum, Task dataclass)
+  - `POST /extract/async` : retourne immédiatement un task_id
+  - `GET /extract/status/{task_id}` : retourne pending/processing/completed/failed
+  - BackgroundTasks FastAPI pour traitement asynchrone
+  - Ancien endpoint synchrone `/extract` conservé pour rétrocompatibilité
+
+- **Intégration GUI polling** :
+  - `cv_upload_view` : appelle `/extract/async`, retourne task_id au frontend
+  - `cv_status_view` : nouvelle vue pour polling depuis le frontend
+  - Modèle CV : ajout champ `task_id` (migration 0003)
+  - JavaScript : polling toutes les 2s avec messages de progression dynamiques
+  - Timeout max 4 minutes (MAX_POLL_ATTEMPTS=120)
+
+- **Suppression CV** :
+  - `cv_delete_view` : endpoint DELETE/POST pour supprimer un CV
+  - Supprime le fichier du storage + cascade sur ExtractedLines
+  - Modal de confirmation avec nom du CV
+  - Bouton corbeille sur chaque document dans la liste
+
+- **Navigation par hash URL** :
+  - `showSection()` met à jour `window.location.hash` avec `history.replaceState()`
+  - Au chargement de la page, lecture du hash pour restaurer la section active
+  - Après upload/suppression CV : `window.location.hash = 'documents'` avant reload
+  - Permet de rester sur la bonne section après n'importe quelle action
+
+**Problèmes rencontrés:**
+- **`shared` package not found** en Docker build
+  - Cause : context `./app/cv-ingestion` n'inclut pas `../../shared`
+  - Solution : context `.` (root) + `COPY shared/` dans Dockerfile
+- **Port 5432 already allocated**
+  - Cause : PostgreSQL local déjà sur le port
+  - Solution : DB_PORT=5433 dans .env
+- **Port 8080 already allocated**
+  - Cause : autre service sur le port
+  - Solution : GUI_PORT=8085 dans .env
+- **`LLM_API_KEY is required for OpenAI`** en Docker
+  - Cause : Docker ne chargeait pas le .env du service
+  - Solution : ajouter `env_file: app/cv-ingestion/.env` dans docker-compose.yml
+- **404 Not Found `/chat/completions`** sur Ollama
+  - Cause : LLM_ENDPOINT sans `/v1` suffix
+  - Solution : `http://ollama.molp.fr/v1` (pas `http://ollama.molp.fr`)
+- **Container ne pick up pas les changements .env**
+  - Solution : `docker-compose down && docker-compose up -d` (pas juste restart)
+- **docker-compose `KeyError: 'ContainerConfig'`**
+  - Cause : bug docker-compose avec rebuild
+  - Solution : `docker-compose down` puis `up` au lieu de juste `up -d`
+
+**Décisions techniques:**
+- **Polling plutôt que WebSockets** : plus simple, suffisant pour le POC
+- **Store en mémoire** plutôt que Redis : simplicité, pas de dépendance externe
+- **BackgroundTasks FastAPI** plutôt que Celery : léger, pas de broker à gérer
+- **task_id UUID** : unique, non prédictible, pas besoin de séquence DB
+- **Cascade delete** : supprimer un CV supprime automatiquement ses ExtractedLines
+
+---
+
 ### 2025-12-22 (8) - Tests intégration cv-ingestion + Package shared installable
 **Contexte:** Tester cv-ingestion avec serveur Ollama distant et rendre le package shared installable
 
@@ -20,6 +242,11 @@
   - Plus besoin de PYTHONPATH pour les imports
   - Microservices vraiment indépendants
 
+- **Fix CI check-branch** :
+  - Job ne se déclenchait pas correctement (github.head_ref vide sur push)
+  - Ajout condition `if: github.event_name == 'pull_request' && github.base_ref == 'main'`
+  - Maintenant le check ne tourne que pour les PRs vers main
+
 - **Interfaces partagées créées** :
   - `shared.constants.ContentType` : enum pour CV et offres
   - `shared.interfaces.ExtractedLine` : ligne extraite avec type et ordre
@@ -32,6 +259,12 @@
   - Solution : transformer shared en package pip installable
 - **Structure package incorrecte** : hatchling vs setuptools
   - Solution : utiliser setuptools avec structure `src/shared/`
+- **CI check-branch exécuté sur push** : `github.head_ref` vide sur event push
+  - Solution : ajouter condition `if: github.event_name == 'pull_request' && github.base_ref == 'main'`
+
+**Commandes utiles:**
+- Supprimer branche locale : `git branch -d feature/matthieu-cv-ingestion`
+- Supprimer branche distante : `git push origin --delete feature/matthieu-cv-ingestion`
 
 **Décisions techniques:**
 - **Package pip installable** plutôt que PYTHONPATH : vraie indépendance des microservices
@@ -253,6 +486,22 @@
 - **Microservices isolés** : ne partagent pas de DB, communiquent uniquement par API
 - **Package pip installable** pour shared : `pip install -e ../../shared` dans requirements.txt
 - **Structure package Python** : `shared/src/shared/` avec setuptools pour imports propres
+- **Polling async** : pattern simple et robuste pour les traitements longs (préférer à WebSockets pour POC)
+- **BackgroundTasks FastAPI** : alternative légère à Celery pour traitement async sans broker
+- **docker-compose context root** : nécessaire quand un service a besoin de fichiers hors de son dossier
+- **env_file vs environment** : env_file charge un fichier .env, environment définit des vars inline
+- **Ollama API** : endpoint doit se terminer par `/v1` pour être compatible OpenAI
+- **Vision LLM** : GPT-4o, Claude 3+, LLaVA supportent l'analyse d'images nativement
+- **Prompts externalisés** : fichiers .txt séparés facilitent l'itération sans toucher au code
+- **Découpage expériences CV** : 1 mission = 1 entrée pour un matching plus précis
+- **pdf2image + poppler** : conversion PDF → images pour Vision LLM ou OCR
+- **Multi-form pattern Django** : `form_type` hidden field pour gérer plusieurs forms sur une page
+- **Re-login après password change** : appeler `login(request, user)` pour éviter la déconnexion
+- **get_or_create pour OneToOne** : crée automatiquement la relation si inexistante
+- **Export RGPD** : exclure les données sensibles (API keys) même si l'utilisateur les demande
+- **Form fields vs JSON** : pour multipart/form-data avec fichier, utiliser Form() pas Body()
+- **Restriction fonctionnalités par tier** : double vérification côté serveur ET côté template
+- **Modal pricing** : CSS natif avec backdrop-filter pour blur, pas besoin de lib JS
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -265,6 +514,14 @@
 - **Ruff B904** : dans un `except`, utiliser `raise ... from e` ou `raise ... from None`
 - **Import shared sans pip install** : ne pas oublier d'installer le package avant de lancer les microservices
 - **Structure package** : bien utiliser `src/package/` pour que setuptools trouve les modules
+- **Docker .env changes** : `docker-compose restart` ne relit pas les .env, utiliser `down` puis `up`
+- **Ollama endpoint** : toujours ajouter `/v1` à l'URL de base pour compatibilité OpenAI
+- **docker-compose context** : si un service a besoin de `../../shared`, mettre context à `.` (root)
+- **KeyError ContainerConfig** : bug docker-compose, résoudre avec `down` complet avant `up`
+- **Page reload perd la section active** : utiliser URL hash (`#section`) pour persister l'état
+- **Polling interrompu par reload** : implémenter `resumeProcessingCVs()` pour reprendre au chargement
+- **PDF scannés sans texte** : pdfplumber retourne vide, utiliser Vision LLM ou OCR
+- **Prompts trop longs dans le code** : externaliser en fichiers .txt pour maintenabilité
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -279,6 +536,10 @@
 - **Factory Pattern** pour providers interchangeables (LLM, DB, etc.)
 - **pydantic-settings** pour config via env vars avec validation
 - **Ruff avec --fix** dans pre-commit : auto-correction des erreurs simples
+- **URL hash navigation** : `history.replaceState()` + lecture du hash au load pour persister l'état UI
+- **Prompts en fichiers .txt** : faciles à éditer, versionner, et itérer sans toucher au code Python
+- **Détection auto PDF texte/image** : heuristique simple (min chars) avant de choisir la méthode d'extraction
+- **Vision LLM + OCR fallback** : robustesse maximale pour tous types de PDF
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python
@@ -306,9 +567,27 @@
 - [ ] Créer projet GCloud + Cloud SQL + Cloud Storage
 - [x] Définir les interfaces partagées (schemas CV, offres) → shared package
 - [x] **Tester cv-ingestion** avec un vrai CV PDF → script test_integration.py
-- [ ] Intégrer l'upload de CV dans la GUI (section "Mes documents")
+- [x] Intégrer l'upload de CV dans la GUI (section "Mes documents")
 - [ ] Implémenter les sections du profil (LM, pitch, succès, hobbies)
 - [ ] Upload photo de profil
-- [ ] **Connecter GUI → cv-ingestion** : appel API après upload CV
-- [ ] **Test API cv-ingestion** : lancer serveur FastAPI et tester endpoint /extract
+- [x] **Connecter GUI → cv-ingestion** : appel API après upload CV
+- [x] **Test API cv-ingestion** : lancer serveur FastAPI et tester endpoint /extract
 - [ ] Installer shared dans les autres microservices (offre-ingestion, matching, gui)
+- [x] **Polling asynchrone** : cv-ingestion avec task_id + GUI polling
+- [x] **Suppression CV** : endpoint + modal de confirmation
+- [x] **Navigation hash URL** : conserver la section active après reload
+- [x] **Vision LLM** : support PDF images/scannés avec GPT-4o, Claude, LLaVA
+- [x] **Prompts externalisés** : fichiers .txt dans src/prompts/
+- [x] **OCR fallback** : Tesseract si Vision LLM non disponible
+- [x] **Toggle/Edit UI** : boutons sur les lignes extraites
+- [x] **Page Gestion Compte** : settings avec identité, email, password, abonnement, LLM config
+- [x] **Export RGPD** : endpoint d'export JSON des données utilisateur
+- [x] **UserLLMConfig model** : permet aux users d'utiliser leur propre LLM
+- [x] **LLM Config Fallback** : utilise env vars si config user vide
+- [x] **Sélecteur d'abonnement** : choix du plan dans Account Settings
+- [x] **Modal Pricing** : comparaison des plans avec fonctionnalités et tarifs
+- [x] **Restriction LLM Config** : disponible uniquement pour Premium+
+- [ ] **Édition inline** : permettre de modifier le contenu des lignes extraites
+- [ ] **Regroupement expériences** : afficher les missions d'un même poste ensemble dans l'UI
+- [ ] **Intégration paiement** : Stripe pour les abonnements payants
+- [ ] **Validation email** : confirmation par email lors du changement d'adresse

@@ -16,4 +16,5 @@ urlpatterns = [
     path("cv/status/<str:task_id>/", views.cv_status_view, name="cv_status"),
     path("cv/delete/<int:cv_id>/", views.cv_delete_view, name="cv_delete"),
     path("line/toggle/<int:line_id>/", views.extracted_line_toggle_view, name="line_toggle"),
+    path("pricing/", views.pricing_view, name="pricing"),
 ]

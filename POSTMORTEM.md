@@ -266,6 +266,23 @@
 - Supprimer branche locale : `git branch -d feature/matthieu-cv-ingestion`
 - Supprimer branche distante : `git push origin --delete feature/matthieu-cv-ingestion`
 
+**Workflow Ruff + Git (commandes essentielles):**
+```bash
+# 1. Checker les erreurs (sans modifier)
+ruff check .
+
+# 2. Auto-fix ce qui peut l'être + formatter
+ruff check --fix . && ruff format .
+
+# 3. Stage + commit + push (one-liner)
+ruff check --fix . && ruff format . && git add -A && git commit -m "message" && git push
+
+# Si le commit échoue à cause du pre-commit hook (trailing whitespace, etc.) :
+# → Les fichiers modifiés par le hook sont "unstaged"
+# → Solution : re-stage et re-commit
+git add -A && git commit -m "message"
+```
+
 **Décisions techniques:**
 - **Package pip installable** plutôt que PYTHONPATH : vraie indépendance des microservices
 - **Mode éditable** (`-e`) : modifications shared reflétées sans réinstallation
@@ -522,6 +539,7 @@
 - **Polling interrompu par reload** : implémenter `resumeProcessingCVs()` pour reprendre au chargement
 - **PDF scannés sans texte** : pdfplumber retourne vide, utiliser Vision LLM ou OCR
 - **Prompts trop longs dans le code** : externaliser en fichiers .txt pour maintenabilité
+- **Pre-commit hooks modifient les fichiers** : les hooks (trailing whitespace, Ruff, etc.) peuvent modifier les fichiers staged, ce qui les "unstage" et fait échouer le commit. Solution : `git add -A && git commit` pour re-stage et recommit
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive

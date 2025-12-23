@@ -521,3 +521,8 @@ def export_data_view(request):
     logger.info(f"User {user.id} exported their data")
 
     return response
+
+
+def pricing_view(request):
+    """Display the pricing page with plan comparison."""
+    return render(request, "accounts/pricing.html")

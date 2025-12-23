@@ -641,6 +641,31 @@ git add -A && git commit -m "message"
 - `.claude/settings.json` pour définir les règles de vibecoding
 - Préfixe de commit `[CortexForge]` pour identifier les commits vibecoding
 - Architecture microservices avec dossiers séparés par domaine
+
+## Dépannage git
+- Pour bien recréer la dépendance entre les branches main et dev, il faut bien mettre à jour la baranche main puis écraser la branche dev en resettant l'historique de la branche dev avec les commandes suivantes :
+
+```bash
+# Se placer sur la branche dev
+git checkout dev
+# Ecraser l'historique de la branche dev avec celui de la branche main
+git reset --hard main
+``` 
+
+### Workflow Git complet (feature branch → PR → merge)
+```bash
+# 1. Avant commit : lint et format
+ruff check --fix . && ruff format .
+
+# 2. Commit
+git add -A && git commit -m "[CortexForge] message"
+
+# 3. Push et créer PR sur GitHub
+git push -u origin feature/ma-branche
+
+# 4. Après merge de la PR : retour sur dev et cleanup
+git checkout dev && git pull && git branch -d feature/ma-branche
+```
 - **CSS clamp()** pour des tailles responsive sans media queries
 - **Template blocks conditionnels** avec `{% if user.is_authenticated %}{{ block.super }}{% endif %}`
 - **Variables CSS** (`:root`) pour cohérence des couleurs/styles

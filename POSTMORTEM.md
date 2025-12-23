@@ -2,44 +2,83 @@
 
 ## 📅 Sessions
 
-### 2025-12-23 (13) - Fix LLM Config Form + Page Pricing + Responsive 4K
-**Contexte:** Corriger le formulaire LLM config, remplacer la modal pricing par une page dédiée, et rendre le site responsive pour grands écrans
+### 2025-12-23 (14) - Fix extraction personal_info/social_link + CSS/Text tweaks
+**Contexte:** Bug où les données personnelles et liens sociaux extraits du CV n'étaient pas sauvegardés correctement
 
 **Réalisations:**
-- **Fix formulaire LLM Config** :
-  - Problème : erreur "Erreur lors de la mise à jour" quand on sauvegarde la config LLM
-  - Cause : `PasswordInput` widget ne préserve pas la valeur de l'API key au re-render
-  - Solution : `clean()` vérifie si une clé existe déjà, `save()` préserve la clé existante si champ vide
-  - Placeholder "Laisser vide pour conserver l'actuelle" + help text si clé configurée
+- **Fix analyzer.py pour personal_info et social_link** :
+  - Bug identifié : `parse_llm_response()` n'extrayait les champs structurés que pour `experience` et `education`
+  - Les types `personal_info` et `social_link` avaient leurs ExtractedLine créées mais avec tous les champs structurés à `None`
+  - Ajout des elif blocks pour extraire : first_name, last_name, email, phone, location (personal_info) et link_type, url (social_link)
 
-- **Regroupement sections Account Settings** :
-  - Fusion Identité + Email + Mot de passe dans une seule carte "Mon compte"
-  - Subsections avec titres h3 et séparateurs horizontaux
-  - CSS `.subsection`, `.subsection-title`, `.subsection-divider`
+- **Fix CSS checkboxes type de contrat** :
+  - Les checkboxes s'affichaient verticalement au lieu d'horizontalement
+  - Le CSS sur `.contract-checkboxes ul` ne fonctionnait pas car Django `CheckboxSelectMultiple` génère un `<ul>` avec styles inline
+  - Solution : rendu manuel des checkboxes avec `{% for choice in form.contract_types %}` au lieu de `{{ form.contract_types }}`
+  - Nouveau CSS ciblant `.contract-checkbox-label` directement
 
-- **Page Pricing dédiée** (`/accounts/pricing/`) :
-  - Remplace la modal qui ne fonctionnait pas (problème de blocks Django)
-  - Template `pricing.html` avec grille de 5 plans
-  - Vue `pricing_view` simple sans login requis
-  - Boutons "Voir les offres" redirigent vers cette page
-
-- **Responsive grands écrans (4K)** :
-  - CSS variables `--base-font-size` qui augmente avec la taille d'écran
-  - Breakpoints : 1440px (18px), 1920px (20px), 2560px (24px), 3840px (28px)
-  - Containers s'élargissent proportionnellement
-  - Templates utilisent `min()` CSS pour limiter la largeur
+- **Mise à jour textes sections profil** :
+  - "Mon pitch" subtitle : "Preparez votre presentation..." → "Boostez votre presentation avec notre IA"
+  - "Succes professionnels" subtitle : "Listez vos accomplissements..." → "Laissez-vous guider par notre consultant IA pour formaliser vos succes"
 
 **Problèmes rencontrés:**
-- **Modal ne s'affichait pas** : blocks `{% block modals %}` et `{% block extra_js %}` pas rendus
-  - Cause : problème de rendu des blocks Django dans le container Docker
-  - Solution : abandonner la modal, créer une page dédiée (plus simple et fiable)
-- **Pre-commit hooks unstage les fichiers** : trailing whitespace modifie les fichiers
-  - Solution : `git add -A && git commit` pour re-stage après modification par hook
+- **ExtractedLine structured fields all None** :
+  - Diagnostic via Django shell : `ExtractedLine.objects.filter(content_type="personal_info")` retournait des objets avec first_name=None
+  - Cause : le code dans parse_llm_response() avait des elif pour experience/education mais pas pour les autres types structurés
+  - Solution : ajout des branches elif pour personal_info et social_link
 
 **Décisions techniques:**
-- **Page dédiée vs Modal** : plus fiable, meilleure UX, URL partageable
-- **CSS variables pour responsive** : `rem` hérite de `html { font-size }`, tout scale automatiquement
-- **Préservation API key** : pattern Django pour champs password qui ne doivent pas être réinitialisés
+- **Extraction conditionnelle par content_type** : chaque type avec des champs structurés a sa propre branche de parsing
+- **Validation None-safe** : `item.get("field", "").strip() if item.get("field") else None` pour éviter les strings vides
+
+---
+
+### 2025-12-23 (13) - Photo Upload avec Cropper.js + django-extensions local
+**Contexte:** Ajouter l'upload de photo de profil avec recadrage style LinkedIn et outils de visualisation des modèles Django
+
+**Réalisations:**
+- **django-extensions pour visualisation modèles** (local uniquement) :
+  - `requirements-dev.txt` créé pour dépendances locales seulement
+  - `django_extensions` ajouté conditionnellement dans settings.py (`if ENV_MODE == "local"`)
+  - Import try/except pour éviter crash si non installé
+  - `graph_models accounts -o models.png` pour générer diagramme des relations
+
+- **Photo de profil avec Cropper.js** :
+  - Field `photo` (ImageField) ajouté au modèle User
+  - Migration 0007_add_photo_to_user créée et appliquée
+  - Pillow ajouté à requirements.txt pour traitement images
+  - `photo_upload_view` et `photo_delete_view` créées
+  - Routes `/photo/upload/` et `/photo/delete/` configurées
+  - Media files servis en développement (config/urls.py avec `static(MEDIA_URL)`)
+
+- **Interface recadrage style LinkedIn** :
+  - Cropper.js intégré via CDN (CSS + JS)
+  - Modal en deux étapes : 1) Sélection photo, 2) Recadrage
+  - Vue circulaire pour le crop (style LinkedIn)
+  - Zoom avec molette, drag pour repositionner
+  - Sortie 400x400px JPEG qualité 90%
+  - Boutons Annuler/Appliquer pour le crop
+
+- **Configuration Docker** :
+  - django_extensions conditionnel : chargé uniquement si `ENV_MODE == "local"` ET module disponible
+  - Évite `ModuleNotFoundError` en Docker où le module n'est pas installé
+
+**Problèmes rencontrés:**
+- **graphviz not found** : pydotplus nécessite le package système graphviz
+  - Solution : `sudo apt install graphviz` (manuel car besoin de sudo)
+- **ModuleNotFoundError: django_extensions** en Docker
+  - Cause : django_extensions installé en local mais pas dans requirements.txt Docker
+  - Solution : ajout conditionnel avec try/except + vérification ENV_MODE == "local"
+- **offre-ingestion sans Dockerfile** : `docker-compose build` échoue
+  - Solution : builder explicitement `docker-compose build gui cv-ingestion`
+
+**Décisions techniques:**
+- **Cropper.js** : bibliothèque la plus populaire et mature pour le recadrage d'images
+- **Two-step modal** : sépare la sélection du recadrage pour une UX plus claire
+- **Crop circulaire** : correspond au style moderne des profils (LinkedIn, etc.)
+- **Canvas toBlob** : conversion côté client avant upload pour réduire la bande passante
+- **requirements-dev.txt** : sépare les dépendances dev (graph_models) des dépendances prod
+- **ENV_MODE check** : double protection (env var + try/except) pour éviter crashes
 
 ---
 
@@ -560,6 +599,13 @@ git add -A && git commit -m "message"
 - **Form fields vs JSON** : pour multipart/form-data avec fichier, utiliser Form() pas Body()
 - **Restriction fonctionnalités par tier** : double vérification côté serveur ET côté template
 - **Modal pricing** : CSS natif avec backdrop-filter pour blur, pas besoin de lib JS
+- **Cropper.js** : bibliothèque la plus mature pour recadrage d'images (utilisée par LinkedIn)
+- **Two-step modal** : sépare la sélection de l'édition pour une meilleure UX
+- **Canvas toBlob** : conversion côté client avant upload pour optimiser la bande passante
+- **requirements-dev.txt** : permet d'avoir des dépendances uniquement pour le dev local
+- **Conditional INSTALLED_APPS** : `if ENV_MODE == "local"` + try/except pour apps optionnelles
+- **parse_llm_response() extensible** : chaque content_type avec des champs structurés nécessite sa propre branche elif
+- **Rendu manuel checkboxes Django** : pour un contrôle CSS total, utiliser `{% for choice in form.field %}{{ choice.tag }}{% endfor %}` au lieu de `{{ form.field }}`
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -581,6 +627,12 @@ git add -A && git commit -m "message"
 - **PDF scannés sans texte** : pdfplumber retourne vide, utiliser Vision LLM ou OCR
 - **Prompts trop longs dans le code** : externaliser en fichiers .txt pour maintenabilité
 - **Pre-commit hooks modifient les fichiers** : les hooks (trailing whitespace, Ruff, etc.) peuvent modifier les fichiers staged, ce qui les "unstage" et fait échouer le commit. Solution : `git add -A && git commit` pour re-stage et recommit
+- **offre-ingestion sans Dockerfile** : `docker-compose build` échoue si un service est déclaré sans Dockerfile
+  - Solution : builder explicitement les services existants : `docker-compose build gui cv-ingestion`
+- **Django app optionnelle en production** : ne jamais mettre une app dev-only dans INSTALLED_APPS sans condition
+  - Solution : `if ENV_MODE == "local": try: import app; INSTALLED_APPS.append(...)`
+- **Nouveaux content_types structurés** : lors de l'ajout d'un content_type avec des champs structurés (comme personal_info ou social_link), ne pas oublier d'ajouter le parsing dans `parse_llm_response()` dans analyzer.py
+- **Django CheckboxSelectMultiple** : le widget génère un `<ul><li>` avec styles qui peuvent override le CSS. Préférer le rendu manuel pour un contrôle total du layout
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -654,7 +706,7 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - [x] **Tester cv-ingestion** avec un vrai CV PDF → script test_integration.py
 - [x] Intégrer l'upload de CV dans la GUI (section "Mes documents")
 - [ ] Implémenter les sections du profil (LM, pitch, succès, hobbies)
-- [ ] Upload photo de profil
+- [x] Upload photo de profil avec Cropper.js (recadrage style LinkedIn)
 - [x] **Connecter GUI → cv-ingestion** : appel API après upload CV
 - [x] **Test API cv-ingestion** : lancer serveur FastAPI et tester endpoint /extract
 - [ ] Installer shared dans les autres microservices (offre-ingestion, matching, gui)

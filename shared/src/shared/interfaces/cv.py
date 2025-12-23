@@ -23,6 +23,23 @@ class EducationData(BaseModel):
     description: str  # Field of study, honors, or additional details
 
 
+class PersonalInfoData(BaseModel):
+    """Structured data for personal information extracted from CV."""
+
+    first_name: str = ""
+    last_name: str = ""
+    email: str = ""
+    phone: str = ""
+    location: str = ""
+
+
+class SocialLinkData(BaseModel):
+    """Structured data for a social link extracted from CV."""
+
+    link_type: str  # linkedin, github, portfolio, blog, medium, other
+    url: str
+
+
 class ExtractedLine(BaseModel):
     """A single extracted line from a CV with its content type."""
 
@@ -35,6 +52,17 @@ class ExtractedLine(BaseModel):
     dates: str | None = None  # Date range
     position: str | None = None  # Job title/diploma
     description: str | None = None  # Description
+
+    # Structured data fields for personal_info
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    location: str | None = None
+
+    # Structured data fields for social_link
+    link_type: str | None = None
+    url: str | None = None
 
     def is_structured(self) -> bool:
         """Check if this line has structured data (experience/education)."""

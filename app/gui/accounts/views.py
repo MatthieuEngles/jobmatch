@@ -21,7 +21,16 @@ from .forms import (
     UserProfileForm,
     UserRegistrationForm,
 )
-from .models import CV, ExtractedLine, User, UserLLMConfig
+from .models import (
+    CV,
+    SOCIAL_LINK_TYPE_CHOICES,
+    CandidateProfile,
+    ExtractedLine,
+    ProfileItemSelection,
+    SocialLink,
+    User,
+    UserLLMConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +66,27 @@ def profile_view(request):
     else:
         form = UserProfileForm(instance=request.user)
 
-    # Get extracted lines grouped by content_type for career path display
     user = request.user
+
+    # Get or create default "Complet" profile
+    default_profile, _ = CandidateProfile.get_or_create_default(user)
+
+    # Get current profile from session or use default
+    current_profile_id = request.session.get("current_profile_id")
+    if current_profile_id:
+        try:
+            current_profile = CandidateProfile.objects.get(id=current_profile_id, user=user)
+        except CandidateProfile.DoesNotExist:
+            current_profile = default_profile
+            request.session["current_profile_id"] = default_profile.id
+    else:
+        current_profile = user.candidate_profiles.filter(is_default=True).first() or default_profile
+        request.session["current_profile_id"] = current_profile.id
+
+    # Get all user profiles for dropdown
+    candidate_profiles = user.candidate_profiles.all()
+
+    # Get extracted lines grouped by content_type for career path display
     experiences = user.extracted_lines.filter(content_type="experience", is_active=True).order_by(
         "order", "-created_at"
     )
@@ -72,9 +100,19 @@ def profile_view(request):
     certifications = user.extracted_lines.filter(content_type="certification", is_active=True).order_by(
         "order", "-created_at"
     )
+    languages = user.extracted_lines.filter(content_type="language", is_active=True).order_by("order", "-created_at")
+    interests = user.extracted_lines.filter(content_type="interest", is_active=True).order_by("order", "-created_at")
+
+    # Build selection map for current profile
+    profile_selections = {}
+    for selection in current_profile.item_selections.all():
+        profile_selections[selection.extracted_line_id] = selection.is_selected
 
     # Get user's CVs for documents section
     user_cvs = user.cvs.all()
+
+    # Get user's social links
+    social_links = user.social_links.all()
 
     context = {
         "form": form,
@@ -83,7 +121,14 @@ def profile_view(request):
         "skills_soft": skills_soft,
         "educations": educations,
         "certifications": certifications,
+        "languages": languages,
+        "interests": interests,
         "user_cvs": user_cvs,
+        "candidate_profiles": candidate_profiles,
+        "current_profile": current_profile,
+        "profile_selections": profile_selections,
+        "social_links": social_links,
+        "social_link_types": SOCIAL_LINK_TYPE_CHOICES,
     }
     return render(request, "accounts/profile.html", context)
 
@@ -94,6 +139,130 @@ def delete_account_view(request):
         request.user.delete()
         return redirect("home")
     return render(request, "accounts/delete_account.html")
+
+
+@login_required
+@require_POST
+def photo_upload_view(request):
+    """Handle profile photo upload with preview and cropping."""
+    if "photo" not in request.FILES:
+        return JsonResponse({"success": False, "error": "Aucune photo fournie"}, status=400)
+
+    photo = request.FILES["photo"]
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if photo.content_type not in allowed_types:
+        return JsonResponse(
+            {"success": False, "error": "Format non supporte. Utilisez JPG, PNG ou WebP."},
+            status=400,
+        )
+
+    # Validate file size (max 5MB)
+    max_size = 5 * 1024 * 1024
+    if photo.size > max_size:
+        return JsonResponse(
+            {"success": False, "error": "La photo ne doit pas depasser 5 Mo"},
+            status=400,
+        )
+
+    # Delete old photo if exists
+    if request.user.photo:
+        request.user.photo.delete(save=False)
+
+    # Save new photo
+    request.user.photo = photo
+    request.user.save(update_fields=["photo"])
+
+    logger.info(f"User {request.user.id} uploaded a new profile photo")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "photo_url": request.user.photo.url,
+            "message": "Photo mise a jour",
+        }
+    )
+
+
+@login_required
+@require_POST
+def photo_delete_view(request):
+    """Delete the user's profile photo."""
+    if request.user.photo:
+        request.user.photo.delete(save=False)
+        request.user.photo = None
+        request.user.save(update_fields=["photo"])
+        logger.info(f"User {request.user.id} deleted their profile photo")
+
+    return JsonResponse({"success": True, "message": "Photo supprimee"})
+
+
+@login_required
+@require_POST
+def social_link_add_view(request):
+    """Add a new social link."""
+    import json
+
+    try:
+        data = json.loads(request.body)
+        link_type = data.get("link_type")
+        url = data.get("url")
+
+        if not link_type or not url:
+            return JsonResponse(
+                {"success": False, "error": "Type et URL requis"},
+                status=400,
+            )
+
+        # Validate link type
+        valid_types = [t[0] for t in SOCIAL_LINK_TYPE_CHOICES]
+        if link_type not in valid_types:
+            return JsonResponse(
+                {"success": False, "error": "Type de lien invalide"},
+                status=400,
+            )
+
+        # Create the link
+        link = SocialLink.objects.create(
+            user=request.user,
+            link_type=link_type,
+            url=url,
+            order=request.user.social_links.count(),
+        )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "link": {
+                    "id": link.id,
+                    "link_type": link.link_type,
+                    "link_type_display": link.get_link_type_display(),
+                    "url": link.url,
+                },
+            }
+        )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"success": False, "error": "Donnees invalides"},
+            status=400,
+        )
+
+
+@login_required
+@require_POST
+def social_link_delete_view(request, link_id):
+    """Delete a social link."""
+    try:
+        link = SocialLink.objects.get(id=link_id, user=request.user)
+        link.delete()
+        return JsonResponse({"success": True})
+    except SocialLink.DoesNotExist:
+        return JsonResponse(
+            {"success": False, "error": "Lien non trouve"},
+            status=404,
+        )
 
 
 @login_required
@@ -262,8 +431,61 @@ def cv_status_view(request, task_id):
                 if line_data.get("description"):
                     line_kwargs["description"] = line_data["description"]
 
+                # Add structured fields for personal_info
+                if line_data.get("first_name"):
+                    line_kwargs["first_name"] = line_data["first_name"]
+                if line_data.get("last_name"):
+                    line_kwargs["last_name"] = line_data["last_name"]
+                if line_data.get("email"):
+                    line_kwargs["email"] = line_data["email"]
+                if line_data.get("phone"):
+                    line_kwargs["phone"] = line_data["phone"]
+                if line_data.get("location"):
+                    line_kwargs["location"] = line_data["location"]
+
+                # Add structured fields for social_link
+                if line_data.get("link_type"):
+                    line_kwargs["link_type"] = line_data["link_type"]
+                if line_data.get("url"):
+                    line_kwargs["url"] = line_data["url"]
+
                 ExtractedLine.objects.create(**line_kwargs)
                 lines_created += 1
+
+                # Sync personal_info to User model (only if fields are empty)
+                content_type = line_data.get("content_type")
+                if content_type == "personal_info":
+                    user = request.user
+                    updated = False
+                    if line_data.get("first_name") and not user.first_name:
+                        user.first_name = line_data["first_name"]
+                        updated = True
+                    if line_data.get("last_name") and not user.last_name:
+                        user.last_name = line_data["last_name"]
+                        updated = True
+                    if line_data.get("phone") and not user.phone:
+                        user.phone = line_data["phone"]
+                        updated = True
+                    if line_data.get("location") and not user.location:
+                        user.location = line_data["location"]
+                        updated = True
+                    if updated:
+                        user.save()
+                        logger.info(f"User {user.id} personal info updated from CV extraction")
+
+                # Create SocialLink from extracted social_link data
+                elif content_type == "social_link" and line_data.get("url"):
+                    link_type = line_data.get("link_type", "other")
+                    url = line_data["url"]
+                    # Avoid duplicates: check if this URL already exists for the user
+                    if not SocialLink.objects.filter(user=request.user, url=url).exists():
+                        SocialLink.objects.create(
+                            user=request.user,
+                            link_type=link_type,
+                            url=url,
+                            order=line_data.get("order", idx),
+                        )
+                        logger.info(f"SocialLink created for user {request.user.id}: {link_type} - {url}")
 
             # Update CV status
             cv.extraction_status = "completed"
@@ -539,3 +761,231 @@ def export_data_view(request):
 def pricing_view(request):
     """Display the pricing page with plan comparison."""
     return render(request, "accounts/pricing.html")
+
+
+# ============================================================================
+# Candidate Profile Management Views
+# ============================================================================
+
+
+@login_required
+@require_POST
+def profile_switch_view(request):
+    """Switch to a different candidate profile."""
+    import json
+
+    try:
+        data = json.loads(request.body)
+        profile_id = data.get("profile_id")
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+    try:
+        profile = CandidateProfile.objects.get(id=profile_id, user=request.user)
+    except CandidateProfile.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Profil non trouvé"}, status=404)
+
+    # Store in session
+    request.session["current_profile_id"] = profile.id
+
+    logger.info(f"User {request.user.id} switched to profile '{profile.title}'")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "profile_id": profile.id,
+            "profile_title": profile.title,
+            "message": f"Profil '{profile.title}' sélectionné",
+        }
+    )
+
+
+@login_required
+@require_POST
+def profile_create_view(request):
+    """Create a new candidate profile."""
+    import json
+
+    try:
+        data = json.loads(request.body)
+        title = data.get("title", "").strip()
+        description = data.get("description", "").strip()
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+    if not title:
+        return JsonResponse({"success": False, "error": "Le titre est requis"}, status=400)
+
+    # Check if title already exists for this user
+    if CandidateProfile.objects.filter(user=request.user, title=title).exists():
+        return JsonResponse({"success": False, "error": "Un profil avec ce titre existe déjà"}, status=400)
+
+    # Create profile
+    profile = CandidateProfile.objects.create(
+        user=request.user,
+        title=title,
+        description=description,
+    )
+
+    # Initialize with all items selected (copy from "Complet" or all active lines)
+    profile.initialize_all_selected()
+
+    # Switch to new profile
+    request.session["current_profile_id"] = profile.id
+
+    logger.info(f"User {request.user.id} created profile '{profile.title}'")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "profile_id": profile.id,
+            "profile_title": profile.title,
+            "message": f"Profil '{profile.title}' créé",
+        }
+    )
+
+
+@login_required
+@require_POST
+def profile_update_view(request, profile_id):
+    """Update an existing candidate profile."""
+    import json
+
+    try:
+        profile = CandidateProfile.objects.get(id=profile_id, user=request.user)
+    except CandidateProfile.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Profil non trouvé"}, status=404)
+
+    try:
+        data = json.loads(request.body)
+        title = data.get("title", "").strip()
+        description = data.get("description", "").strip()
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+    if not title:
+        return JsonResponse({"success": False, "error": "Le titre est requis"}, status=400)
+
+    # Check if title already exists for another profile
+    if CandidateProfile.objects.filter(user=request.user, title=title).exclude(id=profile_id).exists():
+        return JsonResponse({"success": False, "error": "Un profil avec ce titre existe déjà"}, status=400)
+
+    # Prevent renaming "Complet" profile
+    if profile.title == "Complet" and title != "Complet":
+        return JsonResponse({"success": False, "error": "Le profil 'Complet' ne peut pas être renommé"}, status=400)
+
+    profile.title = title
+    profile.description = description
+    profile.save()
+
+    logger.info(f"User {request.user.id} updated profile '{profile.title}'")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "profile_id": profile.id,
+            "profile_title": profile.title,
+            "message": f"Profil '{profile.title}' mis à jour",
+        }
+    )
+
+
+@login_required
+@require_http_methods(["DELETE", "POST"])
+def profile_delete_view(request, profile_id):
+    """Delete a candidate profile."""
+    try:
+        profile = CandidateProfile.objects.get(id=profile_id, user=request.user)
+    except CandidateProfile.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Profil non trouvé"}, status=404)
+
+    # Prevent deleting "Complet" profile
+    if profile.title == "Complet":
+        return JsonResponse({"success": False, "error": "Le profil 'Complet' ne peut pas être supprimé"}, status=400)
+
+    title = profile.title
+    profile.delete()
+
+    # If deleted profile was current, switch to default
+    if request.session.get("current_profile_id") == profile_id:
+        default_profile = request.user.candidate_profiles.filter(is_default=True).first()
+        if default_profile:
+            request.session["current_profile_id"] = default_profile.id
+
+    logger.info(f"User {request.user.id} deleted profile '{title}'")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": f"Profil '{title}' supprimé",
+        }
+    )
+
+
+@login_required
+@require_POST
+def profile_item_toggle_view(request, profile_id, line_id):
+    """Toggle selection status of an item in a profile."""
+    try:
+        profile = CandidateProfile.objects.get(id=profile_id, user=request.user)
+    except CandidateProfile.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Profil non trouvé"}, status=404)
+
+    try:
+        line = ExtractedLine.objects.get(id=line_id, user=request.user)
+    except ExtractedLine.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Élément non trouvé"}, status=404)
+
+    # Get or create selection, then toggle
+    selection, created = ProfileItemSelection.objects.get_or_create(
+        profile=profile,
+        extracted_line=line,
+        defaults={"is_selected": False},  # If creating, set to False (was True by default, now toggled)
+    )
+
+    if not created:
+        selection.is_selected = not selection.is_selected
+        selection.save()
+
+    logger.info(
+        f"User {request.user.id} toggled item {line_id} to {selection.is_selected} in profile '{profile.title}'"
+    )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "is_selected": selection.is_selected,
+            "message": f"Élément {'sélectionné' if selection.is_selected else 'désélectionné'}",
+        }
+    )
+
+
+@login_required
+@require_GET
+def profile_selections_view(request, profile_id):
+    """Get all selections for a profile (used when switching profiles)."""
+    try:
+        profile = CandidateProfile.objects.get(id=profile_id, user=request.user)
+    except CandidateProfile.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Profil non trouvé"}, status=404)
+
+    # Build selection map
+    selections = {}
+    for selection in profile.item_selections.all():
+        selections[selection.extracted_line_id] = selection.is_selected
+
+    # For items without explicit selection, they are selected by default
+    all_line_ids = list(ExtractedLine.objects.filter(user=request.user, is_active=True).values_list("id", flat=True))
+
+    result = {}
+    for line_id in all_line_ids:
+        result[line_id] = selections.get(line_id, True)  # Default to True if not set
+
+    return JsonResponse(
+        {
+            "success": True,
+            "profile_id": profile.id,
+            "profile_title": profile.title,
+            "selections": result,
+        }
+    )

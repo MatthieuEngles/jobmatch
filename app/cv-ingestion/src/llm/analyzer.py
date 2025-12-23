@@ -499,6 +499,28 @@ def parse_llm_response(response_text: str) -> list[ExtractedLine]:
             line_data["position"] = position if position else None
             line_data["description"] = description if description else None
 
+        # Extract structured fields for personal_info
+        elif content_type == ContentType.PERSONAL_INFO.value:
+            first_name = item.get("first_name", "").strip() if item.get("first_name") else None
+            last_name = item.get("last_name", "").strip() if item.get("last_name") else None
+            email = item.get("email", "").strip() if item.get("email") else None
+            phone = item.get("phone", "").strip() if item.get("phone") else None
+            location = item.get("location", "").strip() if item.get("location") else None
+
+            line_data["first_name"] = first_name if first_name else None
+            line_data["last_name"] = last_name if last_name else None
+            line_data["email"] = email if email else None
+            line_data["phone"] = phone if phone else None
+            line_data["location"] = location if location else None
+
+        # Extract structured fields for social_link
+        elif content_type == ContentType.SOCIAL_LINK.value:
+            link_type = item.get("link_type", "").strip() if item.get("link_type") else None
+            url = item.get("url", "").strip() if item.get("url") else None
+
+            line_data["link_type"] = link_type if link_type else None
+            line_data["url"] = url if url else None
+
         result.append(ExtractedLine(**line_data))
 
     logger.info(f"Parsed {len(result)} extracted lines from LLM response")

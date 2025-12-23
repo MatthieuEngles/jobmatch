@@ -2,7 +2,13 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.password_validation import validate_password
 
-from .models import CV, User, UserLLMConfig
+from .models import (
+    CONTRACT_TYPE_CHOICES,
+    CV,
+    SocialLink,
+    User,
+    UserLLMConfig,
+)
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -21,20 +27,84 @@ class UserRegistrationForm(UserCreationForm):
 
 
 class UserProfileForm(forms.ModelForm):
+    """Form for personal data section."""
+
+    contract_types = forms.MultipleChoiceField(
+        choices=CONTRACT_TYPE_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "contract-checkbox"}),
+        required=False,
+        label="Type de contrat recherche",
+    )
+
     class Meta:
         model = User
         fields = [
             "first_name",
             "last_name",
             "phone",
+            "location",
+            "seniority",
             "availability",
+            "contract_types",
             "salary_min",
             "salary_max",
             "remote_preference",
+            "mobility",
+            "personal_notes",
         ]
+        labels = {
+            "first_name": "Prenom",
+            "last_name": "Nom",
+            "phone": "Telephone",
+            "location": "Localisation",
+            "seniority": "Seniorite",
+            "availability": "Disponibilite",
+            "salary_min": "Salaire minimum (k€/an)",
+            "salary_max": "Salaire maximum (k€/an)",
+            "remote_preference": "Preference teletravail",
+            "mobility": "Mobilite geographique",
+            "personal_notes": "Notes personnelles",
+        }
         widgets = {
+            "seniority": forms.Select(attrs={"class": "form-control"}),
             "availability": forms.Select(attrs={"class": "form-control"}),
             "remote_preference": forms.Select(attrs={"class": "form-control"}),
+            "mobility": forms.Select(attrs={"class": "form-control"}),
+            "personal_notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Informations complementaires...",
+                }
+            ),
+            "salary_min": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "salary_max": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize contract_types from JSONField
+        if self.instance and self.instance.contract_types:
+            self.initial["contract_types"] = self.instance.contract_types
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Save contract_types as list to JSONField
+        instance.contract_types = self.cleaned_data.get("contract_types", [])
+        if commit:
+            instance.save()
+        return instance
+
+
+class SocialLinkForm(forms.ModelForm):
+    """Form for a single social link."""
+
+    class Meta:
+        model = SocialLink
+        fields = ["link_type", "url"]
+        widgets = {
+            "link_type": forms.Select(attrs={"class": "form-control link-type-select"}),
+            "url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
         }
 
 

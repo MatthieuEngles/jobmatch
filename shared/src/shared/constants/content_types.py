@@ -16,6 +16,8 @@ class ContentType(str, Enum):
     LANGUAGE = "language"
     INTEREST = "interest"
     CONTACT = "contact"
+    PERSONAL_INFO = "personal_info"
+    SOCIAL_LINK = "social_link"
     OTHER = "other"
 
     # Job offer-specific types (for future use)

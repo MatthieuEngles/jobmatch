@@ -2,6 +2,402 @@
 
 ## 📅 Sessions
 
+### 2025-12-24 (22) - UI Success Cards + Export DOCX + Ruff fixes
+**Contexte:** Enrichir les cartes de succès professionnels avec toggle, visualisation et export, et corriger les erreurs Ruff pour le pre-commit hook.
+
+**Réalisations:**
+
+- **Cartes succès enrichies** :
+  - Toggle "Profil candidat" (comme expériences, éducation) pour inclure/exclure du profil
+  - Bouton "voir" (icône œil) → modal de visualisation avec détails STAR
+  - Bouton "supprimer" (icône corbeille) → modal de confirmation
+  - Nouveau champ `is_active` sur `ProfessionalSuccess` (migration 0014)
+  - Endpoint `success_update_view` mis à jour pour gérer `is_active`
+
+- **Modal de visualisation** :
+  - Affichage complet : Titre, Situation, Tâche, Actions, Résultats, Compétences
+  - Largeur 900px (50% plus large que le défaut 600px)
+  - Bouton "Export DOCX" pour téléchargement Word
+
+- **Export DOCX** :
+  - Bibliothèque `docx.js` v8.5.0 chargée dynamiquement depuis CDN (unpkg)
+  - Build UMD (`index.umd.js`) pour compatibilité browser
+  - Génération document Word avec sections STAR formatées (titres en couleur #667eea)
+  - Téléchargement automatique avec nom fichier basé sur le titre
+  - Feedback visuel : "Chargement..." puis "Téléchargé !" avec gestion erreurs
+
+- **Règle #6 généralisée** :
+  - Règle "questions NON AMBIGUËS" appliquée à toutes les phases du coaching STAR
+  - Exemples MAUVAIS/BON génériques (pas seulement Phase 6)
+
+- **Corrections Ruff pre-commit** :
+  - `SIM105` : `contextlib.suppress()` au lieu de `try/except/pass` (2 occurrences dans views.py)
+  - `F841` : variable `initial_message` inutilisée supprimée
+  - `UP028` : `yield from` au lieu de `for/yield` où applicable (providers.py)
+  - `noqa: UP028` ajouté où `yield from` incompatible avec `try/except` fallback (chat_handler.py)
+
+- **Corrections Bandit pre-commit** :
+  - `B104` : `# noqa: S104` ne fonctionne pas pour Bandit → utiliser `# nosec B104`
+  - `B110` : `try/except/pass` supprimé - le `.filter().first()` Django retourne `None` sans exception
+
+**Problèmes rencontrés:**
+- **Export DOCX sans action** :
+  - Cause 1 : mauvais CDN (`jsdelivr` avec path incorrect)
+  - Cause 2 : Build `index.min.js` au lieu de `index.umd.js` (non compatible browser)
+  - Solution : utiliser `unpkg.com/docx@8.5.0/build/index.umd.js`
+- **Ruff SIM105 faux positif** : `try/except/pass` flaggé mais `contextlib.suppress` est plus idiomatique
+- **Ruff UP028 incompatible avec try/except** : `yield from` ne permet pas de catch les exceptions du générateur
+  - Solution : ajouter `# noqa: UP028` avec explication
+- **Bandit B104 non ignoré** : `# noqa: S104` (syntaxe Ruff/flake8) ne fonctionne pas pour Bandit
+  - Solution : utiliser `# nosec B104` (syntaxe Bandit)
+- **Bandit B110 try/except/pass** : code inutile car `.filter().first()` retourne `None` au lieu de lever une exception
+  - Solution : supprimer le try/except
+
+**Décisions techniques:**
+- **CDN unpkg plutôt que jsdelivr** : URLs plus simples et prévisibles pour les libs npm
+- **Build UMD** : nécessaire pour usage browser sans bundler (ESM ne fonctionne pas avec script tag)
+- **Chargement dynamique** : évite d'inclure 500KB de lib si l'utilisateur n'exporte jamais
+- **contextlib.suppress** : plus pythonique que `try/except/pass` pour ignorer une exception spécifique
+- **noqa avec explication** : documenter pourquoi la règle est ignorée pour la maintenance future
+
+---
+
+### 2025-12-24 (21) - Refonte Prompt STAR + Auto-création Succès
+**Contexte:** Le chatbot STAR était trop verbeux (400+ mots par message) et ne permettait pas la création automatique des succès en fin de conversation.
+
+**Réalisations:**
+
+- **Refonte complète `star_coaching.txt`** :
+  - Messages courts : 2-4 phrases max par réponse (vs 400+ mots avant)
+  - 6 phases strictes : Choix expérience → S → T → A → R → Création
+  - Règle "une seule phase à la fois" : le LLM n'évoque jamais la phase suivante
+  - Exemples MAUVAIS/BON dans le prompt pour guider le modèle
+  - Marqueur `[STAR_COMPLETE]` avec JSON structuré à la fin
+
+- **Détection automatique `[STAR_COMPLETE]`** dans `profile.html` :
+  - Nouvelle méthode `handleStarComplete(rawText, contentDiv)` dans `StarChatbot`
+  - Extraction du JSON après le marqueur via regex
+  - Appel API `/accounts/api/successes/create/` avec les données STAR
+  - Message de confirmation "✅ Succès ajouté à ton profil !"
+  - Fermeture automatique du chat après 2 secondes
+
+- **Chat expandable amélioré** :
+  - CSS `position: fixed` avec overlay backdrop (modal-like)
+  - Couvre tout l'écran y compris le titre de section
+  - Centré avec `top/left: 50%` + `transform: translate(-50%, -50%)`
+  - z-index 1000 pour le chat, 999 pour le backdrop
+
+**Problèmes rencontrés:**
+- **Expand ne couvrait pas le titre** : CSS `position: absolute` sur `.achievements-layout` ne remontait pas assez
+  - Solution : passer à `position: fixed` avec comportement modal
+
+**Décisions techniques:**
+- **Marqueur `[STAR_COMPLETE]` plutôt que extraction séparée** : le LLM génère le JSON directement, pas besoin d'un second appel LLM
+- **is_draft: false** envoyé à l'API : le succès est complet quand auto-créé (toutes les infos STAR collectées)
+- **Fermeture après 2s** : donne le temps à l'utilisateur de lire la confirmation avant reset
+
+**Patterns appliqués:**
+- **Marqueur de fin dans le stream** : `[MARKER]` + JSON permet d'extraire des données structurées du stream SSE
+- **Prompt engineering strict** : exemples MAUVAIS/BON explicites pour contraindre le comportement du modèle
+- **Phases séquentielles** : empêcher le LLM de "sauter" des étapes en interdisant de mentionner les phases suivantes
+
+---
+
+### 2025-12-24 (20) - Markdown + Chat Expandable
+**Contexte:** Améliorer l'affichage des réponses du chatbot (rendu markdown) et permettre d'agrandir la fenêtre de chat pour couvrir la sidebar pendant une conversation.
+
+**Réalisations:**
+
+- **Rendu Markdown dans le chat** :
+  - Ajout de `marked.js` (v11.1.1) via CDN pour parser le markdown des réponses LLM
+  - Nouvelle méthode `renderMarkdown(text)` dans StarChatbot et PitchChatbot
+  - Modification de `addMessage()` : markdown pour assistant, `escapeHtml()` pour user
+  - Modification de `appendToStreamingMessage()` : utilise `textContent` pendant le streaming
+  - Modification de `finishStreamingMessage()` : applique `marked.parse()` à la fin du stream
+  - CSS ajouté pour les éléments markdown (p, strong, em, ul, ol, li, blockquote, code, pre, h1-h3)
+
+- **Chat extensible (expand/collapse)** :
+  - CSS `.achievements-layout.chat-expanded` : position absolute pour couvrir la sidebar
+  - Bouton expand dans les headers des deux chats (STAR et Pitch) avec icônes SVG
+  - Méthodes `expandChat()`, `collapseChat()`, `toggleExpand()` dans les deux classes
+  - Auto-expand dans `startConversation()` : le chat s'agrandit automatiquement
+  - Auto-collapse dans `resetChat()` : le chat se réduit quand on clique "Nouvelle conversation"
+  - Toggle manuel via bouton dans le header
+
+**Décisions techniques:**
+- **marked.js** : bibliothèque standard légère (CDN) plutôt que solution custom
+- **textContent pendant streaming** : évite les problèmes d'injection HTML pendant l'accumulation des tokens, markdown appliqué une seule fois à la fin
+- **CSS position absolute** : permet de superposer le chat sur la sidebar sans modifier le layout de base
+
+**Patterns appliqués:**
+- Streaming + markdown : accumuler en texte brut, parser à la fin pour éviter les états intermédiaires cassés
+- UI responsive : un bouton toggle avec deux icônes (expand/collapse) selon l'état CSS
+
+---
+
+### 2025-12-24 (19) - SSE Streaming pour Chat IA + Fix 404 polling
+**Contexte:** Implémenter le streaming SSE (Server-Sent Events) pour afficher les réponses du chatbot token par token, et corriger un bug 404 sur le polling du status.
+
+**Réalisations:**
+
+- **Fix 404 sur chat status polling** :
+  - Bug : `/accounts/api/chat/status/{task_id}/` retournait 404
+  - Cause : `chat_start_view` recevait le `task_id` de ai-assistant mais ne créait pas de `ChatMessage` avec ce task_id
+  - Solution : ajout de `ChatMessage.objects.create(conversation=conversation, role="assistant", content="", status="pending", task_id=task_id)` après réception du task_id
+
+- **Configuration LLM_MAX_TOKENS** :
+  - Ajout dans `app/ai-assistant/.env` : `LLM_MAX_TOKENS=4096`
+  - Valeur récupérée par `config.py` avec fallback à 4096
+
+- **Streaming SSE complet** (architecture 3 couches) :
+  1. **LLM Providers** (`providers.py`) :
+     - Nouvelle méthode abstraite `chat_stream()` sur `LLMProvider`
+     - Implémentation pour OpenAI : `stream=True` + iteration sur `chunk.choices[0].delta.content`
+     - Implémentation pour Anthropic : `messages.stream()` context manager + `stream.text_stream`
+     - Implémentation pour Ollama : même pattern qu'OpenAI (API compatible)
+
+  2. **FastAPI Endpoints** (`main.py`) :
+     - Nouvelle fonction `_sse_generator()` : formate les tokens en SSE (`data: {"token": "..."}`)
+     - Endpoint `/chat/start/stream` : démarre une conversation avec réponse streaming
+     - Endpoint `/chat/message/stream` : envoie un message avec réponse streaming
+     - Headers SSE : `Cache-Control: no-cache`, `X-Accel-Buffering: no` (nginx)
+
+  3. **Django Proxy** (`views.py`) :
+     - `chat_start_stream_view` : crée ChatConversation + ChatMessage, proxy le stream SSE
+     - `chat_message_stream_view` : crée ChatMessage user + assistant, proxy le stream
+     - Accumulation du contenu pendant le stream pour sauvegarder la réponse complète
+     - `StreamingHttpResponse` avec `content_type="text/event-stream"`
+
+- **Frontend JavaScript** (`profile.html`) :
+  - Propriétés ajoutées aux chatbots : `useStreaming = true`, `currentStreamingMessage`
+  - `startConversationStreaming()` : utilise `fetch()` + `response.body.getReader()` pour lire le stream
+  - `sendMessageStreaming()` : même pattern pour les messages suivants
+  - `createStreamingMessage()` : crée une bulle vide avec classe `.streaming`
+  - `appendToStreamingMessage()` : ajoute le token à la bulle courante
+  - `finishStreamingMessage()` : retire la classe `.streaming` et finalise
+  - Pattern `ReadableStream` avec `TextDecoder` pour parser les chunks SSE
+  - Fallback automatique si `useStreaming = false`
+
+**Problèmes rencontrés:**
+- **404 sur /api/chat/status/{task_id}/** :
+  - Cause : ChatMessage avec task_id manquant dans la base
+  - Diagnostic : les logs montraient que le LLM répondait correctement mais la GUI ne recevait rien
+  - Solution : créer le ChatMessage "pending" immédiatement après avoir reçu le task_id
+
+**Décisions techniques:**
+- **Option 1 choisie : Proxy Django** plutôt que WebSocket direct ou connexion directe client→ai-assistant
+  - Avantages : architecture cohérente, auth centralisée, CORS simplifié
+  - Inconvénient : latence légèrement supérieure (hop supplémentaire)
+  - Impact scaling : le serveur Django doit maintenir les connexions ouvertes pendant le streaming
+
+**Impact Scaling** :
+- **Django** : chaque requête streaming bloque un worker pendant toute la durée de génération (10-60s selon le LLM)
+  - Mitigation : utiliser Gunicorn avec workers async (gevent/eventlet) ou passer à ASGI (Daphne/Uvicorn)
+  - Alternative : augmenter le nombre de workers proportionnellement aux users concurrents
+- **ai-assistant FastAPI** : déjà async natif, scale bien avec uvicorn
+- **LLM** : le bottleneck principal reste le temps de génération du LLM
+- **Recommandation prod** : si >100 users concurrents, envisager une connexion WebSocket directe client→ai-assistant avec auth par token JWT
+
+---
+
+### 2025-12-24 (18) - Prompts proactifs + Transmission LLM Config + Logs debug
+**Contexte:** Améliorer les prompts des assistants IA pour qu'ils soient proactifs (proposent au lieu de poser des questions), transmettre la config LLM utilisateur aux assistants, et ajouter des logs de debug pour les appels LLM.
+
+**Réalisations:**
+
+- **Prompts proactifs** (`star_coaching.txt`, `pitch_coaching.txt`) :
+  - Ajout Règle 0 : "Présente-toi et explique le processus" dès le premier message
+  - STAR : se présente comme coach STAR, explique les étapes (choix expérience → S→T→A→R → validation)
+  - Pitch : se présente comme coach pitch, annonce la génération directe des pitchs
+  - Remplacement de `{existing_successes}` par `{professional_successes}` dans le prompt STAR
+
+- **Transmission LLM Config utilisateur** :
+  - Nouveau schema `LLMConfigRequest` avec `llm_endpoint`, `llm_model`, `llm_api_key`
+  - Ajout `llm_config` optionnel dans `ChatStartRequest` et `ChatMessageRequest`
+  - Helper `_build_llm_config()` dans main.py pour convertir en `LLMConfig`
+  - Helper `_get_user_llm_config()` dans views.py pour récupérer la config Premium+
+  - Transmission de la config aux endpoints `/chat/start` et `/chat/message/async`
+  - Les utilisateurs Premium+ peuvent utiliser leur propre LLM dans le chat
+
+- **Logs debug LLM** (`providers.py`) :
+  - Chaque provider (OpenAI, Anthropic, Ollama) loggue maintenant :
+    - `=== LLM CALL (Provider) ===`
+    - Endpoint utilisé
+    - Modèle utilisé
+    - System prompt (500 premiers chars)
+    - Messages utilisateur (300 premiers chars chacun)
+  - Permet de diagnostiquer les problèmes de connexion/configuration
+
+- **Unification des données envoyées aux assistants** :
+  - `build_system_prompt()` passe maintenant les mêmes champs aux deux types de coaching
+  - `professional_successes` (détaillé) envoyé aux deux pour éviter les doublons
+
+**Problèmes rencontrés:**
+- **KeyError 'existing_successes'** : le prompt STAR référençait `{existing_successes}` mais le code ne passait que `{professional_successes}`
+  - Solution : remplacer les références dans le prompt par des textes statiques ("ci-dessus", "déjà formalisés")
+- **GPU non triggered** : les logs n'apparaissaient pas car aucun appel LLM ne se faisait (erreur silencieuse)
+  - Solution : ajout des logs explicites dans chaque provider avant l'appel LLM
+
+**Décisions techniques:**
+- **LLM config optionnel** : si non fourni ou endpoint vide, utilise les env vars du service
+- **Logs avant l'appel** : permet de voir ce qui est envoyé même si l'appel échoue
+- **500/300 chars max** : évite de polluer les logs avec des prompts complets
+
+---
+
+### 2025-12-24 (17) - Interface Chat Pitch + Modèle Pitch Django
+**Contexte:** Créer l'interface utilisateur pour le coaching pitch et le modèle Django pour stocker les pitchs générés.
+
+**Réalisations:**
+
+- **Modèle Pitch Django** (`accounts/models.py`) :
+  - Champs : `title`, `pitch_30s`, `pitch_3min`, `key_strengths` (JSONField), `target_context`
+  - Métadonnées : `source_conversation`, `is_draft`, `is_default`, `created_at`, `updated_at`
+  - Méthodes : `is_complete()`, `get_word_count_30s()`, `get_word_count_3min()`, `get_completion_percentage()`
+  - Un seul pitch par défaut par utilisateur (save() override)
+
+- **Migration 0012_add_pitch_model** : création de la table Pitch
+
+- **5 nouvelles vues API Pitch** (`views.py`) :
+  - `pitch_list_view` - GET `/api/pitches/`
+  - `pitch_create_view` - POST `/api/pitches/create/`
+  - `pitch_detail_view` - GET `/api/pitches/<id>/`
+  - `pitch_update_view` - POST `/api/pitches/<id>/update/`
+  - `pitch_delete_view` - DELETE `/api/pitches/<id>/delete/`
+
+- **Interface Chat Pitch** (`profile.html`) :
+  - Section "Mon pitch" transformée : placeholder → chat IA complet
+  - Classe JavaScript `PitchChatbot` (~350 lignes) basée sur `StarChatbot`
+  - Envoi `coaching_type: 'pitch'` au démarrage de conversation
+  - Couleur violet (#8b5cf6) pour différencier du coaching STAR (bleu)
+  - Sidebar "Mes pitchs" avec compteur de mots 30s/3min
+  - Lazy init avec MutationObserver quand la section devient visible
+
+- **CSS spécifique pitch** :
+  - `.chat-welcome-note` : note italique pour le contexte
+  - `.pitch-list strong` : couleur violette pour les libellés
+  - `.pitch-card-info` : affichage compteurs de mots
+  - `.pitches-sidebar .successes-count` : badge violet
+
+**Problèmes rencontrés:**
+- **docker-compose KeyError 'ContainerConfig'** : erreur récurrente au rebuild
+  - Solution : `docker-compose rm -sf <service> && docker-compose up -d <service>`
+- **Migrations non détectées dans container** : fichiers locaux non visibles
+  - Solution : rebuild complet du container GUI après ajout des migrations
+
+**Décisions techniques:**
+- **Réutilisation pattern StarChatbot** : même architecture JS, seul `coaching_type` change
+- **Couleur différente (violet)** : distinction visuelle claire entre STAR (bleu) et Pitch (violet)
+- **Word count display** : aide l'utilisateur à respecter les durées cibles (75-80 mots pour 30s, 400-450 mots pour 3min)
+- **Lazy initialization** : les chatbots ne sont instanciés que quand leur section est visible (performance)
+
+---
+
+### 2025-12-24 (16) - Extension ai-assistant pour Pitch Coaching
+**Contexte:** Étendre le module ai-assistant pour supporter également le coaching de création de pitch (30s et 3min), en réutilisant l'infrastructure existante du STAR coaching.
+
+**Réalisations:**
+
+- **Extension schemas.py** :
+  - Ajout de `CoachingType` enum (STAR, PITCH)
+  - Ajout du champ `coaching_type` dans `ChatStartRequest` et `ChatMessageRequest`
+  - Nouveaux champs dans `UserContext` : `skills`, `education`
+  - Nouveaux schémas `ExtractPitchRequest` et `ExtractPitchResponse`
+
+- **Nouveau prompt pitch_coaching.txt** :
+  - Structure pitch 30s : accroche, qui je suis, valeur ajoutée, objectif
+  - Structure pitch 3min : accroche, parcours, réalisations STAR, compétences, vision, conclusion
+  - Intègre les succès STAR du candidat comme base pour les exemples concrets
+  - Placeholders : {education}, {skills}, {professional_successes} (données STAR complètes)
+
+- **Mise à jour chat_handler.py** :
+  - `load_system_prompt(coaching_type)` : charge le prompt approprié
+  - `format_education()`, `format_skills()` : nouvelles fonctions de formatage
+  - `format_existing_successes(detailed=True)` : inclut données STAR complètes pour pitch
+  - `extract_pitch_data()` : extraction des pitchs 30s/3min depuis la conversation
+
+- **Mise à jour main.py** :
+  - Endpoints `/chat/start` et `/chat/message/async` acceptent `coaching_type`
+  - Nouvel endpoint `/chat/extract-pitch`
+
+- **Côté Django** :
+  - Ajout de `COACHING_TYPE_CHOICES` dans models.py
+  - Nouveau champ `coaching_type` sur `ChatConversation`
+  - Migration `0011_add_coaching_type_to_conversation`
+  - `_build_user_context(coaching_type)` : pour pitch, inclut education, skills, et données STAR complètes des succès
+  - Vues mises à jour pour passer et utiliser le coaching_type
+
+**Problèmes rencontrés:**
+- **Aucun problème majeur** : l'architecture générique du module a permis une extension facile
+
+**Décisions techniques:**
+- **Enum CoachingType** : permet d'ajouter facilement d'autres types de coaching à l'avenir
+- **Données STAR complètes pour pitch** : le LLM peut citer les résultats chiffrés des succès dans le pitch
+- **Réutilisation des endpoints** : même API, juste un paramètre `coaching_type` différent
+- **Priorité aux succès finalisés** : pour le pitch, on prend d'abord les succès non-draft
+
+---
+
+### 2025-12-24 (15) - AI Assistant STAR Coaching Chatbot
+**Contexte:** Implémenter un chatbot IA pour accompagner les candidats dans la formalisation de leurs succès professionnels avec la méthode STAR (Situation, Task, Action, Result)
+
+**Réalisations:**
+
+- **Nouveau microservice ai-assistant (FastAPI)** :
+  - Structure complète : `app/ai-assistant/src/{main.py, config.py, schemas.py, task_store.py, llm/, prompts/}`
+  - Endpoints : `/health`, `/chat/start`, `/chat/message/async`, `/chat/message/status/{task_id}`, `/chat/extract-success`
+  - Pattern async polling identique à cv-ingestion (task_id + status polling)
+  - Support multi-LLM : OpenAI, Anthropic, Ollama via Factory Pattern
+  - Dockerfile Python 3.12-slim, port 8084
+
+- **LLM Chat Handler pour coaching STAR** :
+  - `build_system_prompt()` : injecte le contexte utilisateur dans le prompt
+  - `get_initial_message()` : message d'accueil personnalisé
+  - `process_chat_message()` : traitement des messages avec historique
+  - `extract_star_data()` : extraction structurée des composants STAR
+
+- **Prompt STAR coaching** (`prompts/star_coaching.txt`) :
+  - Consultant expert en méthode STAR
+  - Guide progressif S → T → A → R
+  - Encourage quantification et utilisation du "je" (pas "nous")
+  - Placeholders pour contexte : {first_name}, {experiences}, {interests}, {existing_successes}
+
+- **3 nouveaux modèles Django** :
+  - `ChatConversation` : user, title, status (active/completed/abandoned), context_snapshot
+  - `ChatMessage` : conversation, role (user/assistant/system), content, status, task_id, extracted_data
+  - `ProfessionalSuccess` : user, title, situation, task, action, result, skills_demonstrated, is_draft
+  - Migration `0010_add_chat_and_professional_success`
+
+- **9 nouvelles vues Django** :
+  - Chat : `chat_start_view`, `chat_message_view`, `chat_status_view`, `chat_history_view`
+  - Succès : `success_list_view`, `success_create_view`, `success_update_view`, `success_delete_view`
+  - Helper `_build_user_context()` pour récupérer les données utilisateur
+
+- **Interface Chat UI** :
+  - Layout deux colonnes : chat à gauche, liste des succès à droite
+  - Classe JavaScript `StarChatbot` (~400 lignes)
+  - Polling status toutes les 2s avec typing indicator
+  - Messages avec bulles stylisées (user bleu, assistant gris)
+  - Lazy initialization avec MutationObserver
+
+- **Intégration Docker** :
+  - Service `ai-assistant` ajouté à docker-compose.yml
+  - Variable `AI_ASSISTANT_URL` dans settings.py GUI
+  - Réseaux partagés jobmatch-network
+
+**Problèmes rencontrés:**
+- **docker-compose exec -T** : flag nécessaire pour commandes non-interactives (migrations)
+- **Contexte compacté** : session continuée après compactage, contexte récupéré du summary
+
+**Décisions techniques:**
+- **Chat intégré** (pas modal) : meilleure UX pour conversations longues
+- **Microservice dédié** : séparation des responsabilités, scalabilité indépendante
+- **Persistance conversations** : historique en base pour reprendre les échanges
+- **Modèle ProfessionalSuccess dédié** : pas d'utilisation d'ExtractedLine pour éviter confusion
+- **Context injection** : le LLM reçoit automatiquement profil, expériences, intérêts, succès existants
+
+---
+
 ### 2025-12-23 (14) - Fix extraction personal_info/social_link + CSS/Text tweaks
 **Contexte:** Bug où les données personnelles et liens sociaux extraits du CV n'étaient pas sauvegardés correctement
 
@@ -606,6 +1002,31 @@ git add -A && git commit -m "message"
 - **Conditional INSTALLED_APPS** : `if ENV_MODE == "local"` + try/except pour apps optionnelles
 - **parse_llm_response() extensible** : chaque content_type avec des champs structurés nécessite sa propre branche elif
 - **Rendu manuel checkboxes Django** : pour un contrôle CSS total, utiliser `{% for choice in form.field %}{{ choice.tag }}{% endfor %}` au lieu de `{{ form.field }}`
+- **Microservices FastAPI identiques** : dupliquer le pattern de cv-ingestion pour nouveaux services (task_store, providers, schemas)
+- **MutationObserver** : permet d'initialiser des composants JS quand une section devient visible (lazy init)
+- **Prompt engineering STAR** : instructions claires pour guider progressivement S→T→A→R
+- **Context snapshot** : sauvegarder le contexte utilisateur au début de la conversation pour cohérence
+- **Architecture générique pour coaching** : utiliser un `coaching_type` enum permet d'étendre facilement le module à d'autres types de coaching
+- **Données conditionnelles selon le type** : `_build_user_context(coaching_type)` enrichit les données en fonction du besoin (pitch = données STAR complètes)
+- **Prompts séparés par type** : un fichier .txt par type de coaching pour faciliter l'itération
+- **SSE Streaming** : Server-Sent Events avec format `data: {...}\n\n` pour affichage temps réel
+- **ReadableStream API** : `response.body.getReader()` + `TextDecoder` pour parser les chunks SSE en JavaScript
+- **Django StreamingHttpResponse** : permet de proxyer un stream SSE depuis un service externe
+- **Proxy streaming Django** : accumule le contenu pour sauvegarder la réponse complète en base après le stream
+- **LLM streaming** : OpenAI `stream=True`, Anthropic `messages.stream()` context manager
+- **Headers SSE** : `Cache-Control: no-cache`, `X-Accel-Buffering: no` pour éviter le buffering nginx
+- **marked.js pour markdown** : bibliothèque standard légère pour parser le markdown des réponses LLM
+- **Streaming + markdown** : accumuler en `textContent` pendant le stream, appliquer `marked.parse()` une seule fois à la fin
+- **Chat expandable** : CSS `position: absolute` avec classe toggle pour superposer un élément sur son voisin
+- **Marqueur de fin stream** : `[MARKER]` + JSON dans le prompt permet d'extraire des données structurées du stream SSE sans second appel LLM
+- **Prompt engineering strict** : exemples MAUVAIS/BON explicites pour contraindre le comportement verbeux des LLM
+- **Phases séquentielles en prompt** : "n'évoque JAMAIS la phase suivante" empêche le LLM de sauter des étapes
+- **docx.js browser** : utiliser le build UMD (`index.umd.js`) et non ESM ou min pour compatibilité script tag
+- **contextlib.suppress** : remplace `try/except/pass` de façon plus idiomatique (règle Ruff SIM105)
+- **yield from vs try/except** : `yield from` ne peut pas être utilisé dans un try/except car les exceptions du générateur ne seraient pas catchées
+- **noqa avec explication** : toujours documenter pourquoi une règle est ignorée (ex: `# noqa: UP028 - yield from incompatible with try/except`)
+- **Bandit vs Ruff syntaxe** : Bandit utilise `# nosec BXXX`, Ruff utilise `# noqa: SXXX` - ce sont des outils différents avec syntaxes différentes
+- **Django QuerySet.first()** : retourne `None` si pas de résultat, ne lève jamais d'exception - pas besoin de try/except
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -633,6 +1054,10 @@ git add -A && git commit -m "message"
   - Solution : `if ENV_MODE == "local": try: import app; INSTALLED_APPS.append(...)`
 - **Nouveaux content_types structurés** : lors de l'ajout d'un content_type avec des champs structurés (comme personal_info ou social_link), ne pas oublier d'ajouter le parsing dans `parse_llm_response()` dans analyzer.py
 - **Django CheckboxSelectMultiple** : le widget génère un `<ul><li>` avec styles qui peuvent override le CSS. Préférer le rendu manuel pour un contrôle total du layout
+- **docx.js CDN jsdelivr** : le path `build/index.min.js` n'existe pas toujours, utiliser unpkg avec `build/index.umd.js` pour browser
+- **yield from dans try/except** : Ruff UP028 suggère `yield from` mais cela empêche de catch les erreurs et faire un fallback - utiliser `# noqa: UP028`
+- **Bandit `# noqa` ne fonctionne pas** : Bandit ignore la syntaxe `# noqa: SXXX`, utiliser `# nosec BXXX` à la place
+- **try/except/pass sur QuerySet** : `.filter().first()` ne lève pas d'exception, retourne `None` - Bandit B110 détecte ce pattern inutile
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -650,7 +1075,7 @@ git add -A && git commit -m "message"
 git checkout dev
 # Ecraser l'historique de la branche dev avec celui de la branche main
 git reset --hard main
-``` 
+```
 
 ### Workflow Git complet (feature branch → PR → merge)
 ```bash
@@ -724,7 +1149,14 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - [x] **Sélecteur d'abonnement** : choix du plan dans Account Settings
 - [x] **Modal Pricing** : comparaison des plans avec fonctionnalités et tarifs
 - [x] **Restriction LLM Config** : disponible uniquement pour Premium+
+- [x] **AI Assistant STAR Chatbot** : microservice + UI chat pour formalisation succès professionnels
+- [x] **Extension Pitch Coaching** : coaching_type enum, nouveau prompt, données STAR complètes pour pitch
+- [x] **UI Pitch dans profile.html** : interface chat pour section "Mon pitch" (PitchChatbot avec coaching_type=pitch)
+- [x] **Modèle Pitch Django** : stocker les pitchs 30s/3min générés (migration 0012)
+- [ ] **Sauvegarde pitch depuis chat** : bouton pour extraire et sauvegarder le pitch généré
 - [ ] **Édition inline** : permettre de modifier le contenu des lignes extraites
 - [ ] **Regroupement expériences** : afficher les missions d'un même poste ensemble dans l'UI
 - [ ] **Intégration paiement** : Stripe pour les abonnements payants
 - [ ] **Validation email** : confirmation par email lors du changement d'adresse
+- [x] **Auto-création succès STAR** : marqueur `[STAR_COMPLETE]` + extraction JSON + création auto en base
+- [ ] **Tests E2E chatbot STAR** : tester le flux complet conversation → extraction → création succès

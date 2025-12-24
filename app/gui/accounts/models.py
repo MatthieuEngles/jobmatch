@@ -88,6 +88,34 @@ CONTENT_TYPE_CHOICES = [
     ("other", "Autre"),
 ]
 
+# Choices for chat conversation status
+CONVERSATION_STATUS_CHOICES = [
+    ("active", "Active"),
+    ("completed", "Terminee"),
+    ("abandoned", "Abandonnee"),
+]
+
+# Choices for chat message role
+MESSAGE_ROLE_CHOICES = [
+    ("user", "Utilisateur"),
+    ("assistant", "Assistant"),
+    ("system", "Systeme"),
+]
+
+# Choices for chat message status
+MESSAGE_STATUS_CHOICES = [
+    ("pending", "En attente"),
+    ("processing", "En cours"),
+    ("completed", "Terminee"),
+    ("failed", "Echec"),
+]
+
+# Choices for coaching type
+COACHING_TYPE_CHOICES = [
+    ("star", "Succes professionnel (STAR)"),
+    ("pitch", "Pitch (30s et 3min)"),
+]
+
 
 class User(AbstractUser):
     """Custom user model for JobMatch."""
@@ -157,6 +185,12 @@ class User(AbstractUser):
     personal_notes = models.TextField(
         blank=True,
         help_text="Personal notes or additional information",
+    )
+
+    # AI Assistant preferences
+    ai_autonomy_level = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="AI autonomy level (1=Guided, 2=Assisted, 3=Collaborative, 4=Proactive, 5=Autonomous)",
     )
 
     USERNAME_FIELD = "email"
@@ -621,3 +655,303 @@ class ProfileItemSelection(models.Model):
     def __str__(self):
         status = "selected" if self.is_selected else "deselected"
         return f"{self.profile.title}: {self.extracted_line.content[:30]}... ({status})"
+
+
+class ChatConversation(models.Model):
+    """
+    Chat conversation for AI-assisted coaching.
+    Supports STAR method (professional success) and Pitch creation.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_conversations",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Auto-generated title based on conversation content",
+    )
+    coaching_type = models.CharField(
+        max_length=20,
+        choices=COACHING_TYPE_CHOICES,
+        default="star",
+        help_text="Type of coaching (STAR for success, pitch for 30s/3min pitch)",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=CONVERSATION_STATUS_CHOICES,
+        default="active",
+    )
+    context_snapshot = models.JSONField(
+        default=dict,
+        help_text="Snapshot of user context at conversation start (profile, experiences, etc.)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Conversation chat"
+        verbose_name_plural = "Conversations chat"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Conversation {self.id} - {self.user.email} ({self.status})"
+
+    def get_messages(self):
+        """Return all messages in this conversation ordered by creation time."""
+        return self.messages.all().order_by("created_at")
+
+    def get_last_message(self):
+        """Return the last message in the conversation."""
+        return self.messages.order_by("-created_at").first()
+
+    def add_user_message(self, content):
+        """Add a user message to the conversation."""
+        return ChatMessage.objects.create(
+            conversation=self,
+            role="user",
+            content=content,
+            status="completed",
+        )
+
+    def add_assistant_message(self, content, task_id=None, status="completed"):
+        """Add an assistant message to the conversation."""
+        return ChatMessage.objects.create(
+            conversation=self,
+            role="assistant",
+            content=content,
+            task_id=task_id,
+            status=status,
+        )
+
+
+class ChatMessage(models.Model):
+    """
+    Individual message in a chat conversation.
+    Supports async processing with task_id for polling.
+    """
+
+    conversation = models.ForeignKey(
+        ChatConversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=MESSAGE_ROLE_CHOICES,
+    )
+    content = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=MESSAGE_STATUS_CHOICES,
+        default="completed",
+    )
+    task_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Task ID for async processing polling",
+    )
+    extracted_data = models.JSONField(
+        default=dict,
+        help_text="STAR elements detected in this message",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Message chat"
+        verbose_name_plural = "Messages chat"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_role_display()}: {self.content[:50]}..."
+
+    def is_pending(self):
+        """Check if message is still being processed."""
+        return self.status in ("pending", "processing")
+
+
+class ProfessionalSuccess(models.Model):
+    """
+    A professional success/achievement formatted using the STAR method.
+    Can be created from a chat conversation or manually.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="professional_successes",
+    )
+    title = models.CharField(
+        max_length=255,
+        help_text="Short title for the success (e.g., 'Improved customer retention by 18%')",
+    )
+    # STAR components
+    situation = models.TextField(
+        blank=True,
+        help_text="S - Context: Where, when, what was the environment, what were the stakes?",
+    )
+    task = models.TextField(
+        blank=True,
+        help_text="T - Task: What was YOUR specific mission/responsibility?",
+    )
+    action = models.TextField(
+        blank=True,
+        help_text="A - Actions: What did YOU do concretely? (use 'I', not 'we')",
+    )
+    result = models.TextField(
+        blank=True,
+        help_text="R - Results: What were the measurable outcomes?",
+    )
+    # Metadata
+    skills_demonstrated = models.JSONField(
+        default=list,
+        help_text="List of skills demonstrated in this success",
+    )
+    source_conversation = models.ForeignKey(
+        ChatConversation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="generated_successes",
+        help_text="Conversation that generated this success (if any)",
+    )
+    is_draft = models.BooleanField(
+        default=True,
+        help_text="Whether this success is still a draft",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this success is included in the candidate profile",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Succes professionnel"
+        verbose_name_plural = "Succes professionnels"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        status = "brouillon" if self.is_draft else "finalise"
+        return f"{self.title} ({status})"
+
+    def is_complete(self):
+        """Check if all STAR components are filled."""
+        return all([self.situation, self.task, self.action, self.result])
+
+    def get_completion_percentage(self):
+        """Calculate STAR completion percentage."""
+        fields = [self.situation, self.task, self.action, self.result]
+        filled = sum(1 for f in fields if f.strip())
+        return int((filled / 4) * 100)
+
+    def get_star_summary(self):
+        """Get a formatted STAR summary for display."""
+        return {
+            "situation": self.situation[:200] + "..." if len(self.situation) > 200 else self.situation,
+            "task": self.task[:200] + "..." if len(self.task) > 200 else self.task,
+            "action": self.action[:200] + "..." if len(self.action) > 200 else self.action,
+            "result": self.result[:200] + "..." if len(self.result) > 200 else self.result,
+        }
+
+
+class Pitch(models.Model):
+    """
+    User's pitch in two formats: 30 seconds (elevator) and 3 minutes (detailed).
+    Can be created from a chat conversation or manually edited.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pitches",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Optional title for this pitch version (e.g., 'Tech Lead pitch')",
+    )
+    # Pitch content
+    pitch_30s = models.TextField(
+        blank=True,
+        help_text="30-second elevator pitch (~75-80 words)",
+    )
+    pitch_3min = models.TextField(
+        blank=True,
+        help_text="3-minute detailed pitch (~400-450 words)",
+    )
+    # Key strengths highlighted in the pitch
+    key_strengths = models.JSONField(
+        default=list,
+        help_text="List of 3-5 key strengths highlighted in this pitch",
+    )
+    # Target context for this pitch
+    target_context = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Target context (e.g., 'Tech interview', 'Networking event')",
+    )
+    # Metadata
+    source_conversation = models.ForeignKey(
+        ChatConversation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="generated_pitches",
+        help_text="Conversation that generated this pitch (if any)",
+    )
+    is_draft = models.BooleanField(
+        default=True,
+        help_text="Whether this pitch is still a draft",
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Default pitch to display",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Pitch"
+        verbose_name_plural = "Pitches"
+        ordering = ["-is_default", "-created_at"]
+
+    def __str__(self):
+        status = "brouillon" if self.is_draft else "finalise"
+        title = self.title or f"Pitch #{self.id}"
+        return f"{title} ({status})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default pitch per user
+        if self.is_default:
+            Pitch.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    def is_complete(self):
+        """Check if both pitch formats are filled."""
+        return bool(self.pitch_30s and self.pitch_3min)
+
+    def get_word_count_30s(self):
+        """Get word count for 30s pitch (target: 75-80 words)."""
+        return len(self.pitch_30s.split()) if self.pitch_30s else 0
+
+    def get_word_count_3min(self):
+        """Get word count for 3min pitch (target: 400-450 words)."""
+        return len(self.pitch_3min.split()) if self.pitch_3min else 0
+
+    def get_completion_percentage(self):
+        """Calculate pitch completion percentage."""
+        filled = sum(
+            [
+                1 if self.pitch_30s else 0,
+                1 if self.pitch_3min else 0,
+            ]
+        )
+        return int((filled / 2) * 100)

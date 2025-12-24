@@ -157,6 +157,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Microservices URLs
 CV_INGESTION_URL = os.environ.get("CV_INGESTION_URL", "http://localhost:8081")
+AI_ASSISTANT_URL = os.environ.get("AI_ASSISTANT_URL", "http://localhost:8084")
 
 
 # Logging

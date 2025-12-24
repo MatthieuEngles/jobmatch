@@ -10,8 +10,10 @@ services:
     environment:
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - MATCHING_URL=${MATCHING_URL}
+      - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
     depends_on:
       - cv-ingestion
+      - ai-assistant
       - db
     networks:
       - jobmatch-network
@@ -26,6 +28,17 @@ services:
       - app/cv-ingestion/.env
     environment:
       - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - jobmatch-network
+
+  ai-assistant:
+    build:
+      context: .
+      dockerfile: app/ai-assistant/Dockerfile
+    ports:
+      - "${AI_ASSISTANT_PORT:-8084}:8084"
+    env_file:
+      - app/ai-assistant/.env
     networks:
       - jobmatch-network
 

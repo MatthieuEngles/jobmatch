@@ -1,0 +1,6 @@
+# Development dependencies (local only, not for Docker)
+-r requirements.txt
+
+# Model visualization
+django-extensions>=3.2
+pydotplus>=2.0

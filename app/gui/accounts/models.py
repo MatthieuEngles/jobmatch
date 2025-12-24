@@ -19,6 +19,60 @@ SUBSCRIPTION_TIER_CHOICES = [
     ("enterprise", "Entreprise"),
 ]
 
+# Choices for seniority level
+SENIORITY_CHOICES = [
+    ("intern", "Stagiaire"),
+    ("apprentice", "Alternant"),
+    ("junior", "Junior (0-2 ans)"),
+    ("confirmed", "Confirme (2-5 ans)"),
+    ("senior", "Senior (5-10 ans)"),
+    ("expert", "Expert / Lead (10+ ans)"),
+]
+
+# Choices for availability
+AVAILABILITY_CHOICES = [
+    ("immediate", "Immediate"),
+    ("1_month", "1 mois"),
+    ("2_months", "2 mois"),
+    ("3_months", "3 mois"),
+    ("more", "Plus de 3 mois"),
+]
+
+# Choices for contract type
+CONTRACT_TYPE_CHOICES = [
+    ("cdi", "CDI"),
+    ("cdd", "CDD"),
+    ("freelance", "Freelance"),
+    ("alternance", "Alternance"),
+]
+
+# Choices for remote preference
+REMOTE_PREFERENCE_CHOICES = [
+    ("onsite", "Sur site"),
+    ("hybrid", "Hybride"),
+    ("remote", "Full remote"),
+    ("any", "Peu importe"),
+]
+
+# Choices for geographic mobility
+MOBILITY_CHOICES = [
+    ("city", "Ville uniquement"),
+    ("region", "Region"),
+    ("france", "France entiere"),
+    ("europe", "Europe"),
+    ("international", "International"),
+]
+
+# Choices for social link type
+SOCIAL_LINK_TYPE_CHOICES = [
+    ("linkedin", "LinkedIn"),
+    ("github", "GitHub"),
+    ("portfolio", "Portfolio"),
+    ("blog", "Blog personnel"),
+    ("medium", "Medium"),
+    ("other", "Autre"),
+]
+
 # Choices for ExtractedLine content type
 CONTENT_TYPE_CHOICES = [
     ("summary", "Resume / Accroche"),
@@ -29,6 +83,8 @@ CONTENT_TYPE_CHOICES = [
     ("language", "Langue"),
     ("certification", "Certification"),
     ("interest", "Centre d'interet"),
+    ("personal_info", "Informations personnelles"),
+    ("social_link", "Lien social"),
     ("other", "Autre"),
 ]
 
@@ -38,6 +94,17 @@ class User(AbstractUser):
 
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20, blank=True)
+    location = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="City/location",
+    )
+    photo = models.ImageField(
+        upload_to="profile_photos/",
+        blank=True,
+        null=True,
+        help_text="Profile photo",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -48,29 +115,48 @@ class User(AbstractUser):
         default="free",
     )
 
+    # Professional info
+    seniority = models.CharField(
+        max_length=20,
+        choices=SENIORITY_CHOICES,
+        blank=True,
+    )
+
     # Job search preferences
     is_job_seeker = models.BooleanField(default=True)
     availability = models.CharField(
-        max_length=50,
-        choices=[
-            ("immediate", "Immédiate"),
-            ("1_month", "1 mois"),
-            ("3_months", "3 mois"),
-            ("other", "Autre"),
-        ],
+        max_length=20,
+        choices=AVAILABILITY_CHOICES,
         blank=True,
     )
-    salary_min = models.IntegerField(null=True, blank=True)
-    salary_max = models.IntegerField(null=True, blank=True)
+    contract_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of desired contract types (cdi, cdd, freelance, alternance)",
+    )
+    salary_min = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Minimum salary in k€ gross/year",
+    )
+    salary_max = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum salary in k€ gross/year",
+    )
     remote_preference = models.CharField(
         max_length=20,
-        choices=[
-            ("onsite", "Sur site"),
-            ("hybrid", "Hybride"),
-            ("remote", "Full remote"),
-            ("any", "Peu importe"),
-        ],
+        choices=REMOTE_PREFERENCE_CHOICES,
         default="any",
+    )
+    mobility = models.CharField(
+        max_length=20,
+        choices=MOBILITY_CHOICES,
+        blank=True,
+    )
+    personal_notes = models.TextField(
+        blank=True,
+        help_text="Personal notes or additional information",
     )
 
     USERNAME_FIELD = "email"
@@ -113,6 +199,30 @@ class User(AbstractUser):
         Returns: int
         """
         return self.extracted_lines.filter(is_active=True).count()
+
+
+class SocialLink(models.Model):
+    """Social/professional links for a user."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="social_links",
+    )
+    link_type = models.CharField(
+        max_length=20,
+        choices=SOCIAL_LINK_TYPE_CHOICES,
+    )
+    url = models.URLField()
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Lien social"
+        verbose_name_plural = "Liens sociaux"
+        ordering = ["order", "link_type"]
+
+    def __str__(self):
+        return f"{self.get_link_type_display()}: {self.url}"
 
 
 class CV(models.Model):
@@ -184,6 +294,8 @@ class ExtractedLine(models.Model):
     - certification: 1 certification = 1 line
     - summary: 1 paragraph = 1 line
     - interest: 1 interest = 1 line
+    - personal_info: personal data (first_name, last_name, email, phone, location)
+    - social_link: 1 link = 1 line (link_type, url)
     """
 
     user = models.ForeignKey(
@@ -226,6 +338,50 @@ class ExtractedLine(models.Model):
         blank=True,
         null=True,
         help_text="Description of responsibilities/achievements or field of study",
+    )
+
+    # Structured fields for personal_info
+    first_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="First name from CV",
+    )
+    last_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Last name from CV",
+    )
+    email = models.EmailField(
+        blank=True,
+        null=True,
+        help_text="Email from CV",
+    )
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True,
+        help_text="Phone number from CV",
+    )
+    location = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Location/city from CV",
+    )
+
+    # Structured fields for social_link
+    link_type = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Type of social link (linkedin, github, portfolio, blog, medium, other)",
+    )
+    url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL of the social link",
     )
 
     is_active = models.BooleanField(default=True)
@@ -326,3 +482,142 @@ class UserLLMConfig(models.Model):
             "model": self.llm_model,
             "api_key": self.llm_api_key,
         }
+
+
+class CandidateProfile(models.Model):
+    """
+    Candidate profile for targeting specific job types.
+    Each profile can have different items (experiences, skills, etc.) selected.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="candidate_profiles",
+    )
+    title = models.CharField(
+        max_length=100,
+        help_text="Profile title (e.g., 'Data Scientist', 'Tech Lead')",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description of the target position",
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Default profile selected on login",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Profil de candidature"
+        verbose_name_plural = "Profils de candidature"
+        ordering = ["-is_default", "title"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "title"],
+                name="unique_profile_title_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.user.email})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default profile per user
+        if self.is_default:
+            CandidateProfile.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
+        super().save(*args, **kwargs)
+
+    def get_selected_lines(self):
+        """Return all ExtractedLines selected for this profile."""
+        selected_ids = self.item_selections.filter(is_selected=True).values_list("extracted_line_id", flat=True)
+        return ExtractedLine.objects.filter(id__in=selected_ids)
+
+    def get_selected_lines_by_type(self, content_type):
+        """Return selected ExtractedLines of a specific type."""
+        selected_ids = self.item_selections.filter(
+            is_selected=True,
+            extracted_line__content_type=content_type,
+        ).values_list("extracted_line_id", flat=True)
+        return ExtractedLine.objects.filter(id__in=selected_ids)
+
+    def is_line_selected(self, extracted_line_id):
+        """Check if a specific line is selected in this profile."""
+        selection = self.item_selections.filter(extracted_line_id=extracted_line_id).first()
+        # If no selection exists, default to True (selected)
+        return selection.is_selected if selection else True
+
+    def set_line_selection(self, extracted_line_id, is_selected):
+        """Set selection status for a specific line."""
+        selection, created = self.item_selections.get_or_create(
+            extracted_line_id=extracted_line_id,
+            defaults={"is_selected": is_selected},
+        )
+        if not created and selection.is_selected != is_selected:
+            selection.is_selected = is_selected
+            selection.save(update_fields=["is_selected"])
+        return selection
+
+    def initialize_all_selected(self):
+        """Initialize all user's extracted lines as selected for this profile."""
+        lines = ExtractedLine.objects.filter(user=self.user, is_active=True)
+        for line in lines:
+            self.item_selections.get_or_create(
+                extracted_line=line,
+                defaults={"is_selected": True},
+            )
+
+    @classmethod
+    def get_or_create_default(cls, user):
+        """Get or create the default 'Complet' profile for a user."""
+        profile, created = cls.objects.get_or_create(
+            user=user,
+            title="Complet",
+            defaults={
+                "description": "Profil complet avec tous les elements",
+                "is_default": True,
+            },
+        )
+        if created:
+            profile.initialize_all_selected()
+        return profile, created
+
+
+class ProfileItemSelection(models.Model):
+    """
+    Selection status of an ExtractedLine within a CandidateProfile.
+    Tracks which items are selected/deselected for each profile.
+    """
+
+    profile = models.ForeignKey(
+        CandidateProfile,
+        on_delete=models.CASCADE,
+        related_name="item_selections",
+    )
+    extracted_line = models.ForeignKey(
+        ExtractedLine,
+        on_delete=models.CASCADE,
+        related_name="profile_selections",
+    )
+    is_selected = models.BooleanField(
+        default=True,
+        help_text="Whether this item is included in the profile",
+    )
+
+    class Meta:
+        verbose_name = "Selection d'element"
+        verbose_name_plural = "Selections d'elements"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["profile", "extracted_line"],
+                name="unique_selection_per_profile_line",
+            )
+        ]
+
+    def __str__(self):
+        status = "selected" if self.is_selected else "deselected"
+        return f"{self.profile.title}: {self.extracted_line.content[:30]}... ({status})"

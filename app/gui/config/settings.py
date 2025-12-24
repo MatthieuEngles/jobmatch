@@ -34,6 +34,15 @@ INSTALLED_APPS = [
     "accounts",
 ]
 
+# Development-only apps (local only, not in Docker)
+if ENV_MODE == "local":
+    try:
+        import django_extensions  # noqa: F401
+
+        INSTALLED_APPS.append("django_extensions")
+    except ImportError:
+        pass
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Static files in prod

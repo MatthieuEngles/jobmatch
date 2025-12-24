@@ -1872,6 +1872,688 @@
             grid-column: span 1;
         }
     }
+
+    /* ============================================
+       Chat & Achievements Styles
+       ============================================ */
+
+    .achievements-layout {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 24px;
+        min-height: 500px;
+        position: relative;
+    }
+
+    /* Expanded chat mode - covers the entire content-card including title */
+    .achievements-layout.chat-expanded .chat-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 95vw;
+        max-width: 1200px;
+        height: 85vh;
+        z-index: 1000;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .achievements-layout.chat-expanded .successes-sidebar {
+        visibility: hidden;
+    }
+
+    /* Backdrop overlay when chat is expanded */
+    .achievements-layout.chat-expanded::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+
+    @media (max-width: 992px) {
+        .achievements-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Chat Container */
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .chat-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .chat-header-icon {
+        width: 40px;
+        height: 40px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .chat-header-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .chat-header-text {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-header-title {
+        font-weight: 600;
+        font-size: 16px;
+    }
+
+    .chat-header-status {
+        font-size: 12px;
+        opacity: 0.9;
+    }
+
+    .chat-new-btn {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: rgba(255,255,255,0.2);
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: background 0.2s;
+    }
+
+    .chat-expand-btn {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: rgba(255,255,255,0.2);
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: background 0.2s;
+    }
+
+    .chat-expand-btn:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .chat-expand-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Toggle icon based on expanded state */
+    .chat-expand-btn .expand-icon { display: block; }
+    .chat-expand-btn .collapse-icon { display: none; }
+    .chat-expanded .chat-expand-btn .expand-icon { display: none; }
+    .chat-expanded .chat-expand-btn .collapse-icon { display: block; }
+
+    .chat-new-btn:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .chat-new-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Chat Messages */
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f8fafc;
+        min-height: 350px;
+        max-height: 450px;
+    }
+
+    /* Welcome Screen */
+    .chat-welcome {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 40px 20px;
+        height: 100%;
+    }
+
+    .chat-welcome-icon {
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .chat-welcome-icon svg {
+        width: 32px;
+        height: 32px;
+        color: white;
+    }
+
+    .chat-welcome-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 8px;
+    }
+
+    .chat-welcome-desc {
+        color: #64748b;
+        margin-bottom: 16px;
+    }
+
+    .chat-star-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 24px 0;
+        text-align: left;
+        background: #f1f5f9;
+        padding: 16px 20px;
+        border-radius: 8px;
+    }
+
+    .chat-star-list li {
+        color: #475569;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .chat-star-list li:last-child {
+        margin-bottom: 0;
+    }
+
+    .chat-star-list strong {
+        color: #667eea;
+    }
+
+    .chat-start-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .chat-start-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .chat-start-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Message Bubbles */
+    .chat-message {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+        animation: messageSlide 0.3s ease-out;
+    }
+
+    @keyframes messageSlide {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .chat-message.user {
+        flex-direction: row-reverse;
+    }
+
+    .chat-message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .chat-message.assistant .chat-message-avatar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .chat-message-avatar svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .chat-message-content {
+        max-width: 75%;
+        padding: 12px 16px;
+        border-radius: 16px;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .chat-message.user .chat-message-content {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .chat-message.assistant .chat-message-content {
+        background: white;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 4px;
+    }
+
+    /* Markdown styling in chat messages */
+    .chat-message-content p {
+        margin: 0 0 0.5em 0;
+    }
+    .chat-message-content p:last-child {
+        margin-bottom: 0;
+    }
+    .chat-message-content strong {
+        font-weight: 600;
+    }
+    .chat-message-content em {
+        font-style: italic;
+    }
+    .chat-message-content ul, .chat-message-content ol {
+        margin: 0.5em 0;
+        padding-left: 1.5em;
+    }
+    .chat-message-content li {
+        margin: 0.25em 0;
+    }
+    .chat-message-content blockquote {
+        margin: 0.5em 0;
+        padding-left: 1em;
+        border-left: 3px solid #e2e8f0;
+        color: #64748b;
+    }
+    .chat-message-content code {
+        background: #f1f5f9;
+        padding: 0.1em 0.3em;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    .chat-message-content pre {
+        background: #f1f5f9;
+        padding: 0.75em;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 0.5em 0;
+    }
+    .chat-message-content pre code {
+        background: none;
+        padding: 0;
+    }
+    .chat-message-content h1, .chat-message-content h2, .chat-message-content h3 {
+        margin: 0.5em 0 0.25em 0;
+        font-weight: 600;
+    }
+    .chat-message-content h1 { font-size: 1.2em; }
+    .chat-message-content h2 { font-size: 1.1em; }
+    .chat-message-content h3 { font-size: 1em; }
+
+    /* Typing Indicator */
+    .chat-typing {
+        display: flex;
+        gap: 4px;
+        padding: 8px 0;
+    }
+
+    .chat-typing span {
+        width: 8px;
+        height: 8px;
+        background: #94a3b8;
+        border-radius: 50%;
+        animation: typingBounce 1.4s infinite;
+    }
+
+    .chat-typing span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .chat-typing span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typingBounce {
+        0%, 60%, 100% {
+            transform: translateY(0);
+        }
+        30% {
+            transform: translateY(-4px);
+        }
+    }
+
+    /* Chat Input */
+    .chat-input-container {
+        display: flex;
+        gap: 12px;
+        padding: 16px 20px;
+        border-top: 1px solid #e2e8f0;
+        background: white;
+    }
+
+    .chat-input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        font-size: 14px;
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+        font-family: inherit;
+    }
+
+    .chat-input:focus {
+        border-color: #667eea;
+    }
+
+    .chat-send-btn {
+        width: 44px;
+        height: 44px;
+        border: none;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: transform 0.2s, opacity 0.2s;
+    }
+
+    .chat-send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .chat-send-btn:not(:disabled):hover {
+        transform: scale(1.05);
+    }
+
+    .chat-send-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Successes Sidebar */
+    .successes-sidebar {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .successes-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    .successes-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .successes-count {
+        background: #667eea;
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 12px;
+    }
+
+    .successes-list {
+        padding: 16px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .successes-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+    }
+
+    .successes-empty svg {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+
+    .successes-empty p {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    /* Success Card */
+    .success-card {
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .success-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+
+    .success-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .success-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .success-card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+        margin: 0;
+        flex: 1;
+    }
+
+    .success-card-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .success-card-badge.draft {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .success-card-badge.complete {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .success-card-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .success-card-progress-bar {
+        flex: 1;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .success-card-progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 2px;
+        transition: width 0.3s;
+    }
+
+    .success-card-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .success-card-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    .success-card-toggle .toggle-switch {
+        width: 32px;
+        height: 18px;
+    }
+
+    .success-card-toggle .toggle-slider:before {
+        height: 12px;
+        width: 12px;
+    }
+
+    .success-card-toggle .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(14px);
+    }
+
+    .success-card-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .success-card-btn {
+        background: none;
+        border: none;
+        padding: 6px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.2s, color 0.2s;
+        color: #64748b;
+    }
+
+    .success-card-btn:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+
+    .success-card-btn.delete:hover {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .success-card-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Pitch-specific styles */
+    .chat-welcome-note {
+        color: #94a3b8;
+        font-size: 13px;
+        font-style: italic;
+        margin-bottom: 16px;
+    }
+
+    .pitch-list strong {
+        color: #8b5cf6;
+    }
+
+    .pitch-card-info {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .pitch-word-count {
+        font-size: 12px;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    .pitches-sidebar .successes-count {
+        background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    }
+
+    .pitch-card:hover {
+        border-color: #8b5cf6;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+    }
 </style>
 {% endblock %}
 
@@ -1930,7 +2612,13 @@
             </div>
 
             <nav class="profile-menu">
-                <a href="#personal" class="menu-item active" data-section="personal">
+                <a href="#documents" class="menu-item active" data-section="documents">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                    </svg>
+                    Mes documents
+                </a>
+                <a href="#personal" class="menu-item" data-section="personal">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -1942,11 +2630,11 @@
                     </svg>
                     Parcours professionnel
                 </a>
-                <a href="#pitch" class="menu-item" data-section="pitch">
+                <a href="#hobbies" class="menu-item" data-section="hobbies">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Mon pitch 30s/3min
+                    Hobbies & personnel
                 </a>
                 <a href="#achievements" class="menu-item" data-section="achievements">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1954,17 +2642,11 @@
                     </svg>
                     Succes professionnels
                 </a>
-                <a href="#hobbies" class="menu-item" data-section="hobbies">
+                <a href="#pitch" class="menu-item" data-section="pitch">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
-                    Hobbies & personnel
-                </a>
-                <a href="#documents" class="menu-item" data-section="documents">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
-                    </svg>
-                    Mes documents
+                    Mon pitch 30s/3min
                 </a>
 
             </nav>
@@ -1974,7 +2656,7 @@
     <!-- Main content area -->
     <main class="profile-content">
         <!-- Section: Personal data -->
-        <section id="personal" class="content-section">
+        <section id="personal" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
                     <div>
@@ -2423,58 +3105,197 @@
             </div>
         </section>
 
-        <!-- Section: Elevator pitch -->
+        <!-- Section: Elevator pitch with AI chatbot -->
         <section id="pitch" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
                     <div>
                         <h2 class="content-title">Mon pitch</h2>
-                        <p class="content-subtitle">Boostez votre presentation avec notre IA</p>
+                        <p class="content-subtitle">Creez vos pitchs 30 secondes et 3 minutes avec notre coach IA</p>
                     </div>
                 </div>
 
-                <div class="placeholder-section">
-                    <div class="placeholder-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                        </svg>
+                <div class="achievements-layout">
+                    <!-- Left: Chat interface -->
+                    <div class="chat-container">
+                        <div class="chat-header">
+                            <div class="chat-header-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
+                            </div>
+                            <div class="chat-header-text">
+                                <span class="chat-header-title">Coach Pitch</span>
+                                <span class="chat-header-status" id="pitch-chat-status">Pret a vous accompagner</span>
+                            </div>
+                            <button class="chat-expand-btn" id="pitch-chat-expand-btn" title="Agrandir/Reduire">
+                                <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                                <svg class="collapse-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                </svg>
+                            </button>
+                            <button class="chat-new-btn" id="pitch-chat-new-btn" title="Nouvelle conversation">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="chat-messages" id="pitch-chat-messages">
+                            <!-- Welcome message -->
+                            <div class="chat-welcome pitch-welcome">
+                                <div class="chat-welcome-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                    </svg>
+                                </div>
+                                <h3 class="chat-welcome-title">Creez votre pitch</h3>
+                                <p class="chat-welcome-desc">Je vais vous aider a creer deux pitchs percutants :</p>
+                                <ul class="chat-star-list pitch-list">
+                                    <li><strong>30s</strong> - Elevator pitch pour captiver rapidement</li>
+                                    <li><strong>3min</strong> - Pitch detaille pour les entretiens</li>
+                                </ul>
+                                <p class="chat-welcome-note">Vos succes professionnels seront utilises pour enrichir votre pitch.</p>
+                                <button class="chat-start-btn pitch-start-btn" id="pitch-chat-start-btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    Demarrer la conversation
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-container" id="pitch-chat-input-container" style="display: none;">
+                            <textarea
+                                class="chat-input"
+                                id="pitch-chat-input"
+                                placeholder="Ecrivez votre message..."
+                                rows="1"
+                            ></textarea>
+                            <button class="chat-send-btn" id="pitch-chat-send-btn" disabled style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="placeholder-title">Pitch non configure</h3>
-                    <p class="placeholder-desc">Redigez votre pitch pour etre pret lors de vos entretiens</p>
-                    <button class="btn-add">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Rediger mon pitch
-                    </button>
+
+                    <!-- Right: Pitches list -->
+                    <div class="successes-sidebar pitches-sidebar">
+                        <div class="successes-header">
+                            <h3 class="successes-title">Mes pitchs</h3>
+                            <span class="successes-count" id="pitches-count">0</span>
+                        </div>
+                        <div class="successes-list" id="pitches-list">
+                            <!-- Pitches will be loaded here -->
+                            <div class="successes-empty" id="pitches-empty">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
+                                <p>Vos pitchs apparaitront ici</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Section: Professional achievements -->
+        <!-- Section: Professional achievements with AI chatbot -->
         <section id="achievements" class="content-section" style="display: none;">
             <div class="content-card">
                 <div class="content-header">
                     <div>
                         <h2 class="content-title">Succes professionnels</h2>
-                        <p class="content-subtitle">Laissez-vous guider par notre consultant IA pour formaliser vos succes</p>
+                        <p class="content-subtitle">Laissez-vous guider par notre consultant IA pour formaliser vos succes avec la methode STAR</p>
                     </div>
                 </div>
 
-                <div class="placeholder-section">
-                    <div class="placeholder-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                        </svg>
+                <div class="achievements-layout">
+                    <!-- Left: Chat interface -->
+                    <div class="chat-container">
+                        <div class="chat-header">
+                            <div class="chat-header-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                </svg>
+                            </div>
+                            <div class="chat-header-text">
+                                <span class="chat-header-title">Coach STAR</span>
+                                <span class="chat-header-status" id="chat-status">Pret a vous accompagner</span>
+                            </div>
+                            <button class="chat-expand-btn" id="chat-expand-btn" title="Agrandir/Reduire">
+                                <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                                <svg class="collapse-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                </svg>
+                            </button>
+                            <button class="chat-new-btn" id="chat-new-btn" title="Nouvelle conversation">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="chat-messages" id="chat-messages">
+                            <!-- Welcome message -->
+                            <div class="chat-welcome">
+                                <div class="chat-welcome-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                    </svg>
+                                </div>
+                                <h3 class="chat-welcome-title">Methode STAR</h3>
+                                <p class="chat-welcome-desc">Je vais vous guider pour structurer vos realisations professionnelles :</p>
+                                <ul class="chat-star-list">
+                                    <li><strong>S</strong>ituation - Le contexte</li>
+                                    <li><strong>T</strong>ache - Votre mission</li>
+                                    <li><strong>A</strong>ction - Ce que vous avez fait</li>
+                                    <li><strong>R</strong>esultat - L'impact mesurable</li>
+                                </ul>
+                                <button class="chat-start-btn" id="chat-start-btn">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    Demarrer la conversation
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-container" id="chat-input-container" style="display: none;">
+                            <textarea
+                                class="chat-input"
+                                id="chat-input"
+                                placeholder="Ecrivez votre message..."
+                                rows="1"
+                            ></textarea>
+                            <button class="chat-send-btn" id="chat-send-btn" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="placeholder-title">Aucun succes ajoute</h3>
-                    <p class="placeholder-desc">Ajoutez vos realisations pour enrichir votre profil</p>
-                    <button class="btn-add">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Ajouter un succes
-                    </button>
+
+                    <!-- Right: Successes list -->
+                    <div class="successes-sidebar">
+                        <div class="successes-header">
+                            <h3 class="successes-title">Mes succes</h3>
+                            <span class="successes-count" id="successes-count">0</span>
+                        </div>
+                        <div class="successes-list" id="successes-list">
+                            <!-- Successes will be loaded here -->
+                            <div class="successes-empty" id="successes-empty">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                </svg>
+                                <p>Vos succes formalises apparaitront ici</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -2544,7 +3365,7 @@
         </section>
 
         <!-- Section: My documents (CV and cover letters) -->
-        <section id="documents" class="content-section" style="display: none;">
+        <section id="documents" class="content-section">
             <div class="content-card">
                 <div class="content-header">
                     <div>
@@ -2710,6 +3531,82 @@
     </div>
 </div>
 
+<!-- Success Created Modal -->
+<div class="profile-modal-overlay" id="successModal">
+    <div class="profile-modal" style="text-align: center;">
+        <div style="margin-bottom: 20px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" viewBox="0 0 24 24" stroke="#22c55e" style="margin: 0 auto;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h3 style="color: #22c55e; margin-bottom: 12px;">Succes ajoute !</h3>
+        <p style="color: #6b7280; margin-bottom: 24px;">Ton succes professionnel a bien ete ajoute a ton profil.</p>
+        <button type="button" class="profile-modal-btn confirm" onclick="closeSuccessModal()" style="width: 100%;">OK</button>
+    </div>
+</div>
+
+<!-- Success Delete Confirmation Modal -->
+<div class="profile-modal-overlay" id="successDeleteModal">
+    <div class="profile-modal" style="text-align: center;">
+        <div style="margin-bottom: 20px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" viewBox="0 0 24 24" stroke="#dc2626" style="margin: 0 auto;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        </div>
+        <h3 style="color: #dc2626; margin-bottom: 12px;">Supprimer ce succes ?</h3>
+        <p style="color: #6b7280; margin-bottom: 24px;" id="successDeleteTitle">Cette action est irreversible.</p>
+        <div class="profile-modal-actions" style="justify-content: center;">
+            <button type="button" class="profile-modal-btn cancel" onclick="closeSuccessDeleteModal()">Annuler</button>
+            <button type="button" class="profile-modal-btn confirm" style="background: #dc2626;" onclick="confirmDeleteSuccess()">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Success View Modal -->
+<div class="profile-modal-overlay" id="successViewModal">
+    <div class="profile-modal" style="max-width: 900px; width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #1e293b;" id="successViewTitle">Titre du succes</h3>
+            <button type="button" onclick="closeSuccessViewModal()" style="background: none; border: none; cursor: pointer; padding: 4px; color: #64748b;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div style="text-align: left;">
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #667eea; margin: 0 0 8px;">Situation</h4>
+                <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;" id="successViewSituation"></p>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #667eea; margin: 0 0 8px;">Tache</h4>
+                <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;" id="successViewTask"></p>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #667eea; margin: 0 0 8px;">Actions</h4>
+                <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;" id="successViewAction"></p>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #667eea; margin: 0 0 8px;">Resultats</h4>
+                <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;" id="successViewResult"></p>
+            </div>
+            <div>
+                <h4 style="font-size: 14px; font-weight: 600; color: #667eea; margin: 0 0 8px;">Competences demontrees</h4>
+                <div id="successViewSkills" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
+        </div>
+        <div class="profile-modal-actions" style="margin-top: 24px; justify-content: center; gap: 12px;">
+            <button type="button" class="profile-modal-btn cancel" onclick="exportSuccessDocx()" style="display: flex; align-items: center; gap: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export DOCX
+            </button>
+            <button type="button" class="profile-modal-btn confirm" onclick="closeSuccessViewModal()">Fermer</button>
+        </div>
+    </div>
+</div>
+
 <!-- Photo Upload Modal -->
 <div class="photo-modal-overlay" id="photoModal">
     <div class="photo-modal">
@@ -2803,6 +3700,8 @@
 
 <!-- Cropper.js Library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<!-- Marked.js for Markdown rendering in chat -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
 
 <script>
 // Current profile state
@@ -3075,6 +3974,138 @@ function openProfileModal(mode) {
 // Close profile modal
 function closeProfileModal() {
     document.getElementById('profileModal').classList.remove('show');
+}
+
+// Close success modal
+function closeSuccessModal() {
+    document.getElementById('successModal').classList.remove('show');
+}
+
+// Show success modal
+function showSuccessModal() {
+    document.getElementById('successModal').classList.add('show');
+}
+
+// Close success delete modal
+function closeSuccessDeleteModal() {
+    document.getElementById('successDeleteModal').classList.remove('show');
+}
+
+// Close success view modal
+function closeSuccessViewModal() {
+    document.getElementById('successViewModal').classList.remove('show');
+}
+
+// Export success to DOCX
+async function exportSuccessDocx() {
+    const exportBtn = event.target.closest('button');
+    const originalText = exportBtn.innerHTML;
+
+    try {
+        exportBtn.innerHTML = '<span style="display:flex;align-items:center;gap:6px;">Chargement...</span>';
+        exportBtn.disabled = true;
+
+        // Get the current success data from the modal
+        const title = document.getElementById('successViewTitle').textContent;
+        const situation = document.getElementById('successViewSituation').textContent;
+        const task = document.getElementById('successViewTask').textContent;
+        const action = document.getElementById('successViewAction').textContent;
+        const result = document.getElementById('successViewResult').textContent;
+        const skillsContainer = document.getElementById('successViewSkills');
+        const skills = Array.from(skillsContainer.querySelectorAll('span')).map(s => s.textContent).filter(s => s !== 'Aucune competence');
+
+        // Load docx library dynamically if not already loaded
+        if (!window.docx) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/docx@8.5.0/build/index.umd.js';
+            document.head.appendChild(script);
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load docx library'));
+            });
+        }
+
+        const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+
+        // Create document
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children: [
+                    new Paragraph({
+                        text: title,
+                        heading: HeadingLevel.HEADING_1,
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Situation', bold: true, color: '667eea' }),
+                        ],
+                    }),
+                    new Paragraph({ text: situation }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Tache', bold: true, color: '667eea' }),
+                        ],
+                    }),
+                    new Paragraph({ text: task }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Actions', bold: true, color: '667eea' }),
+                        ],
+                    }),
+                    new Paragraph({ text: action }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Resultats', bold: true, color: '667eea' }),
+                        ],
+                    }),
+                    new Paragraph({ text: result }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Competences demontrees', bold: true, color: '667eea' }),
+                        ],
+                    }),
+                    new Paragraph({ text: skills.length > 0 ? skills.join(', ') : '-' }),
+                ],
+            }],
+        });
+
+        // Generate and download
+        const blob = await Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `succes_${title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        exportBtn.innerHTML = '<span style="display:flex;align-items:center;gap:6px;">Telecharge !</span>';
+        setTimeout(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+        }, 2000);
+    } catch (error) {
+        console.error('Export DOCX error:', error);
+        alert('Erreur lors de l\'export: ' + error.message);
+        exportBtn.innerHTML = originalText;
+        exportBtn.disabled = false;
+    }
+}
+
+// Confirm delete success - called from modal button
+function confirmDeleteSuccess() {
+    // Get the StarChatbot instance and call deleteSuccess
+    if (window.starChatInstance && window.starChatInstance.successToDelete) {
+        window.starChatInstance.deleteSuccess(window.starChatInstance.successToDelete);
+        closeSuccessDeleteModal();
+    }
 }
 
 // Save profile (create or update)
@@ -3887,5 +4918,1592 @@ function deletePhoto() {
         alert('Erreur de connexion au serveur');
     });
 }
+
+// ============================================
+// STAR Chat Functionality
+// ============================================
+
+class StarChatbot {
+    constructor() {
+        this.conversationId = null;
+        this.isProcessing = false;
+        this.pollInterval = null;
+        this.useStreaming = true; // Enable streaming by default
+        this.currentStreamingMessage = null; // Track the message being streamed
+
+        // DOM elements
+        this.chatMessages = document.getElementById('chat-messages');
+        this.chatInputContainer = document.getElementById('chat-input-container');
+        this.chatInput = document.getElementById('chat-input');
+        this.chatSendBtn = document.getElementById('chat-send-btn');
+        this.chatStartBtn = document.getElementById('chat-start-btn');
+        this.chatNewBtn = document.getElementById('chat-new-btn');
+        this.chatStatus = document.getElementById('chat-status');
+        this.successesList = document.getElementById('successes-list');
+        this.successesCount = document.getElementById('successes-count');
+        this.successesEmpty = document.getElementById('successes-empty');
+        this.chatExpandBtn = document.getElementById('chat-expand-btn');
+        this.achievementsLayout = document.querySelector('#achievements .achievements-layout');
+
+        this.init();
+    }
+
+    init() {
+        // Bind events
+        if (this.chatStartBtn) {
+            this.chatStartBtn.addEventListener('click', () => this.startConversation());
+        }
+        if (this.chatNewBtn) {
+            this.chatNewBtn.addEventListener('click', () => this.resetChat());
+        }
+        if (this.chatSendBtn) {
+            this.chatSendBtn.addEventListener('click', () => this.sendMessage());
+        }
+        if (this.chatInput) {
+            this.chatInput.addEventListener('input', () => this.updateSendButton());
+            this.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            });
+        }
+        if (this.chatExpandBtn) {
+            this.chatExpandBtn.addEventListener('click', () => this.toggleExpand());
+        }
+
+        // Load existing successes
+        this.loadSuccesses();
+    }
+
+    // Expand/collapse methods
+    expandChat() {
+        if (this.achievementsLayout) {
+            this.achievementsLayout.classList.add('chat-expanded');
+        }
+    }
+
+    collapseChat() {
+        if (this.achievementsLayout) {
+            this.achievementsLayout.classList.remove('chat-expanded');
+        }
+    }
+
+    toggleExpand() {
+        if (this.achievementsLayout) {
+            this.achievementsLayout.classList.toggle('chat-expanded');
+        }
+    }
+
+    async startConversation() {
+        if (this.isProcessing) return;
+
+        this.isProcessing = true;
+        this.chatStatus.textContent = 'Demarrage...';
+        this.chatStartBtn.disabled = true;
+
+        // Auto-expand chat when conversation starts
+        this.expandChat();
+
+        // Use streaming if enabled
+        if (this.useStreaming) {
+            this.startConversationStreaming();
+            return;
+        }
+
+        // Fallback to polling mode
+        try {
+            const response = await fetch('/accounts/api/chat/start/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.conversationId = data.conversation_id;
+                this.showChatInterface();
+                // Show typing indicator while waiting for initial AI message
+                this.showTypingIndicator();
+                this.chatStatus.textContent = 'Reflexion...';
+                this.pollForResponse(data.task_id);
+            } else {
+                this.showError(data.error || 'Erreur lors du demarrage');
+                this.isProcessing = false;
+                this.chatStartBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Start error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatStartBtn.disabled = false;
+        }
+        // Note: isProcessing will be set to false when polling completes
+    }
+
+    async startConversationStreaming() {
+        this.showChatInterface();
+        this.chatStatus.textContent = 'Connexion...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/start/stream/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let messageCreated = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                        this.finishStreamingMessage();
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        // First event contains conversation_id
+                        if (parsed.conversation_id) {
+                            this.conversationId = parsed.conversation_id;
+                            this.chatStatus.textContent = 'Generation...';
+                            continue;
+                        }
+
+                        // Handle errors
+                        if (parsed.error) {
+                            this.showError(parsed.error);
+                            this.isProcessing = false;
+                            continue;
+                        }
+
+                        // Handle token
+                        if (parsed.token !== undefined) {
+                            if (!messageCreated) {
+                                this.createStreamingMessage('assistant');
+                                messageCreated = true;
+                            }
+                            // Unescape newlines
+                            const token = parsed.token.replace(/\\n/g, '\n');
+                            this.appendToStreamingMessage(token);
+                        }
+                    } catch (e) {
+                        console.warn('Parse error:', e, data);
+                    }
+                }
+            }
+
+            this.finishStreamingMessage();
+            this.chatStatus.textContent = 'Connecte';
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+
+        } catch (error) {
+            console.error('Streaming start error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatStartBtn.disabled = false;
+        }
+    }
+
+    showChatInterface() {
+        // Hide welcome, show messages area
+        const welcome = this.chatMessages.querySelector('.chat-welcome');
+        if (welcome) {
+            welcome.style.display = 'none';
+        }
+
+        // Show input container
+        this.chatInputContainer.style.display = 'flex';
+    }
+
+    resetChat() {
+        this.conversationId = null;
+        this.isProcessing = false;
+
+        // Collapse chat when resetting
+        this.collapseChat();
+
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
+
+        // Clear messages except welcome
+        this.chatMessages.innerHTML = `
+            <div class="chat-welcome">
+                <div class="chat-welcome-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                </div>
+                <h3 class="chat-welcome-title">Methode STAR</h3>
+                <p class="chat-welcome-desc">Je vais vous guider pour structurer vos realisations professionnelles :</p>
+                <ul class="chat-star-list">
+                    <li><strong>S</strong>ituation - Le contexte</li>
+                    <li><strong>T</strong>ache - Votre mission</li>
+                    <li><strong>A</strong>ction - Ce que vous avez fait</li>
+                    <li><strong>R</strong>esultat - L'impact mesurable</li>
+                </ul>
+                <button class="chat-start-btn" id="chat-start-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Demarrer la conversation
+                </button>
+            </div>
+        `;
+
+        // Rebind start button
+        const newStartBtn = document.getElementById('chat-start-btn');
+        if (newStartBtn) {
+            newStartBtn.addEventListener('click', () => this.startConversation());
+        }
+
+        // Hide input
+        this.chatInputContainer.style.display = 'none';
+        this.chatStatus.textContent = 'Pret a vous accompagner';
+    }
+
+    async sendMessage() {
+        if (this.isProcessing || !this.conversationId) return;
+
+        const message = this.chatInput.value.trim();
+        if (!message) return;
+
+        this.isProcessing = true;
+        this.chatSendBtn.disabled = true;
+        this.chatInput.value = '';
+        this.updateSendButton();
+
+        // Add user message to chat
+        this.addMessage('user', message);
+
+        // Use streaming if enabled
+        if (this.useStreaming) {
+            this.sendMessageStreaming(message);
+            return;
+        }
+
+        // Fallback to polling mode
+        this.showTypingIndicator();
+        this.chatStatus.textContent = 'Reflexion...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    conversation_id: this.conversationId,
+                    message: message,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.pollForResponse(data.task_id);
+            } else {
+                this.hideTypingIndicator();
+                this.showError(data.error || 'Erreur lors de l\'envoi');
+                this.isProcessing = false;
+            }
+        } catch (error) {
+            console.error('Send error:', error);
+            this.hideTypingIndicator();
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+        }
+    }
+
+    async sendMessageStreaming(message) {
+        this.chatStatus.textContent = 'Generation...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/message/stream/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    conversation_id: this.conversationId,
+                    message: message,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let messageCreated = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log('Stream done, buffer remaining:', buffer);
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                        console.log('Received [DONE], calling finishStreamingMessage');
+                        this.finishStreamingMessage();
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        // First event contains message IDs (skip)
+                        if (parsed.user_message_id || parsed.assistant_message_id) {
+                            continue;
+                        }
+
+                        // Handle errors
+                        if (parsed.error) {
+                            this.showError(parsed.error);
+                            this.isProcessing = false;
+                            continue;
+                        }
+
+                        // Handle token
+                        if (parsed.token !== undefined) {
+                            if (!messageCreated) {
+                                this.createStreamingMessage('assistant');
+                                messageCreated = true;
+                            }
+                            const token = parsed.token.replace(/\\n/g, '\n');
+                            this.appendToStreamingMessage(token);
+                        }
+                    } catch (e) {
+                        console.warn('Parse error:', e, data);
+                    }
+                }
+            }
+
+            // Process any remaining data in buffer after stream ends
+            if (buffer.trim()) {
+                console.log('Processing remaining buffer:', buffer);
+                if (buffer.startsWith('data: ')) {
+                    const data = buffer.slice(6);
+                    if (data === '[DONE]') {
+                        console.log('Found [DONE] in remaining buffer');
+                    }
+                }
+            }
+
+            console.log('Calling finishStreamingMessage after loop');
+            this.finishStreamingMessage();
+            this.chatStatus.textContent = 'Connecte';
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+
+        } catch (error) {
+            console.error('Streaming message error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+        }
+    }
+
+    pollForResponse(taskId) {
+        let attempts = 0;
+        const maxAttempts = 60; // 2 minutes max
+
+        this.pollInterval = setInterval(async () => {
+            attempts++;
+
+            if (attempts > maxAttempts) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+                this.hideTypingIndicator();
+                this.showError('Timeout - pas de reponse');
+                this.isProcessing = false;
+                this.chatSendBtn.disabled = false;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/accounts/api/chat/status/${taskId}/`);
+                const data = await response.json();
+
+                if (data.status === 'completed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                    this.hideTypingIndicator();
+                    this.addMessage('assistant', data.response);
+                    this.chatStatus.textContent = 'Connecte';
+                    this.isProcessing = false;
+                    this.chatSendBtn.disabled = false;
+                    this.scrollToBottom();
+                } else if (data.status === 'failed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                    this.hideTypingIndicator();
+                    this.showError(data.error || 'Erreur de generation');
+                    this.isProcessing = false;
+                    this.chatSendBtn.disabled = false;
+                }
+                // else: still processing, continue polling
+            } catch (error) {
+                console.error('Poll error:', error);
+            }
+        }, 2000); // Poll every 2 seconds
+    }
+
+    addMessage(role, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${role}`;
+
+        const avatarSvg = role === 'assistant'
+            ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
+
+        // Use markdown for assistant messages, escape HTML for user messages
+        const formattedContent = role === 'assistant' ? this.renderMarkdown(content) : this.escapeHtml(content);
+
+        messageDiv.innerHTML = `
+            <div class="chat-message-avatar">${avatarSvg}</div>
+            <div class="chat-message-content">${formattedContent}</div>
+        `;
+
+        // Insert before typing indicator if present
+        const typingIndicator = this.chatMessages.querySelector('.chat-message.typing');
+        if (typingIndicator) {
+            this.chatMessages.insertBefore(messageDiv, typingIndicator);
+        } else {
+            this.chatMessages.appendChild(messageDiv);
+        }
+
+        this.scrollToBottom();
+    }
+
+    renderMarkdown(text) {
+        // Configure marked for safe rendering
+        if (typeof marked !== 'undefined') {
+            return marked.parse(text);
+        }
+        // Fallback if marked is not loaded
+        return this.escapeHtml(text);
+    }
+
+    createStreamingMessage(role) {
+        // Create an empty message element for streaming content
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${role} streaming`;
+
+        const avatarSvg = role === 'assistant'
+            ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
+
+        messageDiv.innerHTML = `
+            <div class="chat-message-avatar">${avatarSvg}</div>
+            <div class="chat-message-content"></div>
+        `;
+
+        this.chatMessages.appendChild(messageDiv);
+        this.currentStreamingMessage = messageDiv;
+        this.scrollToBottom();
+    }
+
+    appendToStreamingMessage(token) {
+        if (!this.currentStreamingMessage) return;
+
+        const contentDiv = this.currentStreamingMessage.querySelector('.chat-message-content');
+        if (contentDiv) {
+            // Unescape newlines from SSE format and append as text
+            const unescapedToken = token.replace(/\\n/g, '\n');
+            contentDiv.textContent += unescapedToken;
+            this.scrollToBottom();
+        }
+    }
+
+    finishStreamingMessage() {
+        if (!this.currentStreamingMessage) return;
+
+        // Remove streaming class
+        this.currentStreamingMessage.classList.remove('streaming');
+
+        // Apply markdown rendering to final content
+        const contentDiv = this.currentStreamingMessage.querySelector('.chat-message-content');
+        if (contentDiv) {
+            const rawText = contentDiv.textContent || '';
+
+            // Debug: log raw text to check markers
+            console.log('finishStreamingMessage rawText:', rawText.substring(0, 200));
+            console.log('Has START:', rawText.includes('[STAR_COMPLETE_START]'));
+            console.log('Has END:', rawText.includes('[STAR_COMPLETE_END]'));
+
+            // Check for STAR_COMPLETE markers (need both START and END)
+            if (rawText.includes('[STAR_COMPLETE_START]') && rawText.includes('[STAR_COMPLETE_END]')) {
+                this.handleStarComplete(rawText, contentDiv);
+            } else {
+                contentDiv.innerHTML = this.renderMarkdown(rawText);
+            }
+        }
+
+        this.currentStreamingMessage = null;
+    }
+
+    async handleStarComplete(rawText, contentDiv) {
+        // Extract the visible message (before the START marker)
+        const startMarkerIndex = rawText.indexOf('[STAR_COMPLETE_START]');
+        const visibleText = rawText.substring(0, startMarkerIndex).trim();
+
+        // Show only the visible part to user (or a default message if empty)
+        const displayText = visibleText || "Parfait ! Je cree ton succes...";
+        contentDiv.innerHTML = this.renderMarkdown(displayText);
+
+        // Extract JSON between START and END markers
+        const jsonMatch = rawText.match(/\[STAR_COMPLETE_START\]\s*([\s\S]*?)\s*\[STAR_COMPLETE_END\]/);
+
+        if (!jsonMatch) {
+            console.error('STAR_COMPLETE markers found but no content between them. Raw:', rawText.substring(startMarkerIndex));
+            this.showError('Le format de reponse est incorrect. Veuillez reessayer.');
+            return;
+        }
+
+        let jsonText = jsonMatch[1].trim();
+
+        // Remove any markdown code block markers if present
+        jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+
+        if (!jsonText) {
+            console.error('STAR_COMPLETE markers found but empty JSON. Raw:', rawText.substring(startMarkerIndex));
+            this.showError('Le format de reponse est incorrect. Veuillez reessayer.');
+            return;
+        }
+
+        try {
+            // Clean up the JSON text (remove leading/trailing whitespace, fix common issues)
+            jsonText = jsonText.trim();
+            const successData = JSON.parse(jsonText);
+
+            // Validate required fields
+            if (!successData.title) {
+                throw new Error('Missing title in success data');
+            }
+
+            // Create the success via API
+            const response = await fetch('/accounts/api/successes/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    title: successData.title,
+                    situation: successData.situation || '',
+                    task: successData.task || '',
+                    action: successData.action || '',
+                    result: successData.result || '',
+                    skills_demonstrated: successData.skills_demonstrated || [],
+                    conversation_id: this.conversationId,
+                    is_draft: false, // Success is complete when auto-created
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Reset chat first
+                this.resetChat();
+
+                // Reload successes list
+                this.loadSuccesses();
+
+                // Show success modal
+                showSuccessModal();
+            } else {
+                console.error('Failed to create success:', result.error);
+                this.showError('Erreur lors de la creation du succes: ' + (result.error || 'erreur inconnue'));
+            }
+        } catch (e) {
+            console.error('Error parsing STAR_COMPLETE JSON:', e, 'Raw JSON:', jsonText);
+            this.showError('Erreur de format JSON. Veuillez reessayer.');
+        }
+    }
+
+    showTypingIndicator() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'chat-message assistant typing';
+        typingDiv.innerHTML = `
+            <div class="chat-message-avatar">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div class="chat-message-content">
+                <div class="chat-typing">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        `;
+        this.chatMessages.appendChild(typingDiv);
+        this.scrollToBottom();
+    }
+
+    hideTypingIndicator() {
+        const typing = this.chatMessages.querySelector('.chat-message.typing');
+        if (typing) {
+            typing.remove();
+        }
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'chat-message assistant';
+        errorDiv.innerHTML = `
+            <div class="chat-message-avatar" style="background: #ef4444;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="chat-message-content" style="border-color: #fecaca; background: #fef2f2; color: #dc2626;">
+                ${this.escapeHtml(message)}
+            </div>
+        `;
+        this.chatMessages.appendChild(errorDiv);
+        this.scrollToBottom();
+        this.chatStatus.textContent = 'Erreur';
+    }
+
+    updateSendButton() {
+        const hasText = this.chatInput.value.trim().length > 0;
+        this.chatSendBtn.disabled = !hasText || this.isProcessing;
+    }
+
+    scrollToBottom() {
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/\n/g, '<br>');
+    }
+
+    getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    }
+
+    // Load existing successes
+    async loadSuccesses() {
+        try {
+            const response = await fetch('/accounts/api/successes/');
+            const data = await response.json();
+
+            if (data.success) {
+                this.renderSuccesses(data.successes);
+            }
+        } catch (error) {
+            console.error('Load successes error:', error);
+        }
+    }
+
+    renderSuccesses(successes) {
+        this.successesCount.textContent = successes.length;
+        // Store successes for later use in modals
+        this.successes = successes;
+
+        if (successes.length === 0) {
+            this.successesEmpty.style.display = 'flex';
+            return;
+        }
+
+        this.successesEmpty.style.display = 'none';
+
+        // Clear existing cards (keep empty message hidden)
+        const existingCards = this.successesList.querySelectorAll('.success-card');
+        existingCards.forEach(card => card.remove());
+
+        // Add success cards
+        successes.forEach(success => {
+            const card = document.createElement('div');
+            card.className = 'success-card';
+            card.dataset.successId = success.id;
+            card.innerHTML = `
+                <div class="success-card-header">
+                    <h4 class="success-card-title">${this.escapeHtml(success.title)}</h4>
+                    <span class="success-card-badge ${success.is_draft ? 'draft' : 'complete'}">
+                        ${success.is_draft ? 'Brouillon' : 'Finalise'}
+                    </span>
+                </div>
+                <div class="success-card-progress">
+                    <div class="success-card-progress-bar">
+                        <div class="success-card-progress-fill" style="width: ${success.completion_percentage}%;"></div>
+                    </div>
+                    <span>${success.completion_percentage}%</span>
+                </div>
+                <div class="success-card-actions">
+                    <div class="success-card-toggle">
+                        <label class="toggle-switch" title="Inclure dans ce profil">
+                            <input type="checkbox" class="toggle-success-profile" data-success-id="${success.id}" ${success.is_active !== false ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Profil</span>
+                    </div>
+                    <div class="success-card-buttons">
+                        <button type="button" class="success-card-btn view" data-success-id="${success.id}" title="Voir le detail">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </button>
+                        <button type="button" class="success-card-btn delete" data-success-id="${success.id}" data-success-title="${this.escapeHtml(success.title)}" title="Supprimer">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            this.successesList.appendChild(card);
+        });
+
+        // Add event listeners for view and delete buttons
+        this.successesList.querySelectorAll('.success-card-btn.view').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const successId = parseInt(btn.dataset.successId);
+                this.viewSuccess(successId);
+            });
+        });
+
+        this.successesList.querySelectorAll('.success-card-btn.delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const successId = parseInt(btn.dataset.successId);
+                const successTitle = btn.dataset.successTitle;
+                this.showDeleteModal(successId, successTitle);
+            });
+        });
+
+        // Add event listeners for toggle
+        this.successesList.querySelectorAll('.toggle-success-profile').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const successId = parseInt(toggle.dataset.successId);
+                this.toggleSuccessProfile(successId, toggle.checked);
+            });
+        });
+    }
+
+    viewSuccess(successId) {
+        const success = this.successes.find(s => s.id === successId);
+        if (!success) return;
+
+        document.getElementById('successViewTitle').textContent = success.title;
+        document.getElementById('successViewSituation').textContent = success.situation || '-';
+        document.getElementById('successViewTask').textContent = success.task || '-';
+        document.getElementById('successViewAction').textContent = success.action || '-';
+        document.getElementById('successViewResult').textContent = success.result || '-';
+
+        const skillsContainer = document.getElementById('successViewSkills');
+        skillsContainer.innerHTML = '';
+        if (success.skills_demonstrated && success.skills_demonstrated.length > 0) {
+            success.skills_demonstrated.forEach(skill => {
+                const tag = document.createElement('span');
+                tag.style.cssText = 'background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 12px; font-size: 12px;';
+                tag.textContent = skill;
+                skillsContainer.appendChild(tag);
+            });
+        } else {
+            skillsContainer.innerHTML = '<span style="color: #9ca3af; font-size: 12px;">Aucune competence</span>';
+        }
+
+        document.getElementById('successViewModal').classList.add('show');
+    }
+
+    showDeleteModal(successId, successTitle) {
+        this.successToDelete = successId;
+        document.getElementById('successDeleteTitle').innerHTML = `<strong>${successTitle}</strong><br>Cette action est irreversible.`;
+        document.getElementById('successDeleteModal').classList.add('show');
+    }
+
+    async deleteSuccess(successId) {
+        try {
+            const response = await fetch(`/accounts/api/successes/${successId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            });
+
+            if (response.ok) {
+                // Reload successes
+                await this.loadSuccesses();
+            } else {
+                console.error('Delete failed');
+                alert('Erreur lors de la suppression');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Erreur lors de la suppression');
+        }
+    }
+
+    async toggleSuccessProfile(successId, isActive) {
+        try {
+            const response = await fetch(`/accounts/api/successes/${successId}/update/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: JSON.stringify({ is_active: isActive })
+            });
+
+            if (!response.ok) {
+                console.error('Toggle failed');
+                // Revert the checkbox
+                const checkbox = this.successesList.querySelector(`.toggle-success-profile[data-success-id="${successId}"]`);
+                if (checkbox) checkbox.checked = !isActive;
+            }
+        } catch (error) {
+            console.error('Toggle error:', error);
+        }
+    }
+}
+
+// ============================================
+// Pitch Chat Functionality
+// ============================================
+
+class PitchChatbot {
+    constructor() {
+        this.conversationId = null;
+        this.isProcessing = false;
+        this.pollInterval = null;
+        this.useStreaming = true; // Enable streaming by default
+        this.currentStreamingMessage = null; // Track the message being streamed
+
+        // DOM elements
+        this.chatMessages = document.getElementById('pitch-chat-messages');
+        this.chatInputContainer = document.getElementById('pitch-chat-input-container');
+        this.chatInput = document.getElementById('pitch-chat-input');
+        this.chatSendBtn = document.getElementById('pitch-chat-send-btn');
+        this.chatStartBtn = document.getElementById('pitch-chat-start-btn');
+        this.chatNewBtn = document.getElementById('pitch-chat-new-btn');
+        this.chatStatus = document.getElementById('pitch-chat-status');
+        this.pitchesList = document.getElementById('pitches-list');
+        this.pitchesCount = document.getElementById('pitches-count');
+        this.pitchesEmpty = document.getElementById('pitches-empty');
+        this.chatExpandBtn = document.getElementById('pitch-chat-expand-btn');
+        this.pitchLayout = document.querySelector('#pitch .achievements-layout');
+
+        this.init();
+    }
+
+    init() {
+        // Bind events
+        if (this.chatStartBtn) {
+            this.chatStartBtn.addEventListener('click', () => this.startConversation());
+        }
+        if (this.chatNewBtn) {
+            this.chatNewBtn.addEventListener('click', () => this.resetChat());
+        }
+        if (this.chatSendBtn) {
+            this.chatSendBtn.addEventListener('click', () => this.sendMessage());
+        }
+        if (this.chatInput) {
+            this.chatInput.addEventListener('input', () => this.updateSendButton());
+            this.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            });
+        }
+        if (this.chatExpandBtn) {
+            this.chatExpandBtn.addEventListener('click', () => this.toggleExpand());
+        }
+
+        // Load existing pitches
+        this.loadPitches();
+    }
+
+    // Expand/collapse methods
+    expandChat() {
+        if (this.pitchLayout) {
+            this.pitchLayout.classList.add('chat-expanded');
+        }
+    }
+
+    collapseChat() {
+        if (this.pitchLayout) {
+            this.pitchLayout.classList.remove('chat-expanded');
+        }
+    }
+
+    toggleExpand() {
+        if (this.pitchLayout) {
+            this.pitchLayout.classList.toggle('chat-expanded');
+        }
+    }
+
+    async startConversation() {
+        if (this.isProcessing) return;
+
+        this.isProcessing = true;
+        this.chatStatus.textContent = 'Demarrage...';
+        this.chatStartBtn.disabled = true;
+
+        // Auto-expand chat when conversation starts
+        this.expandChat();
+
+        // Use streaming if enabled
+        if (this.useStreaming) {
+            this.startConversationStreaming();
+            return;
+        }
+
+        // Fallback to polling mode
+        try {
+            const response = await fetch('/accounts/api/chat/start/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    coaching_type: 'pitch'
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.conversationId = data.conversation_id;
+                this.showChatInterface();
+                // Show typing indicator while waiting for initial AI message
+                this.showTypingIndicator();
+                this.chatStatus.textContent = 'Reflexion...';
+                this.pollForResponse(data.task_id);
+            } else {
+                this.showError(data.error || 'Erreur lors du demarrage');
+                this.isProcessing = false;
+                this.chatStartBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Start error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatStartBtn.disabled = false;
+        }
+        // Note: isProcessing will be set to false when polling completes
+    }
+
+    async startConversationStreaming() {
+        this.showChatInterface();
+        this.chatStatus.textContent = 'Connexion...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/start/stream/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    coaching_type: 'pitch'
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let messageCreated = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                        this.finishStreamingMessage();
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        if (parsed.conversation_id) {
+                            this.conversationId = parsed.conversation_id;
+                            this.chatStatus.textContent = 'Generation...';
+                            continue;
+                        }
+
+                        if (parsed.error) {
+                            this.showError(parsed.error);
+                            this.isProcessing = false;
+                            continue;
+                        }
+
+                        if (parsed.token !== undefined) {
+                            if (!messageCreated) {
+                                this.createStreamingMessage('assistant');
+                                messageCreated = true;
+                            }
+                            const token = parsed.token.replace(/\\n/g, '\n');
+                            this.appendToStreamingMessage(token);
+                        }
+                    } catch (e) {
+                        console.warn('Parse error:', e, data);
+                    }
+                }
+            }
+
+            this.finishStreamingMessage();
+            this.chatStatus.textContent = 'Connecte';
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+
+        } catch (error) {
+            console.error('Streaming start error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatStartBtn.disabled = false;
+        }
+    }
+
+    showChatInterface() {
+        // Hide welcome, show messages area
+        const welcome = this.chatMessages.querySelector('.chat-welcome');
+        if (welcome) {
+            welcome.style.display = 'none';
+        }
+
+        // Show input container
+        this.chatInputContainer.style.display = 'flex';
+    }
+
+    resetChat() {
+        this.conversationId = null;
+        this.isProcessing = false;
+
+        // Collapse chat when resetting
+        this.collapseChat();
+
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
+
+        // Clear messages except welcome
+        this.chatMessages.innerHTML = `
+            <div class="chat-welcome pitch-welcome">
+                <div class="chat-welcome-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </div>
+                <h3 class="chat-welcome-title">Creez votre pitch</h3>
+                <p class="chat-welcome-desc">Je vais vous aider a creer deux pitchs percutants :</p>
+                <ul class="chat-star-list pitch-list">
+                    <li><strong>30s</strong> - Elevator pitch pour captiver rapidement</li>
+                    <li><strong>3min</strong> - Pitch detaille pour les entretiens</li>
+                </ul>
+                <p class="chat-welcome-note">Vos succes professionnels seront utilises pour enrichir votre pitch.</p>
+                <button class="chat-start-btn pitch-start-btn" id="pitch-chat-start-btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Demarrer la conversation
+                </button>
+            </div>
+        `;
+
+        // Rebind start button
+        const newStartBtn = document.getElementById('pitch-chat-start-btn');
+        if (newStartBtn) {
+            newStartBtn.addEventListener('click', () => this.startConversation());
+        }
+
+        // Hide input
+        this.chatInputContainer.style.display = 'none';
+        this.chatStatus.textContent = 'Pret a vous accompagner';
+    }
+
+    async sendMessage() {
+        if (this.isProcessing || !this.conversationId) return;
+
+        const message = this.chatInput.value.trim();
+        if (!message) return;
+
+        this.isProcessing = true;
+        this.chatSendBtn.disabled = true;
+        this.chatInput.value = '';
+        this.updateSendButton();
+
+        // Add user message to chat
+        this.addMessage('user', message);
+
+        // Use streaming if enabled
+        if (this.useStreaming) {
+            this.sendMessageStreaming(message);
+            return;
+        }
+
+        // Fallback to polling mode
+        this.showTypingIndicator();
+        this.chatStatus.textContent = 'Reflexion...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    conversation_id: this.conversationId,
+                    message: message,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.pollForResponse(data.task_id);
+            } else {
+                this.hideTypingIndicator();
+                this.showError(data.error || 'Erreur lors de l\'envoi');
+                this.isProcessing = false;
+            }
+        } catch (error) {
+            console.error('Send error:', error);
+            this.hideTypingIndicator();
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+        }
+    }
+
+    async sendMessageStreaming(message) {
+        this.chatStatus.textContent = 'Generation...';
+
+        try {
+            const response = await fetch('/accounts/api/chat/message/stream/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    conversation_id: this.conversationId,
+                    message: message,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let messageCreated = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                        this.finishStreamingMessage();
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        if (parsed.user_message_id || parsed.assistant_message_id) {
+                            continue;
+                        }
+
+                        if (parsed.error) {
+                            this.showError(parsed.error);
+                            this.isProcessing = false;
+                            continue;
+                        }
+
+                        if (parsed.token !== undefined) {
+                            if (!messageCreated) {
+                                this.createStreamingMessage('assistant');
+                                messageCreated = true;
+                            }
+                            const token = parsed.token.replace(/\\n/g, '\n');
+                            this.appendToStreamingMessage(token);
+                        }
+                    } catch (e) {
+                        console.warn('Parse error:', e, data);
+                    }
+                }
+            }
+
+            this.finishStreamingMessage();
+            this.chatStatus.textContent = 'Connecte';
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+
+        } catch (error) {
+            console.error('Streaming message error:', error);
+            this.showError('Erreur de connexion');
+            this.isProcessing = false;
+            this.chatSendBtn.disabled = false;
+        }
+    }
+
+    pollForResponse(taskId) {
+        let attempts = 0;
+        const maxAttempts = 60; // 2 minutes max
+
+        this.pollInterval = setInterval(async () => {
+            attempts++;
+
+            if (attempts > maxAttempts) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+                this.hideTypingIndicator();
+                this.showError('Timeout - pas de reponse');
+                this.isProcessing = false;
+                this.chatSendBtn.disabled = false;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/accounts/api/chat/status/${taskId}/`);
+                const data = await response.json();
+
+                if (data.status === 'completed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                    this.hideTypingIndicator();
+                    this.addMessage('assistant', data.response);
+                    this.chatStatus.textContent = 'Connecte';
+                    this.isProcessing = false;
+                    this.chatSendBtn.disabled = false;
+                    this.scrollToBottom();
+                } else if (data.status === 'failed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                    this.hideTypingIndicator();
+                    this.showError(data.error || 'Erreur de generation');
+                    this.isProcessing = false;
+                    this.chatSendBtn.disabled = false;
+                }
+                // else: still processing, continue polling
+            } catch (error) {
+                console.error('Poll error:', error);
+            }
+        }, 2000); // Poll every 2 seconds
+    }
+
+    addMessage(role, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${role}`;
+
+        const avatarSvg = role === 'assistant'
+            ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
+
+        const avatarStyle = role === 'assistant' ? 'style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);"' : '';
+
+        // Use markdown for assistant messages, escape HTML for user messages
+        const formattedContent = role === 'assistant' ? this.renderMarkdown(content) : this.escapeHtml(content);
+
+        messageDiv.innerHTML = `
+            <div class="chat-message-avatar" ${avatarStyle}>${avatarSvg}</div>
+            <div class="chat-message-content">${formattedContent}</div>
+        `;
+
+        // Insert before typing indicator if present
+        const typingIndicator = this.chatMessages.querySelector('.chat-message.typing');
+        if (typingIndicator) {
+            this.chatMessages.insertBefore(messageDiv, typingIndicator);
+        } else {
+            this.chatMessages.appendChild(messageDiv);
+        }
+
+        this.scrollToBottom();
+    }
+
+    renderMarkdown(text) {
+        // Configure marked for safe rendering
+        if (typeof marked !== 'undefined') {
+            return marked.parse(text);
+        }
+        // Fallback if marked is not loaded
+        return this.escapeHtml(text);
+    }
+
+    // Streaming helper methods
+    createStreamingMessage(role) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${role} streaming`;
+
+        const avatarSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>';
+
+        messageDiv.innerHTML = `
+            <div class="chat-message-avatar" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">${avatarSvg}</div>
+            <div class="chat-message-content"></div>
+        `;
+
+        this.chatMessages.appendChild(messageDiv);
+        this.currentStreamingMessage = messageDiv;
+        this.scrollToBottom();
+        return messageDiv;
+    }
+
+    appendToStreamingMessage(token) {
+        if (!this.currentStreamingMessage) return;
+
+        const contentDiv = this.currentStreamingMessage.querySelector('.chat-message-content');
+        if (contentDiv) {
+            // Unescape newlines from SSE format and append as text
+            const unescapedToken = token.replace(/\\n/g, '\n');
+            contentDiv.textContent += unescapedToken;
+            this.scrollToBottom();
+        }
+    }
+
+    finishStreamingMessage() {
+        if (!this.currentStreamingMessage) return;
+
+        this.currentStreamingMessage.classList.remove('streaming');
+
+        // Apply markdown rendering to final content
+        const contentDiv = this.currentStreamingMessage.querySelector('.chat-message-content');
+        if (contentDiv) {
+            const rawText = contentDiv.textContent || '';
+            contentDiv.innerHTML = this.renderMarkdown(rawText);
+        }
+
+        this.currentStreamingMessage = null;
+    }
+
+    showTypingIndicator() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'chat-message assistant typing';
+        typingDiv.innerHTML = `
+            <div class="chat-message-avatar" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+            </div>
+            <div class="chat-message-content">
+                <div class="chat-typing">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        `;
+        this.chatMessages.appendChild(typingDiv);
+        this.scrollToBottom();
+    }
+
+    hideTypingIndicator() {
+        const typing = this.chatMessages.querySelector('.chat-message.typing');
+        if (typing) {
+            typing.remove();
+        }
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'chat-message assistant';
+        errorDiv.innerHTML = `
+            <div class="chat-message-avatar" style="background: #ef4444;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="chat-message-content" style="border-color: #fecaca; background: #fef2f2; color: #dc2626;">
+                ${this.escapeHtml(message)}
+            </div>
+        `;
+        this.chatMessages.appendChild(errorDiv);
+        this.scrollToBottom();
+        this.chatStatus.textContent = 'Erreur';
+    }
+
+    updateSendButton() {
+        const hasText = this.chatInput.value.trim().length > 0;
+        this.chatSendBtn.disabled = !hasText || this.isProcessing;
+    }
+
+    scrollToBottom() {
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/\n/g, '<br>');
+    }
+
+    getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    }
+
+    // Load existing pitches
+    async loadPitches() {
+        try {
+            const response = await fetch('/accounts/api/pitches/');
+            const data = await response.json();
+
+            if (data.success) {
+                this.renderPitches(data.pitches);
+            }
+        } catch (error) {
+            console.error('Load pitches error:', error);
+        }
+    }
+
+    renderPitches(pitches) {
+        this.pitchesCount.textContent = pitches.length;
+
+        if (pitches.length === 0) {
+            this.pitchesEmpty.style.display = 'flex';
+            return;
+        }
+
+        this.pitchesEmpty.style.display = 'none';
+
+        // Clear existing cards (keep empty message hidden)
+        const existingCards = this.pitchesList.querySelectorAll('.success-card');
+        existingCards.forEach(card => card.remove());
+
+        // Add pitch cards
+        pitches.forEach(pitch => {
+            const card = document.createElement('div');
+            card.className = 'success-card pitch-card';
+            const completion = pitch.is_complete ? 100 : (pitch.word_count_30s > 0 ? 50 : 0);
+            card.innerHTML = `
+                <div class="success-card-header">
+                    <h4 class="success-card-title">${this.escapeHtml(pitch.title)}</h4>
+                    <span class="success-card-badge ${pitch.is_draft ? 'draft' : 'complete'}">
+                        ${pitch.is_draft ? 'Brouillon' : 'Finalise'}
+                    </span>
+                </div>
+                <div class="pitch-card-info">
+                    <span class="pitch-word-count">30s: ${pitch.word_count_30s} mots</span>
+                    <span class="pitch-word-count">3min: ${pitch.word_count_3min} mots</span>
+                </div>
+                <div class="success-card-progress">
+                    <div class="success-card-progress-bar">
+                        <div class="success-card-progress-fill" style="width: ${completion}%; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);"></div>
+                    </div>
+                    <span>${completion}%</span>
+                </div>
+            `;
+            this.pitchesList.appendChild(card);
+        });
+    }
+}
+
+// Initialize chat when sections become visible
+document.addEventListener('DOMContentLoaded', function() {
+    let pitchChatInstance = null;
+    // Make starChatInstance globally accessible for modal functions
+    window.starChatInstance = null;
+
+    // Initialize STAR chat when achievements section becomes visible
+    const achievementsSection = document.getElementById('achievements');
+    if (achievementsSection) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'style') {
+                    const isVisible = achievementsSection.style.display !== 'none';
+                    if (isVisible && !window.starChatInstance) {
+                        window.starChatInstance = new StarChatbot();
+                    }
+                }
+            });
+        });
+
+        observer.observe(achievementsSection, { attributes: true });
+
+        // Also check if already visible
+        if (achievementsSection.style.display !== 'none') {
+            window.starChatInstance = new StarChatbot();
+        }
+    }
+
+    // Initialize Pitch chat when pitch section becomes visible
+    const pitchSection = document.getElementById('pitch');
+    if (pitchSection) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'style') {
+                    const isVisible = pitchSection.style.display !== 'none';
+                    if (isVisible && !pitchChatInstance) {
+                        pitchChatInstance = new PitchChatbot();
+                    }
+                }
+            });
+        });
+
+        observer.observe(pitchSection, { attributes: true });
+
+        // Also check if already visible
+        if (pitchSection.style.display !== 'none') {
+            pitchChatInstance = new PitchChatbot();
+        }
+    }
+});
 </script>
 {% endblock %}

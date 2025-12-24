@@ -650,7 +650,7 @@ git add -A && git commit -m "message"
 git checkout dev
 # Ecraser l'historique de la branche dev avec celui de la branche main
 git reset --hard main
-``` 
+```
 
 ### Workflow Git complet (feature branch → PR → merge)
 ```bash

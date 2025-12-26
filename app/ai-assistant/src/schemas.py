@@ -118,3 +118,76 @@ class HealthResponse(BaseModel):
 
     status: str
     service: str
+
+
+# --- CV and Cover Letter Generation ---
+
+
+class JobOfferContext(BaseModel):
+    """Job offer context for document generation."""
+
+    title: str
+    company: str = ""
+    location: str = ""
+    contract_type: str = ""
+    remote_type: str = ""
+    description: str = ""
+    skills: list[str] = []
+
+
+class CandidateContext(BaseModel):
+    """Extended candidate context for CV/Cover letter generation."""
+
+    first_name: str = ""
+    last_name: str = ""
+    email: str = ""
+    phone: str = ""
+    location: str = ""
+    experiences: list[dict] = []
+    education: list[dict] = []
+    skills: list[str] = []
+    professional_successes: list[dict] = []
+    interests: list[str] = []
+    social_links: list[dict] = []  # [{name: "LinkedIn", url: "..."}, ...]
+
+
+class GenerateCVRequest(BaseModel):
+    """Request to generate a customized CV."""
+
+    application_id: int
+    candidate: CandidateContext
+    job_offer: JobOfferContext
+    adaptation_level: int = 2  # 1-4: 1=faithful, 2=moderate, 3=strong, 4=perfect match
+    llm_config: LLMConfigRequest | None = None
+
+
+class GenerateCVResponse(BaseModel):
+    """Response after CV generation request."""
+
+    task_id: str
+    message: str = "CV generation started"
+
+
+class GenerateCoverLetterRequest(BaseModel):
+    """Request to generate a cover letter."""
+
+    application_id: int
+    candidate: CandidateContext
+    job_offer: JobOfferContext
+    custom_cv: str = ""  # The previously generated CV
+    llm_config: LLMConfigRequest | None = None
+
+
+class GenerateCoverLetterResponse(BaseModel):
+    """Response after cover letter generation request."""
+
+    task_id: str
+    message: str = "Cover letter generation started"
+
+
+class GenerationTaskStatusResponse(BaseModel):
+    """Response for generation task status."""
+
+    status: str  # pending, processing, completed, failed
+    content: str | None = None  # Generated content if completed
+    error: str | None = None  # Error message if failed

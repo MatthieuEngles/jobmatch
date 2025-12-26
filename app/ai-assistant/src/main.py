@@ -1,5 +1,6 @@
 """AI Assistant FastAPI service for STAR and Pitch coaching."""
 
+import asyncio
 import json
 import logging
 
@@ -11,6 +12,8 @@ from .config import settings
 from .llm.chat_handler import (
     extract_pitch_data,
     extract_star_data,
+    generate_cover_letter,
+    generate_cv,
     get_initial_message_async,
     process_chat_message,
     stream_chat_message,
@@ -26,6 +29,11 @@ from .schemas import (
     ExtractPitchResponse,
     ExtractSuccessRequest,
     ExtractSuccessResponse,
+    GenerateCoverLetterRequest,
+    GenerateCoverLetterResponse,
+    GenerateCVRequest,
+    GenerateCVResponse,
+    GenerationTaskStatusResponse,
     HealthResponse,
     LLMConfigRequest,
     TaskStatusResponse,
@@ -341,6 +349,140 @@ async def extract_pitch(request: ExtractPitchRequest):
     except Exception as e:
         logger.error(f"Pitch extraction failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# --- CV and Cover Letter Generation Endpoints ---
+
+
+async def _generate_cv_task(
+    task_id: str,
+    request: GenerateCVRequest,
+):
+    """Background task to generate a CV."""
+    try:
+        await task_store.update_status(task_id, TaskStatus.PROCESSING)
+
+        llm_config = _build_llm_config(request.llm_config)
+
+        cv_content = await generate_cv(
+            candidate=request.candidate,
+            job_offer=request.job_offer,
+            adaptation_level=request.adaptation_level,
+            llm_config=llm_config,
+        )
+
+        await task_store.complete_task(
+            task_id,
+            {"content": cv_content},
+        )
+
+    except Exception as e:
+        logger.error(f"CV generation failed: {e}")
+        await task_store.fail_task(task_id, str(e))
+
+
+async def _generate_cover_letter_task(
+    task_id: str,
+    request: GenerateCoverLetterRequest,
+):
+    """Background task to generate a cover letter."""
+    try:
+        await task_store.update_status(task_id, TaskStatus.PROCESSING)
+
+        llm_config = _build_llm_config(request.llm_config)
+
+        cover_letter_content = await generate_cover_letter(
+            candidate=request.candidate,
+            job_offer=request.job_offer,
+            custom_cv=request.custom_cv,
+            llm_config=llm_config,
+        )
+
+        await task_store.complete_task(
+            task_id,
+            {"content": cover_letter_content},
+        )
+
+    except Exception as e:
+        logger.error(f"Cover letter generation failed: {e}")
+        await task_store.fail_task(task_id, str(e))
+
+
+@app.post("/generate/cv", response_model=GenerateCVResponse)
+async def generate_cv_endpoint(
+    request: GenerateCVRequest,
+):
+    """Generate a customized CV for a job application.
+
+    The CV is generated in the background based on:
+    - The candidate's profile (experiences, skills, successes)
+    - The target job offer (description, requirements)
+
+    Use /generate/status/{task_id} to poll for the result.
+    """
+    try:
+        task_id = await task_store.create_task(conversation_id=request.application_id)
+
+        # Use asyncio.create_task for true background execution (non-blocking)
+        asyncio.create_task(_generate_cv_task(task_id, request))
+
+        return GenerateCVResponse(task_id=task_id, message="CV generation started")
+
+    except Exception as e:
+        logger.error(f"Failed to start CV generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/generate/cover-letter", response_model=GenerateCoverLetterResponse)
+async def generate_cover_letter_endpoint(
+    request: GenerateCoverLetterRequest,
+):
+    """Generate a customized cover letter for a job application.
+
+    The cover letter is generated in the background based on:
+    - The candidate's profile
+    - The target job offer
+    - The previously generated CV (optional but recommended)
+
+    Use /generate/status/{task_id} to poll for the result.
+    """
+    try:
+        task_id = await task_store.create_task(conversation_id=request.application_id)
+
+        # Use asyncio.create_task for true background execution (non-blocking)
+        asyncio.create_task(_generate_cover_letter_task(task_id, request))
+
+        return GenerateCoverLetterResponse(task_id=task_id, message="Cover letter generation started")
+
+    except Exception as e:
+        logger.error(f"Failed to start cover letter generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/generate/status/{task_id}", response_model=GenerationTaskStatusResponse)
+async def get_generation_status(task_id: str):
+    """Poll for the status of a CV or cover letter generation task.
+
+    Returns:
+        - status: pending, processing, completed, or failed
+        - content: The generated content (if completed)
+        - error: Error message (if failed)
+    """
+    task = await task_store.get_task(task_id)
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    content = None
+
+    if task.status == TaskStatus.COMPLETED and task.result:
+        content = task.result.get("content")
+
+    return GenerationTaskStatusResponse(
+        status=task.status.value,
+        content=content,
+        error=task.error,
+    )
 
 
 if __name__ == "__main__":

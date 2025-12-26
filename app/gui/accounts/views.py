@@ -1,4 +1,5 @@
 import contextlib
+import json as json_module
 import logging
 
 import requests
@@ -23,11 +24,14 @@ from .forms import (
     UserRegistrationForm,
 )
 from .models import (
+    APPLICATION_STATUS_CHOICES,
     CV,
     SOCIAL_LINK_TYPE_CHOICES,
+    Application,
     CandidateProfile,
     ChatConversation,
     ChatMessage,
+    DocxTemplate,
     ExtractedLine,
     Pitch,
     ProfessionalSuccess,
@@ -669,11 +673,31 @@ def account_settings_view(request):
             except (ValueError, TypeError):
                 error_message = "Niveau d'autonomie invalide."
 
+        elif form_type == "docx_template":
+            try:
+                template_id = int(request.POST.get("docx_template_id", 0))
+                if template_id:
+                    template = DocxTemplate.objects.filter(id=template_id).first()
+                    if template:
+                        user.docx_template = template
+                        user.save(update_fields=["docx_template"])
+                        success_message = f"Template '{template.name}' sélectionné."
+                    else:
+                        error_message = "Template introuvable."
+                else:
+                    error_message = "Veuillez sélectionner un template."
+            except (ValueError, TypeError):
+                error_message = "Template invalide."
+
+    # Get all available DOCX templates
+    docx_templates = DocxTemplate.objects.all()
+
     context = {
         "identity_form": identity_form,
         "email_form": email_form,
         "password_form": password_form,
         "llm_form": llm_form,
+        "docx_templates": docx_templates,
         "success_message": success_message,
         "error_message": error_message,
     }
@@ -1977,3 +2001,396 @@ def pitch_detail_view(request, pitch_id):
             },
         }
     )
+
+
+@login_required
+def applications_list_view(request):
+    """Display all user's applications as cards."""
+    applications = Application.objects.filter(user=request.user).select_related("imported_offer", "candidate_profile")
+
+    # Group by status for potential filtering
+    status_counts = {
+        "all": applications.count(),
+        "added": applications.filter(status="added").count(),
+        "in_progress": applications.filter(status="in_progress").count(),
+        "applied": applications.filter(status="applied").count(),
+        "interview": applications.filter(status="interview").count(),
+        "accepted": applications.filter(status="accepted").count(),
+        "rejected": applications.filter(status="rejected").count(),
+    }
+
+    # Filter by status if requested
+    status_filter = request.GET.get("status")
+    if status_filter and status_filter != "all":
+        applications = applications.filter(status=status_filter)
+
+    context = {
+        "applications": applications,
+        "status_counts": status_counts,
+        "current_filter": status_filter or "all",
+    }
+    return render(request, "accounts/applications_list.html", context)
+
+
+@login_required
+def application_detail_view(request, application_id):
+    """Display detailed view of a single application."""
+    application = (
+        Application.objects.filter(id=application_id, user=request.user)
+        .select_related("imported_offer", "candidate_profile")
+        .first()
+    )
+
+    if not application:
+        from django.http import Http404
+
+        raise Http404("Candidature non trouvee")
+
+    # Get user's DOCX template (or default) as JSON string
+    docx_template_config = None
+    user = request.user
+    if user.docx_template:
+        docx_template_config = json_module.dumps(user.docx_template.to_js_config())
+    else:
+        # Use default template if user has no preference
+        default_template = DocxTemplate.objects.filter(is_default=True).first()
+        if default_template:
+            docx_template_config = json_module.dumps(default_template.to_js_config())
+
+    context = {
+        "application": application,
+        "docx_template_config": docx_template_config,
+    }
+    return render(request, "accounts/application_detail.html", context)
+
+
+@login_required
+@require_POST
+def application_update_status_view(request, application_id):
+    """Update application status via AJAX or form."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        from django.http import Http404
+
+        raise Http404("Candidature non trouvee")
+
+    new_status = request.POST.get("status")
+    valid_statuses = [choice[0] for choice in APPLICATION_STATUS_CHOICES]
+
+    if new_status in valid_statuses:
+        old_status = application.status
+        application.status = new_status
+        application.add_history_event(
+            "status_changed",
+            f"Statut change de {old_status} a {new_status}",
+        )
+        application.save()
+
+    return redirect("accounts:application_detail", application_id=application.id)
+
+
+@login_required
+@require_POST
+def application_update_notes_view(request, application_id):
+    """Update application notes."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        from django.http import Http404
+
+        raise Http404("Candidature non trouvee")
+
+    notes = request.POST.get("notes", "")
+    application.notes = notes
+    if notes:
+        application.add_history_event("note_added", "Notes mises a jour")
+    application.save()
+
+    return redirect("accounts:application_detail", application_id=application.id)
+
+
+@login_required
+@require_POST
+def application_delete_view(request, application_id):
+    """Delete an application."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        from django.http import Http404
+
+        raise Http404("Candidature non trouvee")
+
+    application.delete()
+    return redirect("accounts:applications_list")
+
+
+# --- CV and Cover Letter Generation Views ---
+
+
+def _build_candidate_context(user, profile=None):
+    """Build candidate context from user and profile for AI generation."""
+    # Get experiences from extracted lines
+    experiences = []
+    for line in user.extracted_lines.filter(content_type="experience", is_active=True):
+        experiences.append(
+            {
+                "entity": line.entity or "",
+                "position": line.position or "",
+                "dates": line.dates or "",
+                "description": line.description or line.content or "",
+            }
+        )
+
+    # Get education
+    education = []
+    for line in user.extracted_lines.filter(content_type="education", is_active=True):
+        education.append(
+            {
+                "entity": line.entity or "",
+                "degree": line.position or "",
+                "dates": line.dates or "",
+            }
+        )
+
+    # Get skills
+    skills = []
+    for line in user.extracted_lines.filter(content_type__in=["skill_hard", "skill_soft"], is_active=True):
+        skills.append(line.content)
+
+    # Get professional successes
+    successes = []
+    for success in user.professional_successes.filter(is_active=True):
+        successes.append(
+            {
+                "title": success.title,
+                "situation": success.situation,
+                "task": success.task,
+                "action": success.action,
+                "result": success.result,
+            }
+        )
+
+    # Get interests
+    interests = []
+    for line in user.extracted_lines.filter(content_type="interest", is_active=True):
+        interests.append(line.content)
+
+    # Get social links
+    social_links = []
+    for link in user.social_links.all().order_by("order"):
+        social_links.append(
+            {
+                "name": link.get_link_type_display(),
+                "url": link.url,
+            }
+        )
+
+    return {
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
+        "email": user.email or "",
+        "phone": user.phone or "",
+        "location": user.location or "",
+        "experiences": experiences,
+        "education": education,
+        "skills": skills,
+        "professional_successes": successes,
+        "interests": interests,
+        "social_links": social_links,
+    }
+
+
+def _build_job_offer_context(imported_offer):
+    """Build job offer context from ImportedOffer for AI generation."""
+    return {
+        "title": imported_offer.title or "",
+        "company": imported_offer.company or "",
+        "location": imported_offer.location or "",
+        "contract_type": imported_offer.contract_type or "",
+        "remote_type": imported_offer.remote_type or "",
+        "description": imported_offer.description or "",
+        "skills": imported_offer.skills or [],
+    }
+
+
+@login_required
+@require_POST
+def application_generate_cv_view(request, application_id):
+    """Trigger CV generation for an application."""
+    import json as json_module
+
+    application = (
+        Application.objects.filter(id=application_id, user=request.user).select_related("imported_offer").first()
+    )
+
+    if not application:
+        return JsonResponse({"error": "Candidature non trouvee"}, status=404)
+
+    # Parse request body for adaptation level
+    adaptation_level = 2  # Default value
+    if request.body:
+        with contextlib.suppress(json_module.JSONDecodeError):
+            body_data = json_module.loads(request.body)
+            adaptation_level = body_data.get("adaptation_level", 2)
+            # Ensure it's within valid range
+            adaptation_level = max(1, min(4, int(adaptation_level)))
+
+    # Build contexts
+    candidate_context = _build_candidate_context(request.user, application.candidate_profile)
+    job_offer_context = _build_job_offer_context(application.imported_offer)
+
+    # Call ai-assistant service
+    ai_assistant_url = settings.AI_ASSISTANT_URL or "http://ai-assistant:8084"
+
+    try:
+        response = requests.post(
+            f"{ai_assistant_url}/generate/cv",
+            json={
+                "application_id": application.id,
+                "candidate": candidate_context,
+                "job_offer": job_offer_context,
+                "adaptation_level": adaptation_level,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Store task_id in application for polling
+        application.add_history_event("cv_generation_started", f"Task ID: {data['task_id']}")
+        application.save()
+
+        return JsonResponse(
+            {
+                "task_id": data["task_id"],
+                "message": "Generation du CV lancee",
+            }
+        )
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to call ai-assistant for CV generation: {e}")
+        return JsonResponse({"error": "Service IA indisponible"}, status=503)
+
+
+@login_required
+@require_POST
+def application_generate_cover_letter_view(request, application_id):
+    """Trigger cover letter generation for an application."""
+    application = (
+        Application.objects.filter(id=application_id, user=request.user).select_related("imported_offer").first()
+    )
+
+    if not application:
+        return JsonResponse({"error": "Candidature non trouvee"}, status=404)
+
+    # Build contexts
+    candidate_context = _build_candidate_context(request.user, application.candidate_profile)
+    job_offer_context = _build_job_offer_context(application.imported_offer)
+
+    # Call ai-assistant service
+    ai_assistant_url = settings.AI_ASSISTANT_URL or "http://ai-assistant:8084"
+
+    try:
+        response = requests.post(
+            f"{ai_assistant_url}/generate/cover-letter",
+            json={
+                "application_id": application.id,
+                "candidate": candidate_context,
+                "job_offer": job_offer_context,
+                "custom_cv": application.custom_cv or "",
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Store task_id in application for polling
+        application.add_history_event("cover_letter_generation_started", f"Task ID: {data['task_id']}")
+        application.save()
+
+        return JsonResponse(
+            {
+                "task_id": data["task_id"],
+                "message": "Generation de la lettre lancee",
+            }
+        )
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to call ai-assistant for cover letter generation: {e}")
+        return JsonResponse({"error": "Service IA indisponible"}, status=503)
+
+
+@login_required
+@require_GET
+def application_generation_status_view(request, application_id, task_id):
+    """Poll for generation task status."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        return JsonResponse({"error": "Candidature non trouvee"}, status=404)
+
+    # Call ai-assistant service for status
+    ai_assistant_url = settings.AI_ASSISTANT_URL or "http://ai-assistant:8084"
+
+    try:
+        response = requests.get(
+            f"{ai_assistant_url}/generate/status/{task_id}",
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        return JsonResponse(data)
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to get generation status: {e}")
+        return JsonResponse({"error": "Service IA indisponible"}, status=503)
+
+
+@login_required
+@require_POST
+def application_save_cv_view(request, application_id):
+    """Save generated CV content to application."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        return JsonResponse({"error": "Candidature non trouvee"}, status=404)
+
+    import json as json_module
+
+    try:
+        data = json_module.loads(request.body)
+        content = data.get("content", "")
+    except json_module.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    application.custom_cv = content
+    application.add_history_event("cv_generated", "CV personnalise genere")
+    application.save()
+
+    return JsonResponse({"success": True, "message": "CV enregistre"})
+
+
+@login_required
+@require_POST
+def application_save_cover_letter_view(request, application_id):
+    """Save generated cover letter content to application."""
+    application = Application.objects.filter(id=application_id, user=request.user).first()
+
+    if not application:
+        return JsonResponse({"error": "Candidature non trouvee"}, status=404)
+
+    import json as json_module
+
+    try:
+        data = json_module.loads(request.body)
+        content = data.get("content", "")
+    except json_module.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    application.cover_letter = content
+    application.add_history_event("cover_letter_generated", "Lettre de motivation generee")
+    application.save()
+
+    return JsonResponse({"success": True, "message": "Lettre enregistree"})

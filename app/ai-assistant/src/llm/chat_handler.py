@@ -5,7 +5,7 @@ import logging
 import re
 from pathlib import Path
 
-from ..schemas import CoachingType, UserContext
+from ..schemas import CandidateContext, CoachingType, JobOfferContext, UserContext
 from .providers import LLMConfig, get_llm_provider
 
 logger = logging.getLogger(__name__)
@@ -516,4 +516,291 @@ async def extract_pitch_data(
         }
     except Exception as e:
         logger.error(f"Pitch extraction failed: {e}")
+        raise
+
+
+# --- CV and Cover Letter Generation ---
+
+
+def _format_experiences_detailed(experiences: list[dict]) -> str:
+    """Format experiences with full details for document generation."""
+    if not experiences:
+        return "(aucune experience)"
+
+    lines = []
+    for exp in experiences:
+        entity = exp.get("entity", "")
+        position = exp.get("position", "")
+        dates = exp.get("dates", "")
+        description = exp.get("description", "")
+
+        if entity or position:
+            lines.append(f"\n**{position}** | {entity} | {dates}")
+            if description:
+                lines.append(f"   {description}")
+
+    return "\n".join(lines) if lines else "(aucune experience)"
+
+
+def _format_education_detailed(education: list[dict]) -> str:
+    """Format education with full details."""
+    if not education:
+        return "(aucune formation)"
+
+    lines = []
+    for edu in education:
+        entity = edu.get("entity", "")
+        degree = edu.get("degree", edu.get("position", ""))
+        dates = edu.get("dates", "")
+        if entity or degree:
+            lines.append(f"- {degree} | {entity} | {dates}")
+
+    return "\n".join(lines) if lines else "(aucune formation)"
+
+
+def _format_successes_detailed(successes: list[dict]) -> str:
+    """Format professional successes with full STAR details."""
+    if not successes:
+        return "(aucun succes professionnel)"
+
+    lines = []
+    for success in successes:
+        title = success.get("title", "Sans titre")
+        lines.append(f"\n**{title}**")
+        if success.get("situation"):
+            lines.append(f"  Situation : {success['situation']}")
+        if success.get("task"):
+            lines.append(f"  Tache : {success['task']}")
+        if success.get("action"):
+            lines.append(f"  Action : {success['action']}")
+        if success.get("result"):
+            lines.append(f"  Resultat : {success['result']}")
+
+    return "\n".join(lines) if lines else "(aucun succes professionnel)"
+
+
+def _format_social_links(social_links: list[dict]) -> str:
+    """Format social links for CV display."""
+    if not social_links:
+        return "(aucun lien)"
+
+    lines = []
+    for link in social_links:
+        name = link.get("name", "")
+        url = link.get("url", "")
+        if name and url:
+            lines.append(f"- {name}: {url}")
+
+    return "\n".join(lines) if lines else "(aucun lien)"
+
+
+def _get_adaptation_instructions(level: int) -> str:
+    """Get specific instructions based on adaptation level."""
+    instructions = {
+        1: """
+## Niveau d'adaptation : FIDELE AU PROFIL (Niveau 1)
+
+IMPORTANT : Reste tres fidele au profil du candidat.
+- Reprends quasi a l'identique les informations du profil
+- Ne modifie pas les competences listees
+- Garde les formulations originales des experiences
+- Ne force PAS l'adaptation a l'offre
+- Seul ajustement : reorganiser l'ordre des experiences si pertinent
+- Ton objectif : un CV authentique qui represente exactement le candidat
+""",
+        2: """
+## Niveau d'adaptation : ADAPTATION MODEREE (Niveau 2)
+
+Adapte moderement le CV a l'offre :
+- Reformule les experiences pour mieux correspondre au poste vise
+- Mets en avant les competences qui matchent avec l'offre
+- Utilise le vocabulaire du secteur de l'entreprise
+- NE MENS PAS sur les competences : n'ajoute pas de skills que le candidat n'a pas
+- Reorganise les experiences par pertinence pour le poste
+- Ton objectif : un CV bien adapte mais 100% veridique
+""",
+        3: """
+## Niveau d'adaptation : ADAPTATION FORTE (Niveau 3)
+
+Force fortement le matching avec l'offre :
+- Reformule agressivement les experiences pour matcher l'offre
+- Ajoute les competences de l'offre SI le candidat POURRAIT les avoir (inference raisonnable)
+- Par exemple : si le candidat a fait du Python, on peut inferer qu'il connait les bases de Git
+- Utilise exactement les mots-cles de l'offre dans le CV
+- Maximise le score ATS en reprenant les termes exacts
+- Attention : reste dans le domaine du plausible
+- Ton objectif : maximiser le matching tout en restant defensable en entretien
+""",
+        4: """
+## Niveau d'adaptation : MATCH QUASI-PARFAIT (Niveau 4)
+
+ATTENTION : Ce niveau genere un CV tres optimise mais potentiellement embelli.
+
+- Le CV doit matcher quasi-parfaitement avec l'offre
+- Ajoute TOUTES les competences de l'offre dans le CV
+- Reformule completement les experiences pour correspondre au poste
+- Maximise absolument le score ATS
+- Le candidat devra etre capable de justifier/apprendre rapidement ces competences
+- AVERTISSEMENT : Ce niveau peut inclure des competences non verifiables
+- Ton objectif : un CV qui passe tous les filtres ATS et attire l'attention des recruteurs
+""",
+    }
+    return instructions.get(level, instructions[2])
+
+
+def build_cv_prompt(
+    candidate: CandidateContext,
+    job_offer: JobOfferContext,
+    adaptation_level: int = 2,
+) -> str:
+    """Build the CV generation prompt with candidate and job context."""
+    template_path = PROMPTS_DIR / "cv_generation.txt"
+    template = template_path.read_text(encoding="utf-8")
+
+    # Get adaptation-specific instructions
+    adaptation_instructions = _get_adaptation_instructions(adaptation_level)
+
+    format_args = {
+        "first_name": candidate.first_name or "Prenom",
+        "last_name": candidate.last_name or "Nom",
+        "email": candidate.email or "",
+        "phone": candidate.phone or "",
+        "location": candidate.location or "",
+        "social_links": _format_social_links(candidate.social_links),
+        "experiences": _format_experiences_detailed(candidate.experiences),
+        "education": _format_education_detailed(candidate.education),
+        "skills": ", ".join(candidate.skills) if candidate.skills else "(aucune competence)",
+        "professional_successes": _format_successes_detailed(candidate.professional_successes),
+        "interests": ", ".join(candidate.interests) if candidate.interests else "",
+        # Job offer
+        "job_title": job_offer.title,
+        "company": job_offer.company or "Entreprise",
+        "job_location": job_offer.location or "",
+        "contract_type": job_offer.contract_type or "",
+        "remote_type": job_offer.remote_type or "",
+        "job_description": job_offer.description or "(pas de description)",
+        "job_skills": ", ".join(job_offer.skills) if job_offer.skills else "",
+        # Adaptation level instructions
+        "adaptation_instructions": adaptation_instructions,
+    }
+
+    return template.format(**format_args)
+
+
+def build_cover_letter_prompt(
+    candidate: CandidateContext,
+    job_offer: JobOfferContext,
+    custom_cv: str = "",
+) -> str:
+    """Build the cover letter generation prompt with candidate, job, and CV context."""
+    template_path = PROMPTS_DIR / "cover_letter_generation.txt"
+    template = template_path.read_text(encoding="utf-8")
+
+    format_args = {
+        "first_name": candidate.first_name or "Prenom",
+        "last_name": candidate.last_name or "Nom",
+        "location": candidate.location or "",
+        "experiences": _format_experiences_detailed(candidate.experiences),
+        "skills": ", ".join(candidate.skills) if candidate.skills else "(aucune competence)",
+        "professional_successes": _format_successes_detailed(candidate.professional_successes),
+        # Job offer
+        "job_title": job_offer.title,
+        "company": job_offer.company or "Entreprise",
+        "job_location": job_offer.location or "",
+        "job_description": job_offer.description or "(pas de description)",
+        "job_skills": ", ".join(job_offer.skills) if job_offer.skills else "",
+        # Previously generated CV
+        "custom_cv": custom_cv or "(CV non encore genere)",
+    }
+
+    return template.format(**format_args)
+
+
+async def generate_cv(
+    candidate: CandidateContext,
+    job_offer: JobOfferContext,
+    adaptation_level: int = 2,
+    llm_config: LLMConfig | None = None,
+) -> str:
+    """Generate a customized CV based on candidate profile and job offer.
+
+    Args:
+        candidate: The candidate's profile data.
+        job_offer: The target job offer.
+        adaptation_level: Level of adaptation (1-4). 1=faithful, 4=perfect match.
+        llm_config: Optional custom LLM configuration.
+
+    Returns:
+        The generated CV as text.
+    """
+    import asyncio
+
+    provider = get_llm_provider(llm_config)
+    prompt = build_cv_prompt(candidate, job_offer, adaptation_level)
+
+    system_prompt = (
+        "Tu es un expert en redaction de CV professionnels. "
+        "Tu generes des CV clairs, structures et optimises pour les ATS. "
+        "Reponds uniquement avec le CV, sans commentaire ni explication."
+    )
+
+    logger.info(
+        f"Generating CV for {candidate.first_name} targeting {job_offer.title} (adaptation level: {adaptation_level})"
+    )
+
+    try:
+        # Run synchronous LLM call in a thread to avoid blocking the event loop
+        response = await asyncio.to_thread(
+            provider.chat,
+            [{"role": "user", "content": prompt}],
+            system_prompt,
+        )
+        logger.info(f"Generated CV: {len(response)} characters")
+        return response
+    except Exception as e:
+        logger.error(f"CV generation failed: {e}")
+        raise
+
+
+async def generate_cover_letter(
+    candidate: CandidateContext,
+    job_offer: JobOfferContext,
+    custom_cv: str = "",
+    llm_config: LLMConfig | None = None,
+) -> str:
+    """Generate a customized cover letter based on candidate profile and job offer.
+
+    Args:
+        candidate: The candidate's profile data.
+        job_offer: The target job offer.
+        custom_cv: The previously generated CV (for reference).
+        llm_config: Optional custom LLM configuration.
+
+    Returns:
+        The generated cover letter as text.
+    """
+    import asyncio
+
+    provider = get_llm_provider(llm_config)
+    prompt = build_cover_letter_prompt(candidate, job_offer, custom_cv)
+
+    system_prompt = (
+        "Tu es un expert en redaction de lettres de motivation. "
+        "Tu generes des lettres percutantes, personnalisees et professionnelles. "
+        "Reponds uniquement avec la lettre, sans commentaire ni explication."
+    )
+
+    logger.info(f"Generating cover letter for {candidate.first_name} targeting {job_offer.title}")
+
+    try:
+        # Run synchronous LLM call in a thread to avoid blocking the event loop
+        response = await asyncio.to_thread(
+            provider.chat,
+            [{"role": "user", "content": prompt}],
+            system_prompt,
+        )
+        logger.info(f"Generated cover letter: {len(response)} characters")
+        return response
+    except Exception as e:
+        logger.error(f"Cover letter generation failed: {e}")
         raise

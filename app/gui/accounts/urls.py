@@ -55,4 +55,38 @@ urlpatterns = [
     path("api/pitches/<int:pitch_id>/", views.pitch_detail_view, name="pitch_detail"),
     path("api/pitches/<int:pitch_id>/update/", views.pitch_update_view, name="pitch_update"),
     path("api/pitches/<int:pitch_id>/delete/", views.pitch_delete_view, name="pitch_delete"),
+    # Applications (candidatures)
+    path("applications/", views.applications_list_view, name="applications_list"),
+    path("applications/<int:application_id>/", views.application_detail_view, name="application_detail"),
+    path(
+        "applications/<int:application_id>/status/",
+        views.application_update_status_view,
+        name="application_update_status",
+    ),
+    path(
+        "applications/<int:application_id>/notes/", views.application_update_notes_view, name="application_update_notes"
+    ),
+    path("applications/<int:application_id>/delete/", views.application_delete_view, name="application_delete"),
+    # AI generation for applications
+    path(
+        "applications/<int:application_id>/generate/cv/",
+        views.application_generate_cv_view,
+        name="application_generate_cv",
+    ),
+    path(
+        "applications/<int:application_id>/generate/cover-letter/",
+        views.application_generate_cover_letter_view,
+        name="application_generate_cover_letter",
+    ),
+    path(
+        "applications/<int:application_id>/generate/status/<str:task_id>/",
+        views.application_generation_status_view,
+        name="application_generation_status",
+    ),
+    path("applications/<int:application_id>/save/cv/", views.application_save_cv_view, name="application_save_cv"),
+    path(
+        "applications/<int:application_id>/save/cover-letter/",
+        views.application_save_cover_letter_view,
+        name="application_save_cover_letter",
+    ),
 ]

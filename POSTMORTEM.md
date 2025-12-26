@@ -2,6 +2,404 @@
 
 ## 📅 Sessions
 
+### 2025-12-24 (29) - Boutons Voir/Télécharger DOCX pour CV et Lettre
+
+**Contexte:** Améliorer l'UX de la page candidature en ajoutant des boutons d'action (voir/télécharger) pour les documents générés, avec export DOCX.
+
+**Réalisations:**
+
+- **Nouveau layout document-item** :
+  - Remplacé les simples boutons texte par des cartes `.document-item` avec icônes d'action
+  - Deux boutons par document : œil (voir) et flèche (télécharger DOCX)
+  - Design cohérent avec hover effet violet
+
+- **Export DOCX avec docx.js** :
+  - Chargement dynamique de la librairie docx.js depuis unpkg CDN
+  - Parsing intelligent du contenu : détection des headers `--- TITLE ---`, bullet points, paragraphes
+  - Formatage DOCX avec titres colorés (#667eea), bullet points natifs
+  - Nommage fichier avec nom entreprise slugifié
+
+- **Amélioration modal preview** :
+  - Ajout bouton "Télécharger DOCX" dans le footer de la modal
+  - Variable `currentPreviewType` pour savoir quel document est affiché
+
+**Fonctions JavaScript ajoutées:**
+- `downloadDocx(type)` : télécharge CV ou lettre selon le type
+- `downloadCurrentDocx()` : télécharge le document actuellement prévisualisé
+- `generateDocx(content, title, fileName)` : génère et télécharge le DOCX
+
+**Fichiers modifiés:**
+- `app/gui/templates/accounts/application_detail.html` : CSS + JS + HTML pour boutons action
+
+---
+
+### 2025-12-24 (28) - Génération CV/Lettre de motivation + Fix async pattern
+
+**Contexte:** Implémentation de la génération IA de CV et lettres de motivation personnalisés pour les candidatures, avec correction du pattern async pour éviter les timeouts.
+
+**Réalisations:**
+
+- **Génération de CV personnalisé** :
+  - Nouveau prompt `cv_generation.txt` avec optimisation ATS (intitulé proche de l'offre, mots-clés exacts)
+  - Ajout des liens sociaux (LinkedIn, Portfolio, GitHub) dans le CV
+  - Endpoint FastAPI `/generate/cv` avec task_id + polling
+
+- **Génération de lettre de motivation** :
+  - Nouveau prompt `cover_letter_generation.txt`
+  - Utilise le CV généré comme référence pour cohérence
+  - Endpoint FastAPI `/generate/cover-letter`
+
+- **Schémas Pydantic** (schemas.py) :
+  - `CandidateContext` : profil complet avec social_links
+  - `JobOfferContext` : offre cible
+  - `GenerateCVRequest/Response`, `GenerateCoverLetterRequest/Response`
+  - `GenerationTaskStatusResponse` pour le polling
+
+- **UI génération** (application_detail.html) :
+  - Boutons "Générer CV" et "Générer la lettre"
+  - Animation loading pendant la génération
+  - Polling status toutes les 2 secondes
+  - Modal de preview pour visualiser les documents générés
+  - Sauvegarde automatique en base après génération
+
+- **Documentation pattern async** (docs/ASYNC_PATTERNS.md) :
+  - Explication complète du problème de timeout
+  - Diagramme du flow task_id + polling
+  - Exemples code FastAPI, Django, JavaScript
+  - Pièges à éviter (BackgroundTasks vs create_task, to_thread)
+
+**Problèmes rencontrés:**
+
+- **"Service IA indisponible" (timeout 10s)** :
+  - Symptôme : Django timeout après 10s, mais ai-assistant génère bien le CV (30s)
+  - Cause : `BackgroundTasks.add_task()` n'est pas vraiment async - attend la fin de la fonction
+  - Cause 2 : `provider.chat()` est synchrone, bloque l'event loop même dans une fonction `async`
+
+- **Solution double** :
+  1. Remplacer `background_tasks.add_task(fn)` par `asyncio.create_task(fn())` pour retourner immédiatement
+  2. Utiliser `asyncio.to_thread(provider.chat, ...)` pour exécuter l'appel LLM synchrone dans un thread séparé
+
+- **docker-compose KeyError 'ContainerConfig'** :
+  - Bug de docker-compose avec des containers stale
+  - Solution : `docker-compose stop svc && docker-compose rm -f svc && docker-compose up -d svc`
+
+**Décisions techniques:**
+
+- **Task-based polling plutôt que streaming** : Pour génération one-shot (CV, lettre), le polling est plus simple et robuste que SSE
+- **asyncio.create_task() plutôt que BackgroundTasks** : Seule façon d'avoir une vraie exécution non-bloquante avec FastAPI
+- **asyncio.to_thread() pour LLM calls** : Les SDKs OpenAI/Anthropic sont synchrones, nécessitent un thread pool
+- **Documentation dédiée** : Pattern async suffisamment complexe pour mériter un fichier docs/ASYNC_PATTERNS.md
+
+**Fichiers créés/modifiés:**
+- `app/ai-assistant/src/main.py` : asyncio.create_task() pour génération
+- `app/ai-assistant/src/llm/chat_handler.py` : asyncio.to_thread() pour LLM calls + social_links
+- `app/ai-assistant/src/prompts/cv_generation.txt` : prompt CV avec ATS
+- `app/ai-assistant/src/schemas.py` : CandidateContext.social_links
+- `app/gui/accounts/views.py` : endpoints génération + status polling + save
+- `app/gui/templates/accounts/application_detail.html` : UI génération complète
+- `docs/ASYNC_PATTERNS.md` : documentation pattern pending/done
+
+---
+
+### 2025-12-24 (27) - Candidatures sur Home + Fix ENV_MODE Docker + Migrations
+**Contexte:** Afficher les candidatures récentes sur la page d'accueil et résoudre les problèmes de configuration Docker (ENV_MODE, base de données).
+
+**Réalisations:**
+
+- **Affichage candidatures sur page d'accueil** :
+  - Nouvelle vue `HomeView` dans `config/views.py` (remplace `TemplateView` générique)
+  - Passe `recent_applications` (3 dernières) et `applications_count` au template
+  - Mini-cartes dans la section "Suivi des candidatures" avec : entreprise, status coloré, titre
+  - Badge compteur dans le header de la carte
+  - Lien "Voir toutes mes candidatures (N)"
+
+- **Styles CSS pour mini-cartes** :
+  - `.application-mini-card` avec bordure gauche colorée
+  - Badges status colorés : `.app-status-added` (gris), `.app-status-in_progress` (bleu), `.app-status-applied` (orange), `.app-status-interview` (violet), `.app-status-accepted` (vert), `.app-status-rejected` (rouge)
+
+- **Fix ENV_MODE dans docker-compose.yml** :
+  - Ajout `ENV_MODE=dev` pour le service gui
+  - Ajout variables PostgreSQL : `POSTGRES_HOST=db`, `POSTGRES_PORT=5432`, etc.
+  - Suppression dépendances vers services non implémentés (cv-ingestion, ai-assistant)
+
+- **Commande `full-restart` dans dev.sh** :
+  - `./dev.sh full-restart [svc]` : stop + rm + build + up
+  - Message d'aide amélioré avec liste formatée
+
+- **Fix IntegrityError sur import d'offre** :
+  - Remplacé `Application.objects.create()` par `get_or_create()` dans `ImportOfferView`
+  - Évite erreur si l'Application existe déjà pour ce user+offre
+
+**Problèmes rencontrés:**
+- **`no such table: accounts_application`** (SQLite erreur) :
+  - Cause : `ENV_MODE` non défini → Django utilisait mode "local" mais psycopg2 absent → fallback SQLite
+  - Solution : ajouter `ENV_MODE=dev` dans docker-compose.yml pour forcer PostgreSQL
+
+- **`relation "accounts_application" does not exist`** (PostgreSQL erreur) :
+  - Cause : migration créée dans le container mais pas persistée dans le code source
+  - Solution : `docker cp` pour récupérer la migration, puis `makemigrations && migrate`
+
+- **Base de données vide après full-restart** :
+  - Cause : nouveau container avec PostgreSQL vide (pas de user)
+  - Solution : créer superuser via `manage.py shell`
+
+**Décisions techniques:**
+- **Vue HomeView plutôt que TemplateView** : nécessaire pour passer le contexte dynamique (candidatures)
+- **get_or_create pour Application** : idempotent, évite les erreurs de doublon
+- **docker cp pour migrations** : récupérer les fichiers générés dans le container vers le code source
+
+**Fichiers créés/modifiés:**
+- `app/gui/config/views.py` : nouvelle HomeView
+- `app/gui/config/urls.py` : utilise HomeView au lieu de TemplateView
+- `app/gui/templates/home.html` : mini-cartes candidatures + CSS
+- `docker-compose.yml` : ENV_MODE=dev + variables PostgreSQL
+- `dev.sh` : commande full-restart + aide améliorée
+- `app/gui/api/views.py` : get_or_create pour Application
+- `app/gui/accounts/migrations/0016_add_application_model.py` : migration Application
+
+---
+
+### 2025-12-24 (26) - Dev Workflow + Base de données partagée + Script dev.sh
+**Contexte:** Résoudre le problème de perte de données entre les rebuilds Docker et améliorer le workflow de développement.
+
+**Réalisations:**
+
+- **Base de données partagée Local/Docker** :
+  - Avant : Local utilisait SQLite, Docker utilisait PostgreSQL → données séparées
+  - Après : Les deux modes utilisent le même PostgreSQL Docker
+  - Local se connecte via `localhost:5433` (port exposé)
+  - Docker se connecte via `db:5432` (réseau interne)
+  - Modification dans `settings.py` : config DB unifiée
+
+- **Script interactif `dev.sh`** :
+  - Menu interactif avec emojis et couleurs
+  - Affichage du status des containers au démarrage
+  - Sous-menus : Start, Stop, Rebuild, Logs, Shell, Migrations, Reset DB
+  - Mode rapide en ligne de commande : `./dev.sh start`, `./dev.sh rebuild gui`, etc.
+  - Gestion gracieuse des services non implémentés (skip avec warning)
+  - Option "Start core services only" pour ne démarrer que db + gui
+
+- **Commandes rapides disponibles** :
+  ```bash
+  ./dev.sh start              # Démarre db + gui
+  ./dev.sh stop               # Arrête tout (données préservées)
+  ./dev.sh rebuild gui        # Rebuild + restart gui
+  ./dev.sh logs gui           # Voir les logs
+  ./dev.sh migrate            # Appliquer migrations
+  ./dev.sh shell              # Django shell
+  ```
+
+**Problèmes rencontrés:**
+- **Perte de données après rebuild** : causée par l'utilisation de bases différentes (SQLite local vs PostgreSQL Docker)
+  - Solution : unifier sur PostgreSQL, accessible via port exposé en local
+- **Migration manquante** : `no such table: accounts_application` après création du modèle
+  - Solution : `docker-compose exec -T gui python manage.py makemigrations && migrate`
+
+**Décisions techniques:**
+- **PostgreSQL partout** : cohérence des données entre modes de développement
+- **Volume Docker persistant** : `postgres_data` survit aux `docker-compose down` (sans `-v`)
+- **Script interactif** : plus user-friendly que des commandes manuelles
+- **Mode rapide CLI** : pour les actions fréquentes sans passer par le menu
+
+**Fichiers créés/modifiés:**
+- `dev.sh` : script de développement interactif
+- `app/gui/config/settings.py` : config DB unifiée pour local/Docker
+
+---
+
+### 2025-12-24 (25) - Swagger Docs + Application Model + Candidatures UI
+**Contexte:** Documenter l'API REST avec Swagger/OpenAPI, créer le modèle Application (candidature) et afficher les candidatures en cards.
+
+**Réalisations:**
+
+- **Documentation Swagger (drf-spectacular)** :
+  - Ajout `drf-spectacular>=0.27` dans requirements.txt
+  - Configuration dans settings.py : `SPECTACULAR_SETTINGS` avec titre, description, version
+  - Routes ajoutées : `/api/schema/` (JSON), `/api/docs/` (Swagger UI), `/api/redoc/` (ReDoc)
+  - Décorateurs `@extend_schema` sur toutes les vues API (tags, summary, request/response schemas)
+  - Auth JWT intégrée avec `persistAuthorization: True` dans Swagger UI
+
+- **Modèle Application (Candidature)** (migration 0016) :
+  - Workflow status : added → in_progress → applied → interview → accepted/rejected
+  - Liens : `imported_offer` (FK), `candidate_profile` (FK nullable)
+  - Documents : `custom_cv` (TextField), `custom_cv_file` (FileField), `cover_letter`, `cover_letter_file`
+  - Métadonnées : `interview_date`, `notes`, `history` (JSONField pour event tracking)
+  - Helper methods : `add_history_event()`, `has_cv()`, `has_cover_letter()`, `get_completion_status()`
+  - Dynamic upload paths : `applications/{user_id}/{app_id}/cv/` et `.../cover_letter/`
+
+- **Auto-création Application sur import** :
+  - Dans `ImportOfferView.post()` (api/views.py) : création automatique d'une Application après chaque ImportedOffer
+  - Associe le `candidate_profile` si fourni lors de l'import
+
+- **Page liste candidatures** (`/accounts/applications/`) :
+  - Vue `applications_list_view` avec filtrage par status (query param `?status=`)
+  - Compteurs par status : all, added, in_progress, applied, interview, accepted, rejected
+  - Template cards avec : header (entreprise, titre), meta (lieu, contrat, remote), badge status, progress (CV, Lettre)
+  - Grid responsive `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))`
+  - Status badges colorés (vert=accepted, bleu=applied, orange=in_progress, rouge=rejected)
+
+- **Intégration home page** :
+  - Lien "Suivi des candidatures" → `/accounts/applications/`
+  - Suppression du badge "coming soon"
+
+**Problèmes rencontrés:**
+- **Données perdues après rebuild** : l'offre test importée via l'extension a disparu après `docker-compose down/up`
+  - Cause : volumes Docker recréés en dev
+  - Note : comportement attendu, pas un bug
+
+**Décisions techniques:**
+- **drf-spectacular plutôt que drf-yasg** : plus moderne, meilleur support OpenAPI 3, maintenu activement
+- **History en JSONField** : simplicité, pas besoin d'une table séparée pour le POC
+- **Application auto-créée** : chaque offre importée démarre automatiquement le workflow de candidature
+- **Status workflow linéaire** : added → in_progress → applied → interview → {accepted, rejected}
+
+**Fichiers créés/modifiés:**
+- `app/gui/requirements.txt` : ajout drf-spectacular
+- `app/gui/config/settings.py` : config SPECTACULAR_SETTINGS
+- `app/gui/api/urls.py` : routes schema/docs/redoc
+- `app/gui/api/views.py` : extend_schema decorators + Application auto-create
+- `app/gui/accounts/models.py` : Application model
+- `app/gui/accounts/views.py` : applications_list_view
+- `app/gui/accounts/urls.py` : route applications
+- `app/gui/templates/accounts/applications_list.html` : nouveau template
+- `app/gui/templates/home.html` : lien candidatures
+
+---
+
+### 2025-12-24 (24) - API REST Extension Navigateur (DRF + JWT)
+**Contexte:** Créer une API REST pour l'extension navigateur JobMatch qui capture des offres d'emploi depuis n'importe quel site web.
+
+**Réalisations:**
+
+- **Nouvelle app Django `api/`** :
+  - Structure complète : `urls.py`, `views.py`, `serializers.py`, `apps.py`
+  - Séparation claire entre pages web (accounts) et API REST (api)
+  - Prêt pour versioning futur (`/api/v1/`, `/api/v2/`)
+
+- **Authentification JWT (SimpleJWT)** :
+  - `POST /api/auth/token/` - Login → access + refresh tokens
+  - `POST /api/auth/token/refresh/` - Rafraîchir le token
+  - `GET /api/auth/user/` - Infos utilisateur courant
+  - `POST /api/auth/logout/` - Blacklist refresh token
+  - Config : access 15min, refresh 7 jours, rotation automatique
+
+- **Endpoints offres importées** :
+  - `POST /api/offers/import/` - Importer une offre capturée
+  - `GET /api/offers/` - Lister les offres de l'utilisateur
+  - `GET/PATCH/DELETE /api/offers/<id>/` - Détail, mise à jour status, suppression
+  - `GET /api/health/` - Health check
+
+- **Modèle `ImportedOffer`** (migration 0015) :
+  - Champs source : `source_url`, `source_domain`, `captured_at`
+  - Champs offre : `title`, `company`, `location`, `description`, `contract_type`, `remote_type`, `salary` (JSON), `skills` (JSON)
+  - Matching : `match_score`, `matched_at` (TODO: intégration service matching)
+  - Status : new, viewed, saved, applied, rejected
+  - Contrainte unicité : `(user, source_url)` évite les doublons
+
+- **Configuration CORS** :
+  - Dev : `CORS_ALLOW_ALL_ORIGINS = True`
+  - Prod : regex pour `chrome-extension://` et `moz-extension://`
+  - Headers autorisés : authorization, content-type, etc.
+
+- **Dépendances ajoutées** :
+  - `djangorestframework>=3.14`
+  - `djangorestframework-simplejwt>=5.3`
+  - `django-cors-headers>=4.3`
+
+**Problèmes rencontrés:**
+- **ModuleNotFoundError rest_framework** : dépendances non installées en local
+  - Solution : `pip install djangorestframework djangorestframework-simplejwt django-cors-headers`
+- **Port 8085 déjà utilisé** : serveur Django déjà lancé
+  - Solution : `docker-compose down && build && up`
+
+**Décisions techniques:**
+- **App séparée `api/`** : meilleure séparation des responsabilités que tout mettre dans `accounts`
+- **JWT plutôt que sessions** : les sessions Django ne fonctionnent pas cross-origin pour les extensions
+- **Rotation des refresh tokens** : sécurité renforcée, ancien token blacklisté après refresh
+- **camelCase dans API** : convention frontend, snake_case dans les modèles Django
+- **Contrainte unicité sur URL** : un utilisateur ne peut pas importer deux fois la même offre
+
+**TODOs documentés:**
+1. **Matching service integration** : appeler POST /match lors de l'import d'une offre
+2. **CORS security** : restreindre aux IDs d'extensions spécifiques en production
+
+**Fichiers créés:**
+- `app/gui/api/__init__.py`, `apps.py`, `urls.py`, `views.py`, `serializers.py`
+- `app/gui/accounts/migrations/0015_add_imported_offer.py`
+- `docs/api_extension.md` - Documentation complète de l'API
+
+---
+
+### 2025-12-24 (23) - Architecture Offres/Matching + Infrastructure Cloud + Stratégie ML
+**Contexte:** Concevoir l'architecture d'intégration entre le GUI, le service offres (Mohamed) et le service matching (Maxime), avec une vision cloud et stratégie ML long terme.
+
+**Réalisations:**
+
+- **Analyse base offers.db (Silver)** :
+  - 13 tables SQLite : offers (principale), offers_lieu_travail, offers_entreprise, offers_salaire, offers_competences, etc.
+  - 150 offres sample avec format France Travail (codes ROME, NAF)
+  - Champs clés identifiés pour l'UI : intitule, typeContratLibelle, libelle (salaire), competences, formations
+
+- **Architecture offres documentée** (`docs/interface_gui_offers.md`) :
+  - Option 1 (recommandée) : API REST exposée par `offre-ingestion` → GUI consomme
+  - Option 2 (pragmatique court terme) : Base partagée avec modèle Django `managed=False`
+  - Mapping champs UI ↔ tables SQLite
+
+- **Architecture matching documentée** (`docs/interface_gui_offers_match.md`) :
+  - Flux complet : GUI → cv_embedding → Matcher → (id, score) top 20 → GUI → offre-ingestion → détails
+  - Modèle cache `MatchResult` avec TTL 24h et invalidation sur changement profil
+  - Modèles Django : `JobOffer`, `JobOfferSkill`, `MatchResult`
+  - API specs : POST /match (CV embedding → scores), GET /offers/{id} (détail offre)
+
+- **Analyse critique architecture actuelle** :
+  - Points forts : microservices Docker, shared/ package, Factory pattern LLM, Medallion (Bronze→Silver→Gold)
+  - Améliorations suggérées : pgvector, message queue, monitoring/alerting, CI/CD complet
+
+- **Recommandation infrastructure GCP** :
+  - Services : Cloud Run (serverless), Cloud SQL + pgvector, Vertex AI (embeddings), BigQuery, Memorystore
+  - Coûts estimés : MVP ~50-60$/mois, Growth ~300-400$/mois
+  - Migration en 4 phases : Local → GCP MVP → GCP Growth → GCP Scale
+
+- **Stratégie ML & Embeddings** :
+  - MVP : sentence-transformers pre-trained (all-MiniLM-L6-v2), pas de MLflow
+  - V1 : collecte données via `OfferInteraction` model (vues, applications, embauches)
+  - V2 : fine-tuning avec MLflow (contrastive learning, cross-encoder, learning to rank)
+  - Dataset potentiel : profils + offres + candidatures = supervision implicite
+
+- **Modèle OfferInteraction conçu** :
+  ```python
+  class OfferInteraction(models.Model):
+      user = models.ForeignKey(User)
+      offer_external_id = models.CharField(max_length=50)
+      match_score = models.FloatField()  # Score initial du matcher
+      viewed = models.BooleanField()
+      time_spent_seconds = models.IntegerField()
+      saved = models.BooleanField()
+      applied = models.BooleanField()
+      got_interview = models.BooleanField(null=True)
+      got_hired = models.BooleanField(null=True)
+  ```
+
+**Problèmes rencontrés:**
+- **Pandoc LaTeX unicode** : caractères ↔, ✅ non supportés par pdflatex
+  - Solution 1 : xelatex engine
+  - Solution 2 : Python markdown + wkhtmltopdf (sans LaTeX)
+
+**Décisions techniques:**
+- **API REST (Option 1)** : découplage propre GUI/offres, Mohamed contrôle son API
+- **Cache lazy refresh** : TTL 24h avec invalidation explicite (pas de refresh proactif)
+- **pgvector recommandé** : PostgreSQL extension pour recherche vectorielle avec index HNSW
+- **GCP plutôt qu'AWS** : meilleur rapport coût/features pour ML (Vertex AI, BigQuery)
+- **MLflow différé** : overkill pour MVP avec modèles pre-trained, utile uniquement pour fine-tuning
+- **Collecte données implicite** : tracker les interactions dès le MVP pour préparer le fine-tuning futur
+
+**Documents créés:**
+- `docs/interface_gui_offers.md` - Interface GUI ↔ Offres
+- `docs/interface_gui_offers_match.md` - Architecture complète avec matching, cache, cloud, ML
+- `docs/interface_gui_offers_match.pdf` - Export PDF pour l'équipe
+
+---
+
 ### 2025-12-24 (22) - UI Success Cards + Export DOCX + Ruff fixes
 **Contexte:** Enrichir les cartes de succès professionnels avec toggle, visualisation et export, et corriger les erreurs Ruff pour le pre-commit hook.
 
@@ -996,6 +1394,10 @@ git add -A && git commit -m "message"
 - **Restriction fonctionnalités par tier** : double vérification côté serveur ET côté template
 - **Modal pricing** : CSS natif avec backdrop-filter pour blur, pas besoin de lib JS
 - **Cropper.js** : bibliothèque la plus mature pour recadrage d'images (utilisée par LinkedIn)
+- **Port interne vs externe Docker** : `5433:5432` signifie port 5433 exposé sur l'hôte, port 5432 interne au réseau Docker
+- **TemplateView vs custom View** : pour passer du contexte dynamique (queries DB), il faut une vue personnalisée
+- **get_or_create** : pattern idempotent pour éviter les erreurs IntegrityError sur les contraintes uniques
+- **docker cp** : permet de copier des fichiers du container vers l'hôte (utile pour récupérer des migrations générées)
 - **Two-step modal** : sépare la sélection de l'édition pour une meilleure UX
 - **Canvas toBlob** : conversion côté client avant upload pour optimiser la bande passante
 - **requirements-dev.txt** : permet d'avoir des dépendances uniquement pour le dev local
@@ -1027,6 +1429,27 @@ git add -A && git commit -m "message"
 - **noqa avec explication** : toujours documenter pourquoi une règle est ignorée (ex: `# noqa: UP028 - yield from incompatible with try/except`)
 - **Bandit vs Ruff syntaxe** : Bandit utilise `# nosec BXXX`, Ruff utilise `# noqa: SXXX` - ce sont des outils différents avec syntaxes différentes
 - **Django QuerySet.first()** : retourne `None` si pas de résultat, ne lève jamais d'exception - pas besoin de try/except
+- **drf-spectacular** : documentation OpenAPI 3 automatique pour Django REST Framework, plus moderne que drf-yasg
+- **Auto-création modèles liés** : créer les modèles dépendants (Application) directement dans la vue API d'import pour simplifier le workflow
+- **JSONField pour history** : simple et efficace pour un event log sans nécessiter une table séparée
+- **pgvector** : extension PostgreSQL pour recherche vectorielle, index HNSW pour performances (remplace Faiss/Milvus)
+- **Modèle Django `managed=False`** : permet de lire une table créée par un autre service sans que Django la gère
+- **Cache lazy refresh** : TTL simple avec invalidation explicite, plus simple que refresh proactif
+- **GCP Cloud Run** : serverless containers, scale to zero, idéal pour microservices avec trafic variable
+- **Vertex AI text-embedding-004** : embeddings Google optimisés pour français, alternative à sentence-transformers
+- **MLflow pour fine-tuning uniquement** : overkill pour modèles pre-trained, utile pour experiment tracking et model registry
+- **Contrastive learning** : technique de fine-tuning embeddings avec triplets (anchor, positive, negative)
+- **Cross-encoder** : modèle de re-ranking plus précis que bi-encoder, utilisé en second stage
+- **Learning to Rank** : approche ML pour optimiser l'ordre des résultats de recherche
+- **OfferInteraction pattern** : collecter les interactions utilisateur (vues, clics, applications) pour supervision implicite
+- **wkhtmltopdf** : génération PDF depuis HTML sans LaTeX, supporte unicode nativement
+- **Base de données partagée dev** : utiliser le même PostgreSQL en local et Docker via port exposé (ex: `localhost:5433`)
+- **Script dev interactif** : menu bash avec couleurs + mode CLI rapide pour les commandes fréquentes
+- **`set +e` en bash** : permet de continuer même si une commande échoue (utile pour services manquants)
+- **`asyncio.create_task()` vs `BackgroundTasks`** : BackgroundTasks de FastAPI n'est PAS vraiment async - il attend la fin de la fonction avant de renvoyer la réponse HTTP. Utiliser `asyncio.create_task()` pour une vraie exécution non-bloquante
+- **`asyncio.to_thread()` pour appels synchrones** : Les SDKs LLM (OpenAI, Anthropic) sont synchrones et bloquent l'event loop. Wrapper avec `await asyncio.to_thread(fn, args)` pour exécuter dans un thread pool
+- **Pattern task_id + polling** : Pour les traitements longs (>10s), retourner immédiatement un task_id et laisser le client faire du polling sur `/status/{task_id}`
+- **ATS optimization** : L'intitulé du CV doit être très proche du titre de l'offre, et reprendre les mots-clés exacts (pas de synonymes)
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -1058,6 +1481,23 @@ git add -A && git commit -m "message"
 - **yield from dans try/except** : Ruff UP028 suggère `yield from` mais cela empêche de catch les erreurs et faire un fallback - utiliser `# noqa: UP028`
 - **Bandit `# noqa` ne fonctionne pas** : Bandit ignore la syntaxe `# noqa: SXXX`, utiliser `# nosec BXXX` à la place
 - **try/except/pass sur QuerySet** : `.filter().first()` ne lève pas d'exception, retourne `None` - Bandit B110 détecte ce pattern inutile
+- **SQLite vs PostgreSQL en dev** : utiliser des bases différentes entre local et Docker cause des pertes de données et incohérences
+- **ENV_MODE manquant dans docker-compose.yml** : sans `ENV_MODE=dev`, Django utilise le mode "local" qui essaie de se connecter à `localhost:5433` (inaccessible depuis le container)
+- **Migrations créées dans le container** : si `makemigrations` est exécuté dans le container, le fichier de migration n'existe pas dans le code source → utiliser `docker cp` pour récupérer
+- **Volume Docker vs base vide** : `docker-compose down` sans `-v` préserve les données, mais un `full-restart` d'un service ne recrée pas les users → créer un superuser après reset
+- **`docker-compose down -v`** : le flag `-v` supprime les volumes = perte de toutes les données. Ne jamais utiliser sauf pour reset complet
+- **FastAPI BackgroundTasks pour async** : NE PAS utiliser pour les tâches longues car elles bloquent quand même la réponse HTTP. Utiliser `asyncio.create_task()` à la place
+- **Async functions avec appels synchrones** : Marquer une fonction `async` ne la rend pas non-bloquante si elle appelle du code synchrone. Utiliser `asyncio.to_thread()` pour wrapper les appels bloquants
+- **Timeout court sur POST de démarrage** : Le POST qui lance une tâche async doit retourner en <1s. Si ça prend plus longtemps, vérifier que la tâche n'est pas exécutée de manière synchrone
+- **Django `mark_safe()` sans sanitization** : Bandit B703/B308 détecte les risques XSS.
+  - **Problème réel** : `mark_safe()` sur du contenu utilisateur = faille XSS critique (injection de `<script>`)
+  - **Faux positif** : Bandit ne peut pas savoir si le contenu est sanitizé, il alerte toujours
+  - **Solution** : sanitizer avec `bleach.clean()` avant `mark_safe()` avec whitelist stricte de tags/attributs, puis ajouter `# nosec B308 B703` avec un commentaire expliquant pourquoi c'est sécurisé
+  - **Exemple** : `return mark_safe(bleach.clean(html, tags=ALLOWED_TAGS))  # nosec B308 B703`
+- **Exemples JWT dans la documentation** : Gitleaks détecte les tokens JWT même fictifs comme secrets.
+  - **Problème réel** : aucun, ce sont des exemples de documentation, pas de vrais tokens
+  - **Faux positif** : Gitleaks ne distingue pas les exemples des vrais secrets
+  - **Solution** : utiliser des placeholders explicites comme `<JWT_ACCESS_TOKEN>` au lieu de vrais formats JWT `eyJ0eXAi...`
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -1160,3 +1600,12 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - [ ] **Validation email** : confirmation par email lors du changement d'adresse
 - [x] **Auto-création succès STAR** : marqueur `[STAR_COMPLETE]` + extraction JSON + création auto en base
 - [ ] **Tests E2E chatbot STAR** : tester le flux complet conversation → extraction → création succès
+- [x] **Swagger/OpenAPI docs** : drf-spectacular avec `/api/docs/` et `/api/redoc/`
+- [x] **Modèle Application** : workflow candidature (added → in_progress → applied → interview → accepted/rejected)
+- [x] **Auto-création Application** : chaque ImportedOffer crée automatiquement une Application
+- [x] **Page liste candidatures** : cards avec filtrage par status
+- [ ] **Page détail candidature** : vue complète avec actions (modifier status, notes, documents)
+- [ ] **Intégrer matching service** : appeler POST /match lors de l'import d'une offre
+- [ ] **Restreindre CORS production** : limiter aux IDs d'extensions spécifiques
+- [x] **Script dev.sh** : menu interactif + commandes CLI pour le workflow de développement
+- [x] **Base PostgreSQL partagée** : local et Docker utilisent la même base via port exposé

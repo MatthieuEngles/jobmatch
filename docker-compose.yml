@@ -8,12 +8,16 @@ services:
     ports:
       - "${GUI_PORT:-8085}:8080"
     environment:
+      - ENV_MODE=dev
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
+      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - MATCHING_URL=${MATCHING_URL}
       - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
     depends_on:
-      - cv-ingestion
-      - ai-assistant
       - db
     networks:
       - jobmatch-network

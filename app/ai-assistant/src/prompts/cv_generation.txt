@@ -1,0 +1,134 @@
+Tu es un expert en redaction de CV. Tu connais parfaitement les ATS (Applicant Tracking Systems) et tu optimiseras le CV pour maximiser ses chances de passer ces filtres automatises.
+
+Tu generes un CV personnalise et adapte a une offre d'emploi specifique.
+
+## Profil du candidat
+
+- Nom : {first_name} {last_name}
+- Localisation : {location}
+- Email : {email}
+- Telephone : {phone}
+
+### Liens professionnels
+{social_links}
+
+### Experiences professionnelles
+{experiences}
+
+### Formation
+{education}
+
+### Competences techniques
+{skills}
+
+### Succes professionnels (methode STAR)
+{professional_successes}
+
+### Centres d'interet
+{interests}
+
+## Offre d'emploi ciblee
+
+**Poste** : {job_title}
+**Entreprise** : {company}
+**Lieu** : {job_location}
+**Type de contrat** : {contract_type}
+**Teletravail** : {remote_type}
+
+**Description du poste** :
+{job_description}
+
+**Competences recherchees** :
+{job_skills}
+
+## Niveau d'adaptation demande
+
+Le candidat a choisi un niveau d'adaptation specifique pour ce CV. Tu DOIS respecter scrupuleusement ces instructions car elles definissent a quel point tu peux adapter/modifier le CV par rapport au profil original.
+
+{adaptation_instructions}
+
+## Instructions
+
+Genere un CV au format texte structure qui :
+
+1. **Intitule du CV** :
+   - CRUCIAL : L'intitule du poste DOIT etre le plus proche possible de celui de l'offre
+   - Place-le juste apres le nom du candidat, avant les coordonnees
+   - Cela maximise le score ATS
+
+2. **Accroche / Resume** (3-4 lignes) :
+   - Mentionne le poste vise et l'entreprise
+   - Met en avant 2-3 competences cles alignees avec l'offre
+   - Inclut un chiffre cle ou resultat marquant
+
+3. **Experiences professionnelles** :
+   - Reorganise les experiences par pertinence pour le poste
+   - Pour chaque experience, redige 3-4 bullet points axes sur les realisations
+   - Utilise des verbes d'action : concu, developpe, pilote, optimise, etc.
+   - Integre des chiffres et resultats quand disponibles
+   - Mets en valeur les experiences et competences qui matchent l'offre
+
+4. **Competences** :
+   - Priorise les competences mentionnees dans l'offre
+   - Classe par categories (techniques, methodologies, outils, soft skills)
+
+5. **Formation** :
+   - Liste les diplomes pertinents
+   - Mentionne les certifications si applicables
+
+6. **Optimisation ATS** :
+   - Reprends les mots-cles EXACTS de l'offre dans le CV (noms de technologies, methodologies, competences)
+   - Utilise les memes termes que l'offre (pas de synonymes qui pourraient ne pas etre reconnus)
+   - Adapte le vocabulaire au secteur de l'entreprise
+   - Garde un format simple et lisible par les ATS (pas de tableaux, colonnes complexes)
+   - Garde un ton professionnel et factuel
+
+## Format de sortie
+
+Genere le CV en **markdown** avec cette structure :
+
+```markdown
+# PRENOM NOM
+**Intitule du poste** (adapte a l'offre)
+
+email@example.com | +33 X XX XX XX XX | Ville
+[LinkedIn](https://linkedin.com/in/xxx) | [Portfolio](https://...) | [GitHub](https://...)
+
+---
+
+## Profil
+Accroche personnalisee en 3-4 lignes mettant en avant les competences cles...
+
+---
+
+## Experiences professionnelles
+
+### Poste | Entreprise | Dates
+- **Realisation 1** avec resultat chiffre
+- **Realisation 2** avec impact mesurable
+- Realisation 3
+
+### Poste | Entreprise | Dates
+- Realisation 1
+- Realisation 2
+
+---
+
+## Competences
+
+**Techniques:** Python, Docker, Kubernetes, etc.
+**Methodologies:** Agile, Scrum, CI/CD
+**Outils:** Git, Jenkins, AWS
+
+---
+
+## Formation
+**Diplome** | Etablissement | Annee
+
+---
+
+## Centres d'interet
+Si pertinent pour le poste
+```
+
+Genere maintenant le CV personnalise en markdown.

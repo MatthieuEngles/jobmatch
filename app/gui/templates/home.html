@@ -537,6 +537,108 @@
         letter-spacing: 0.5px;
     }
 
+    /* Applications count badge */
+    .applications-count-badge {
+        background: var(--primary);
+        color: white;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-left: auto;
+    }
+
+    /* Applications preview in home card */
+    .applications-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .application-mini-card {
+        background: var(--light);
+        border-radius: 10px;
+        padding: 12px;
+        border-left: 3px solid var(--primary);
+    }
+
+    .app-mini-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .app-mini-company {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--dark);
+    }
+
+    .app-mini-status {
+        padding: 2px 8px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .app-status-added {
+        background: #e2e8f0;
+        color: #64748b;
+    }
+
+    .app-status-in_progress {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .app-status-applied {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .app-status-interview {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+
+    .app-status-accepted {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .app-status-rejected {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .app-mini-title {
+        font-size: 0.9rem;
+        color: #334155;
+        line-height: 1.3;
+    }
+
+    .app-mini-status-date {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+
+    .app-mini-date {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    .application-mini-card:hover {
+        background: #f1f5f9;
+        transform: translateX(4px);
+        transition: all 0.2s ease;
+    }
+
     /* Responsive breakpoints */
     @media (max-width: 992px) {
         .dashboard-grid {
@@ -593,7 +695,7 @@
                 </a>
 
                 <!-- Column 2: Suivi des candidatures (tall) -->
-                <a href="#" class="action-card tall">
+                <div class="action-card tall" style="cursor: default;">
                     <div class="card-header">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -601,16 +703,43 @@
                             </svg>
                         </div>
                         <h3 class="action-title">Suivi des candidatures</h3>
+                        {% if applications_count %}
+                        <span class="applications-count-badge">{{ applications_count }}</span>
+                        {% endif %}
                     </div>
-                    <span class="coming-soon-badge">Bientot disponible</span>
+
+                    {% if recent_applications %}
+                    <div class="applications-preview">
+                        {% for app in recent_applications %}
+                        <a href="{% url 'accounts:application_detail' app.id %}" class="application-mini-card" style="text-decoration: none; color: inherit;">
+                            <div class="app-mini-header">
+                                <span class="app-mini-company">{{ app.imported_offer.company|default:"Entreprise" }}</span>
+                                <div class="app-mini-status-date">
+                                    <span class="app-mini-status app-status-{{ app.status }}">
+                                        {% if app.status == 'added' %}Ajoutee{% elif app.status == 'in_progress' %}En cours{% elif app.status == 'applied' %}Envoyee{% elif app.status == 'interview' %}Entretien{% elif app.status == 'accepted' %}Acceptee{% elif app.status == 'rejected' %}Refusee{% endif %}
+                                    </span>
+                                    <span class="app-mini-date">{{ app.created_at|date:"d/m/Y" }}</span>
+                                </div>
+                            </div>
+                            <div class="app-mini-title">{{ app.imported_offer.title|truncatechars:40 }}</div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
                     <p class="action-desc">Suivez l'etat de vos candidatures en temps reel : en attente, entretien, acceptee, refusee...</p>
-                    <span class="action-arrow">
+                    {% endif %}
+
+                    <a href="{% url 'accounts:applications_list' %}" class="action-arrow" style="text-decoration: none;">
+                        {% if applications_count %}
+                        Voir toutes mes candidatures ({{ applications_count }})
+                        {% else %}
                         Voir mes candidatures
+                        {% endif %}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                         </svg>
-                    </span>
-                </a>
+                    </a>
+                </div>
 
                 <!-- Column 3: Top offres pour vous (tall) -->
                 <a href="#" class="action-card tall">

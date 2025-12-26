@@ -193,6 +193,16 @@ class User(AbstractUser):
         help_text="AI autonomy level (1=Guided, 2=Assisted, 3=Collaborative, 4=Proactive, 5=Autonomous)",
     )
 
+    # DOCX export preferences
+    docx_template = models.ForeignKey(
+        "DocxTemplate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users",
+        help_text="Preferred DOCX template for CV/cover letter exports",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
 
@@ -955,3 +965,424 @@ class Pitch(models.Model):
             ]
         )
         return int((filled / 2) * 100)
+
+
+# Choices for imported offer status
+IMPORTED_OFFER_STATUS_CHOICES = [
+    ("new", "Nouvelle"),
+    ("viewed", "Vue"),
+    ("saved", "Sauvegardee"),
+    ("applied", "Candidature envoyee"),
+    ("rejected", "Rejetee"),
+]
+
+
+class ImportedOffer(models.Model):
+    """
+    Job offer captured by browser extension.
+    Stores offers from any job board (LinkedIn, Indeed, etc.) imported by the user.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="imported_offers",
+    )
+    candidate_profile = models.ForeignKey(
+        CandidateProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="imported_offers",
+        help_text="Candidate profile used for matching (optional)",
+    )
+
+    # Source information
+    source_url = models.URLField(
+        max_length=500,
+        help_text="Original URL of the job offer",
+    )
+    source_domain = models.CharField(
+        max_length=100,
+        help_text="Domain name of the source (e.g., linkedin.com)",
+    )
+    captured_at = models.DateTimeField(
+        help_text="When the offer was captured by the extension",
+    )
+
+    # Offer details
+    title = models.CharField(max_length=300)
+    company = models.CharField(max_length=200, blank=True)
+    location = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    contract_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Contract type (CDI, CDD, etc.)",
+    )
+    remote_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Remote work type (onsite, hybrid, remote)",
+    )
+    salary = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Salary info: {min, max, currency, period}",
+    )
+    skills = models.JSONField(
+        default=list,
+        help_text="List of skills mentioned in the offer",
+    )
+
+    # Matching results
+    # TODO: Integrate with matching service to compute match_score
+    match_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Match score from matching service (0-1)",
+    )
+    matched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the match was computed",
+    )
+
+    # Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=IMPORTED_OFFER_STATUS_CHOICES,
+        default="new",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Offre importee"
+        verbose_name_plural = "Offres importees"
+        ordering = ["-captured_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "source_url"],
+                name="unique_offer_per_user_url",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "-captured_at"]),
+            models.Index(fields=["source_domain"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.company or 'Unknown'} ({self.source_domain})"
+
+    def get_salary_display(self):
+        """Return formatted salary string."""
+        if not self.salary:
+            return None
+        min_sal = self.salary.get("min")
+        max_sal = self.salary.get("max")
+        currency = self.salary.get("currency", "EUR")
+        period = self.salary.get("period", "year")
+
+        if min_sal and max_sal:
+            return f"{min_sal:,} - {max_sal:,} {currency}/{period}"
+        elif min_sal:
+            return f"From {min_sal:,} {currency}/{period}"
+        elif max_sal:
+            return f"Up to {max_sal:,} {currency}/{period}"
+        return None
+
+    def get_match_score_percentage(self):
+        """Return match score as percentage (0-100)."""
+        if self.match_score is None:
+            return None
+        return int(self.match_score * 100)
+
+
+# Choices for application status
+APPLICATION_STATUS_CHOICES = [
+    ("added", "Ajoutee"),
+    ("in_progress", "En cours"),
+    ("applied", "Candidature envoyee"),
+    ("interview", "Entretien prevu"),
+    ("accepted", "Acceptee"),
+    ("rejected", "Refusee"),
+]
+
+
+def application_cv_path(instance, filename):
+    """Generate path for custom CV files."""
+    return f"applications/{instance.user.id}/{instance.id}/cv_{filename}"
+
+
+def application_cover_letter_path(instance, filename):
+    """Generate path for cover letter files."""
+    return f"applications/{instance.user.id}/{instance.id}/cover_letter_{filename}"
+
+
+class Application(models.Model):
+    """
+    Job application combining an offer with custom CV and cover letter.
+    Tracks the full application workflow from creation to final result.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="applications",
+    )
+
+    # Link to offer (ImportedOffer for now, JobOffer can be added later)
+    imported_offer = models.ForeignKey(
+        ImportedOffer,
+        on_delete=models.CASCADE,
+        related_name="applications",
+        help_text="The imported job offer for this application",
+    )
+
+    # Candidate profile used for this application
+    candidate_profile = models.ForeignKey(
+        CandidateProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+        help_text="Candidate profile used for this application",
+    )
+
+    # Custom CV for this application
+    custom_cv = models.TextField(
+        blank=True,
+        help_text="Custom CV content tailored for this offer",
+    )
+    custom_cv_file = models.FileField(
+        upload_to=application_cv_path,
+        null=True,
+        blank=True,
+        help_text="Generated PDF of the custom CV",
+    )
+
+    # Cover letter for this application
+    cover_letter = models.TextField(
+        blank=True,
+        help_text="Cover letter content tailored for this offer",
+    )
+    cover_letter_file = models.FileField(
+        upload_to=application_cover_letter_path,
+        null=True,
+        blank=True,
+        help_text="Generated PDF of the cover letter",
+    )
+
+    # Application status
+    status = models.CharField(
+        max_length=20,
+        choices=APPLICATION_STATUS_CHOICES,
+        default="added",
+    )
+
+    # Interview details
+    interview_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Scheduled interview date and time",
+    )
+
+    # Personal notes
+    notes = models.TextField(
+        blank=True,
+        help_text="Personal notes about this application",
+    )
+
+    # History of events (JSON array)
+    # Format: [{"date": "ISO datetime", "event": "event_type", "details": "..."}]
+    # Event types: created, cv_generated, cover_letter_generated, applied,
+    #              interview_scheduled, status_changed, note_added
+    history = models.JSONField(
+        default=list,
+        help_text="Timeline of events for this application",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Candidature"
+        verbose_name_plural = "Candidatures"
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "imported_offer"],
+                name="unique_application_per_user_offer",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "-updated_at"]),
+        ]
+
+    def __str__(self):
+        offer_title = self.imported_offer.title if self.imported_offer else "Unknown"
+        return f"Application: {offer_title} ({self.get_status_display()})"
+
+    def add_history_event(self, event_type, details=""):
+        """Add an event to the history timeline."""
+        from django.utils import timezone
+
+        event = {
+            "date": timezone.now().isoformat(),
+            "event": event_type,
+            "details": details,
+        }
+        self.history.append(event)
+
+    def save(self, *args, **kwargs):
+        """Override save to add created event on first save."""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and not self.history:
+            self.add_history_event("created", "Application created")
+            super().save(update_fields=["history"])
+
+    def get_offer_title(self):
+        """Return the title of the linked offer."""
+        if self.imported_offer:
+            return self.imported_offer.title
+        return None
+
+    def get_offer_company(self):
+        """Return the company of the linked offer."""
+        if self.imported_offer:
+            return self.imported_offer.company
+        return None
+
+    def has_cv(self):
+        """Check if a custom CV has been created."""
+        return bool(self.custom_cv or self.custom_cv_file)
+
+    def has_cover_letter(self):
+        """Check if a cover letter has been created."""
+        return bool(self.cover_letter or self.cover_letter_file)
+
+    def get_completion_status(self):
+        """Return completion status of application documents."""
+        return {
+            "cv": self.has_cv(),
+            "cover_letter": self.has_cover_letter(),
+            "complete": self.has_cv() and self.has_cover_letter(),
+        }
+
+
+class DocxTemplate(models.Model):
+    """DOCX template configuration for CV and cover letter exports."""
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Template name (e.g., 'Professional', 'Modern', 'Classic')",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Template description",
+    )
+
+    # Font settings
+    font_name = models.CharField(
+        max_length=50,
+        default="Calibri",
+        help_text="Main font family (e.g., 'Calibri', 'Arial', 'Times New Roman')",
+    )
+    font_size_name = models.PositiveSmallIntegerField(
+        default=32,
+        help_text="Font size for name/title in half-points (32 = 16pt)",
+    )
+    font_size_section = models.PositiveSmallIntegerField(
+        default=24,
+        help_text="Font size for section titles in half-points (24 = 12pt)",
+    )
+    font_size_body = models.PositiveSmallIntegerField(
+        default=20,
+        help_text="Font size for body text in half-points (20 = 10pt)",
+    )
+
+    # Color settings
+    accent_color = models.CharField(
+        max_length=7,
+        default="#667eea",
+        help_text="Accent color for section titles (hex format, e.g., '#667eea')",
+    )
+
+    # Margin settings (in twips: 1 inch = 1440 twips, 1 cm = 567 twips)
+    margin_top = models.PositiveIntegerField(
+        default=1134,
+        help_text="Top margin in twips (1134 = 2cm)",
+    )
+    margin_right = models.PositiveIntegerField(
+        default=1134,
+        help_text="Right margin in twips (1134 = 2cm)",
+    )
+    margin_bottom = models.PositiveIntegerField(
+        default=1134,
+        help_text="Bottom margin in twips (1134 = 2cm)",
+    )
+    margin_left = models.PositiveIntegerField(
+        default=1134,
+        help_text="Left margin in twips (1134 = 2cm)",
+    )
+
+    # Spacing settings
+    line_spacing = models.PositiveSmallIntegerField(
+        default=276,
+        help_text="Line spacing in 240ths of a line (240 = single, 276 = 1.15, 360 = 1.5)",
+    )
+    paragraph_spacing_after = models.PositiveSmallIntegerField(
+        default=120,
+        help_text="Space after paragraphs in twips (120 = approx 2mm)",
+    )
+
+    # System flags
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Is this the default template for new users?",
+    )
+    is_system = models.BooleanField(
+        default=False,
+        help_text="Is this a system template (cannot be deleted)?",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Template DOCX"
+        verbose_name_plural = "Templates DOCX"
+        ordering = ["-is_default", "name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """Ensure only one default template exists."""
+        if self.is_default:
+            DocxTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    def to_js_config(self):
+        """Return template configuration as a dict for JavaScript/docx.js."""
+        return {
+            "fontName": self.font_name,
+            "fontSizeName": self.font_size_name,
+            "fontSizeSection": self.font_size_section,
+            "fontSizeBody": self.font_size_body,
+            "accentColor": self.accent_color.lstrip("#"),
+            "marginTop": self.margin_top,
+            "marginRight": self.margin_right,
+            "marginBottom": self.margin_bottom,
+            "marginLeft": self.margin_left,
+            "lineSpacing": self.line_spacing,
+            "paragraphSpacingAfter": self.paragraph_spacing_after,
+        }

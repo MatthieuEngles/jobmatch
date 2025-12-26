@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+        h1 { color: #1a1a2e; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        h2 { color: #16213e; margin-top: 30px; }
+        h3 { color: #0f3460; }
+        h4 { color: #1a1a2e; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        pre { background: #1a1a2e; color: #e0e0e0; padding: 15px; border-radius: 5px;
+               overflow-x: auto; font-size: 0.85em; white-space: pre-wrap; }
+        pre code { background: none; color: inherit; }
+        table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #667eea; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        blockquote { border-left: 4px solid #667eea; margin: 0; padding-left: 20px; color: #666; }
+        ul { padding-left: 25px; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+<h1>Interface GUI - Offres &amp; Matching</h1>
+<h2>Vue d'ensemble</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                           ARCHITECTURE                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  [Mohamed]                    [Maxime]                    [GUI]          │
+│  offre-ingestion              matching                    accounts       │
+│       │                          │                          │            │
+│       ▼                          │                          │            │
+│  ┌─────────────┐                 │                          │            │
+│  │ offers      │ ◄───────────────┤                          │            │
+│  │ + embedding │  (lit embeddings)                          │            │
+│  └─────────────┘                 │                          │            │
+│                                  │                          │            │
+│                                  │     POST /match          │            │
+│                                  │ ◄────────────────────────┤            │
+│                                  │   { cv_embedding: [...] }│            │
+│                                  │                          │            │
+│                                  │     Response             │            │
+│                                  │ ────────────────────────►│            │
+│                                  │   [                      │            │
+│                                  │     {id: &quot;ABC&quot;, score: 0.94},         │
+│                                  │     {id: &quot;DEF&quot;, score: 0.89},         │
+│                                  │     ...top 20            │            │
+│                                  │   ]                      │            │
+│                                  │                          │            │
+│                                  │                          ▼            │
+│                                  │              GET /offers?ids=ABC,DEF  │
+│       ◄──────────────────────────┼──────────────────────────┤            │
+│       │  Response: offer details │                          │            │
+│       ├──────────────────────────┼─────────────────────────►│            │
+│                                                              │            │
+│                                                    ┌─────────▼─────────┐ │
+│                                                    │  Affichage UI     │ │
+│                                                    │  20 offres triées │ │
+│                                                    │  par score match  │ │
+│                                                    └───────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>Flow de données</h2>
+<h3>1. Génération embedding CV</h3>
+<ul>
+<li><strong>Responsable</strong> : Maxime (dossier <code>shared/</code>)</li>
+<li><strong>Stockage</strong> : Base GUI (champ sur CandidateProfile ou table dédiée)</li>
+</ul>
+<h3>2. Matching CV ↔ Offres</h3>
+<ul>
+<li><strong>GUI → Maxime</strong> : <code>POST /match</code> avec <code>cv_embedding</code> (vecteur)</li>
+<li><strong>Maxime</strong> : Compare avec embeddings offres (fournis par Mohamed)</li>
+<li><strong>Maxime → GUI</strong> : Liste <code>[{id, score}, ...]</code> (top 20)</li>
+</ul>
+<h3>3. Récupération détails offres</h3>
+<ul>
+<li><strong>GUI → Mohamed</strong> : <code>GET /offers?ids=ABC,DEF,...</code></li>
+<li><strong>Mohamed → GUI</strong> : Détails complets des offres</li>
+</ul>
+<h3>4. Affichage</h3>
+<ul>
+<li>GUI affiche les offres triées par score de matching</li>
+</ul>
+<hr />
+<h2>APIs attendues</h2>
+<h3>API Matching (Maxime)</h3>
+<pre><code class="language-http">POST /match
+Content-Type: application/json
+
+{
+  &quot;cv_embedding&quot;: [0.123, -0.456, 0.789, ...]  // vecteur 768/1536 dimensions
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">[
+  {&quot;id&quot;: &quot;201VPGR&quot;, &quot;score&quot;: 0.94},
+  {&quot;id&quot;: &quot;201VPGQ&quot;, &quot;score&quot;: 0.89},
+  {&quot;id&quot;: &quot;201VPGN&quot;, &quot;score&quot;: 0.87},
+  ...
+]
+</code></pre>
+<h3>API Offres (Mohamed)</h3>
+<pre><code class="language-http">GET /offers?ids=201VPGR,201VPGQ,201VPGN
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">[
+  {
+    &quot;id&quot;: &quot;201VPGR&quot;,
+    &quot;intitule&quot;: &quot;Développeur Python&quot;,
+    &quot;description&quot;: &quot;...&quot;,
+    &quot;entreprise&quot;: &quot;ACME Corp&quot;,
+    &quot;lieu&quot;: &quot;Paris 75001&quot;,
+    &quot;typeContrat&quot;: &quot;CDI&quot;,
+    &quot;salaire&quot;: &quot;45-55K€&quot;,
+    &quot;competences&quot;: [
+      {&quot;libelle&quot;: &quot;Python&quot;, &quot;exigence&quot;: &quot;E&quot;},
+      {&quot;libelle&quot;: &quot;Django&quot;, &quot;exigence&quot;: &quot;S&quot;}
+    ]
+  },
+  ...
+]
+</code></pre>
+<hr />
+<h2>Dossier shared/</h2>
+<h3>Contenu actuel (piloté par Maxime)</h3>
+<pre><code>shared/
+└── embedding/
+    └── model.py  # Code génération embedding
+</code></pre>
+<h3>Bonnes pratiques</h3>
+<table>
+<thead>
+<tr>
+<th>Contenu</th>
+<th>OK ?</th>
+<th>Raison</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Code partagé (fonctions, classes)</td>
+<td>✅</td>
+<td>Évite duplication entre services</td>
+</tr>
+<tr>
+<td>Modèle d'embedding (fichiers .bin)</td>
+<td>⚠️</td>
+<td>Mieux dans volume Docker ou S3</td>
+</tr>
+<tr>
+<td>Données (embeddings calculés)</td>
+<td>❌</td>
+<td>Devrait être en base (PostgreSQL + pgvector)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommandation</strong> : Le modèle d'embedding devrait être :
+- Téléchargé au démarrage du container (cache Docker), ou
+- Stocké dans un bucket S3/MinIO partagé</p>
+<hr />
+<h2>Cache des résultats matching (GUI)</h2>
+<h3>Option retenue : Cache en base avec lazy refresh</h3>
+<pre><code class="language-python">class MatchResult(models.Model):
+    &quot;&quot;&quot;Cache local des résultats de matching.&quot;&quot;&quot;
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    profile = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE)
+    offer_external_id = models.CharField(max_length=50)
+    score = models.FloatField()
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['profile', 'offer_external_id']
+        indexes = [
+            models.Index(fields=['profile', '-score']),
+        ]
+</code></pre>
+<h3>Stratégie d'invalidation</h3>
+<table>
+<thead>
+<tr>
+<th>Événement</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TTL &gt; 24h</td>
+<td>Re-match au prochain accès</td>
+</tr>
+<tr>
+<td>CV modifié</td>
+<td>Invalider cache immédiatement</td>
+</tr>
+<tr>
+<td>Profil modifié (expériences, compétences)</td>
+<td>Invalider cache</td>
+</tr>
+<tr>
+<td>Nouvelles offres (Mohamed)</td>
+<td>Lazy refresh au prochain accès</td>
+</tr>
+</tbody>
+</table>
+<h3>Évolution future (optionnelle)</h3>
+<p>Background job Celery pour refresh nocturne + notifications si nouveau match &gt; 0.9</p>
+<hr />
+<h2>Modèle JobOffer (GUI)</h2>
+<p>Le GUI définit son propre modèle, indépendant du schéma de Mohamed :</p>
+<pre><code class="language-python">class JobOffer(models.Model):
+    &quot;&quot;&quot;Local cache of job offers from offre-ingestion API.&quot;&quot;&quot;
+
+    # ID externe (celui de Mohamed)
+    external_id = models.CharField(max_length=50, unique=True)
+
+    # Champs principaux
+    title = models.TextField()
+    description = models.TextField()
+    company_name = models.CharField(max_length=255, blank=True)
+
+    # Localisation
+    location = models.CharField(max_length=255)
+    postal_code = models.CharField(max_length=10, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    # Contrat
+    contract_type = models.CharField(max_length=100)
+    experience_required = models.CharField(max_length=100, blank=True)
+
+    # Classification
+    rome_code = models.CharField(max_length=10, blank=True)
+    rome_label = models.CharField(max_length=255, blank=True)
+    sector = models.CharField(max_length=255, blank=True)
+
+    # Dates
+    published_at = models.DateTimeField()
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-published_at']
+
+
+class JobOfferSkill(models.Model):
+    &quot;&quot;&quot;Skills required for a job offer.&quot;&quot;&quot;
+    offer = models.ForeignKey(JobOffer, on_delete=models.CASCADE, related_name='skills')
+    label = models.TextField()
+    is_required = models.BooleanField(default=False)  # E=True, S=False
+</code></pre>
+<p><strong>Avantages</strong> :
+- Nommage anglais cohérent avec le codebase GUI
+- Structure adaptée aux besoins UI (pas les 13 tables de Mohamed)
+- Cache local = moins d'appels API, UI rapide
+- Indépendance totale du schéma de Mohamed</p>
+<hr />
+<h2>Questions en attente</h2>
+<ol>
+<li><strong>Mohamed</strong> : Quelle URL pour l'API offres ? Format de réponse ?</li>
+<li><strong>Maxime</strong> : Quelle URL pour l'API matching ? Dimension du vecteur embedding ?</li>
+<li><strong>Équipe</strong> : Notification quand nouveau match &gt; seuil ?</li>
+</ol>
+<hr />
+<h2>Analyse critique de l'architecture actuelle</h2>
+<h3>Ce qui est bien fait</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Analyse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Microservices</strong></td>
+<td>Bonne séparation : <code>gui</code>, <code>cv-ingestion</code>, <code>ai-assistant</code>, <code>offre-ingestion</code>, <code>matching</code></td>
+</tr>
+<tr>
+<td><strong>Docker Compose</strong></td>
+<td>Network isolé, variables d'environnement externalisées</td>
+</tr>
+<tr>
+<td><strong>shared/</strong></td>
+<td>Package Python installable (<code>pip install -e .</code>), interfaces typées (Pydantic)</td>
+</tr>
+<tr>
+<td><strong>Embeddings</strong></td>
+<td>Factory pattern avec providers interchangeables (sentence-transformers, vec2vec)</td>
+</tr>
+</tbody>
+</table>
+<h3>Points d'amélioration (niveau Data Engineer senior)</h3>
+<table>
+<thead>
+<tr>
+<th>Problème</th>
+<th>Impact</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pas de pgvector</strong></td>
+<td>Matching en Python = lent sur 100K+ offres</td>
+<td>PostgreSQL + pgvector pour recherche vectorielle native</td>
+</tr>
+<tr>
+<td><strong>SQLite pour offres</strong></td>
+<td>Pas scalable, pas de concurrence</td>
+<td>Migration PostgreSQL obligatoire</td>
+</tr>
+<tr>
+<td><strong>Embeddings en mémoire</strong></td>
+<td>Recalcul à chaque restart</td>
+<td>Stocker en base avec index HNSW</td>
+</tr>
+<tr>
+<td><strong>Pas de message queue</strong></td>
+<td>Couplage synchrone entre services</td>
+<td>Redis Streams ou RabbitMQ pour découplage</td>
+</tr>
+<tr>
+<td><strong>Pas de monitoring</strong></td>
+<td>Aveugle en production</td>
+<td>Prometheus + Grafana</td>
+</tr>
+<tr>
+<td><strong>Pas de CI/CD</strong></td>
+<td>Déploiements manuels risqués</td>
+<td>GitHub Actions + ArgoCD</td>
+</tr>
+<tr>
+<td><strong>Secrets en .env</strong></td>
+<td>Risque de commit accidentel</td>
+<td>Vault ou cloud secrets manager</td>
+</tr>
+<tr>
+<td><strong>Pas de rate limiting</strong></td>
+<td>Vulnérable aux abus</td>
+<td>nginx rate limit ou API Gateway</td>
+</tr>
+</tbody>
+</table>
+<h3>Architecture cible (niveau production)</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                        ARCHITECTURE CIBLE                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                    │
+│  │   GUI       │     │ cv-ingest   │     │ ai-assist   │                    │
+│  │  (Django)   │     │  (FastAPI)  │     │  (FastAPI)  │                    │
+│  └──────┬──────┘     └──────┬──────┘     └──────┬──────┘                    │
+│         │                   │                   │                            │
+│         └─────────┬─────────┴─────────┬─────────┘                            │
+│                   │                   │                                      │
+│                   ▼                   ▼                                      │
+│         ┌─────────────────┐  ┌─────────────────┐                            │
+│         │  Redis Streams  │  │   PostgreSQL    │                            │
+│         │  (event bus)    │  │  + pgvector     │                            │
+│         └────────┬────────┘  └────────┬────────┘                            │
+│                  │                    │                                      │
+│                  ▼                    ▼                                      │
+│         ┌─────────────────┐  ┌─────────────────┐                            │
+│         │ offre-ingest    │  │    matching     │                            │
+│         │ (consumer)      │  │ (vector search) │                            │
+│         └─────────────────┘  └─────────────────┘                            │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                        OBSERVABILITY                                 │    │
+│  │  Prometheus ─► Grafana    Loki ─► Logs    Jaeger ─► Traces          │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>Infrastructure Cloud recommandée</h2>
+<h3>Comparatif des 3 clouds</h3>
+<table>
+<thead>
+<tr>
+<th>Critère</th>
+<th>GCP</th>
+<th>AWS</th>
+<th>Azure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Coût startup</strong></td>
+<td>✅ 300$ crédits + Always Free</td>
+<td>⚠️ 12 mois Free Tier</td>
+<td>⚠️ 200$ crédits</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL + pgvector</strong></td>
+<td>✅ Cloud SQL (pgvector natif)</td>
+<td>✅ RDS + pgvector</td>
+<td>✅ Azure DB</td>
+</tr>
+<tr>
+<td><strong>Vector Search managé</strong></td>
+<td>✅ Vertex AI Matching Engine</td>
+<td>⚠️ OpenSearch (cher)</td>
+<td>⚠️ Cognitive Search</td>
+</tr>
+<tr>
+<td><strong>Kubernetes</strong></td>
+<td>✅ GKE Autopilot (simple)</td>
+<td>⚠️ EKS (complexe)</td>
+<td>⚠️ AKS</td>
+</tr>
+<tr>
+<td><strong>Serverless containers</strong></td>
+<td>✅ Cloud Run (excellent)</td>
+<td>✅ Fargate</td>
+<td>⚠️ Container Apps</td>
+</tr>
+<tr>
+<td><strong>ML/Embeddings</strong></td>
+<td>✅ Vertex AI</td>
+<td>✅ SageMaker</td>
+<td>⚠️ Azure ML</td>
+</tr>
+<tr>
+<td><strong>Object Storage</strong></td>
+<td>✅ GCS</td>
+<td>✅ S3</td>
+<td>✅ Blob Storage</td>
+</tr>
+</tbody>
+</table>
+<h3>Recommandation : Google Cloud Platform (GCP)</h3>
+<p><strong>Pourquoi GCP ?</strong>
+1. <strong>Cloud Run</strong> : Containers serverless avec scale-to-zero (0$ quand pas de trafic)
+2. <strong>Cloud SQL</strong> : PostgreSQL managé avec pgvector inclus
+3. <strong>Vertex AI</strong> : Embeddings API (text-embedding-004) sans gérer de GPU
+4. <strong>BigQuery</strong> : Analytics sur les offres (gratuit jusqu'à 1TB/mois)
+5. <strong>Crédits startup</strong> : 300$ gratuits + programme Google for Startups</p>
+<hr />
+<h2>Architecture GCP proposée</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ARCHITECTURE GCP                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                         CLOUD RUN (Serverless)                       │    │
+│  │                                                                       │    │
+│  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐         │    │
+│  │  │   gui     │  │ cv-ingest │  │ ai-assist │  │  matching │         │    │
+│  │  │  Django   │  │  FastAPI  │  │  FastAPI  │  │  FastAPI  │         │    │
+│  │  │  512MB    │  │  1GB      │  │  2GB      │  │  1GB      │         │    │
+│  │  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘         │    │
+│  │        │              │              │              │                │    │
+│  └────────┼──────────────┼──────────────┼──────────────┼────────────────┘    │
+│           │              │              │              │                     │
+│           ▼              ▼              ▼              ▼                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                      VPC CONNECTOR (private)                         │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│           │                             │                                    │
+│           ▼                             ▼                                    │
+│  ┌─────────────────┐           ┌─────────────────┐                          │
+│  │   Cloud SQL     │           │   Memorystore   │                          │
+│  │   PostgreSQL    │           │   (Redis)       │                          │
+│  │   + pgvector    │           │   cache/queue   │                          │
+│  │   db-f1-micro   │           │   1GB           │                          │
+│  └─────────────────┘           └─────────────────┘                          │
+│                                                                              │
+│  ┌─────────────────┐           ┌─────────────────┐                          │
+│  │   Cloud Storage │           │   Vertex AI     │                          │
+│  │   (GCS)         │           │   Embeddings    │                          │
+│  │   CVs, models   │           │   text-embed-004│                          │
+│  └─────────────────┘           └─────────────────┘                          │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                         OPTIONNEL (Analytics)                        │    │
+│  │                                                                       │    │
+│  │  Cloud SQL ──► Dataflow ──► BigQuery ──► Looker Studio              │    │
+│  │  (CDC sync)    (ETL)        (Analytics)   (Dashboard)                │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>Estimation des coûts GCP (mensuel)</h2>
+<h3>Scénario 1 : MVP (&lt; 1000 users/mois)</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Config</th>
+<th>Coût/mois</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cloud Run (4 services)</td>
+<td>512MB-2GB, scale-to-zero</td>
+<td>~5-15$</td>
+</tr>
+<tr>
+<td>Cloud SQL</td>
+<td>db-f1-micro (shared CPU)</td>
+<td>~10$</td>
+</tr>
+<tr>
+<td>Memorystore Redis</td>
+<td>1GB Basic</td>
+<td>~35$</td>
+</tr>
+<tr>
+<td>Cloud Storage</td>
+<td>10GB</td>
+<td>~0.25$</td>
+</tr>
+<tr>
+<td>Vertex AI Embeddings</td>
+<td>10K requêtes</td>
+<td>~2$</td>
+</tr>
+<tr>
+<td><strong>TOTAL MVP</strong></td>
+<td></td>
+<td><strong>~50-60$/mois</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>Scénario 2 : Growth (10K+ users/mois)</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Config</th>
+<th>Coût/mois</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cloud Run (4 services)</td>
+<td>1-4GB, min instances=1</td>
+<td>~80-150$</td>
+</tr>
+<tr>
+<td>Cloud SQL</td>
+<td>db-custom-2-4096 (2 vCPU)</td>
+<td>~70$</td>
+</tr>
+<tr>
+<td>Memorystore Redis</td>
+<td>5GB Standard</td>
+<td>~150$</td>
+</tr>
+<tr>
+<td>Cloud Storage</td>
+<td>100GB</td>
+<td>~2.5$</td>
+</tr>
+<tr>
+<td>Vertex AI Embeddings</td>
+<td>100K requêtes</td>
+<td>~20$</td>
+</tr>
+<tr>
+<td>BigQuery</td>
+<td>100GB stockage</td>
+<td>~2.5$</td>
+</tr>
+<tr>
+<td><strong>TOTAL Growth</strong></td>
+<td></td>
+<td><strong>~300-400$/mois</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>Optimisations coût</h3>
+<ol>
+<li><strong>Committed Use Discounts</strong> : -30% sur Cloud SQL si engagement 1 an</li>
+<li><strong>Cloud Run scale-to-zero</strong> : 0$ la nuit/weekend si pas de trafic</li>
+<li><strong>Preemptible/Spot VMs</strong> : -60% pour les jobs batch (embeddings)</li>
+<li><strong>AlloyDB</strong> : Alternative Cloud SQL si besoin de perf vectorielle extrême</li>
+</ol>
+<hr />
+<h2>Migration vers GCP - Roadmap</h2>
+<h3>Phase 1 : Foundation (Semaine 1-2)</h3>
+<pre><code class="language-bash"># 1. Créer projet GCP
+gcloud projects create jobmatch-prod --name=&quot;JobMatch Production&quot;
+
+# 2. Activer APIs
+gcloud services enable \
+  run.googleapis.com \
+  sqladmin.googleapis.com \
+  redis.googleapis.com \
+  storage.googleapis.com \
+  aiplatform.googleapis.com
+
+# 3. Créer Cloud SQL avec pgvector
+gcloud sql instances create jobmatch-db \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=europe-west1 \
+  --database-flags=cloudsql.enable_pgvector=on
+</code></pre>
+<h3>Phase 2 : Deploy services (Semaine 3-4)</h3>
+<pre><code class="language-yaml"># cloudbuild.yaml
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/gui', '-f', 'app/gui/Dockerfile', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/gui']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gui'
+      - '--image=gcr.io/$PROJECT_ID/gui'
+      - '--region=europe-west1'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=DATABASE_URL=$$DATABASE_URL'
+</code></pre>
+<h3>Phase 3 : pgvector migration (Semaine 5)</h3>
+<pre><code class="language-sql">-- Activer pgvector
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Table offres avec embedding
+CREATE TABLE offers (
+    id VARCHAR(50) PRIMARY KEY,
+    title TEXT,
+    description TEXT,
+    embedding vector(768),  -- dimension du modèle
+    -- autres champs...
+);
+
+-- Index HNSW pour recherche rapide
+CREATE INDEX ON offers USING hnsw (embedding vector_cosine_ops);
+
+-- Recherche des 20 meilleures offres
+SELECT id, title, 1 - (embedding &lt;=&gt; $1) as score
+FROM offers
+ORDER BY embedding &lt;=&gt; $1
+LIMIT 20;
+</code></pre>
+<h3>Phase 4 : Vertex AI embeddings (Semaine 6)</h3>
+<pre><code class="language-python"># Remplacer sentence-transformers local par Vertex AI
+from google.cloud import aiplatform
+
+def get_embedding(text: str) -&gt; list[float]:
+    &quot;&quot;&quot;Generate embedding using Vertex AI.&quot;&quot;&quot;
+    model = aiplatform.TextEmbeddingModel.from_pretrained(&quot;text-embedding-004&quot;)
+    embeddings = model.get_embeddings([text])
+    return embeddings[0].values  # 768 dimensions
+</code></pre>
+<hr />
+<h2>Alternatives selon le budget</h2>
+<h3>Budget serré (&lt; 30$/mois)</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│  Railway.app ou Render.com              │
+│  ─────────────────────────────────────  │
+│  • PostgreSQL inclus (pgvector)         │
+│  • Docker containers                    │
+│  • Auto-deploy from GitHub              │
+│  • ~20-30$/mois pour 4 services         │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Budget moyen (50-100$/mois) - Recommandé</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│  GCP Cloud Run + Cloud SQL              │
+│  ─────────────────────────────────────  │
+│  • Scale-to-zero                        │
+│  • PostgreSQL + pgvector                │
+│  • Vertex AI pour embeddings            │
+│  • ~50-80$/mois                         │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Budget confortable (200-500$/mois)</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│  GCP GKE Autopilot                      │
+│  ─────────────────────────────────────  │
+│  • Kubernetes managé                    │
+│  • Scaling horizontal auto              │
+│  • AlloyDB pour vector search           │
+│  • Monitoring complet                   │
+│  • ~300-500$/mois                       │
+└─────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>Stratégie ML &amp; Embeddings</h2>
+<h3>Phase actuelle : Modèle pré-entraîné (MVP)</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│  APPROCHE MVP - Pas de MLflow nécessaire                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  sentence-transformers/all-MiniLM-L6-v2                         │
+│       │                                                          │
+│       ▼                                                          │
+│  HuggingFace Hub (déjà versionné)                               │
+│       │                                                          │
+│       ▼                                                          │
+│  pip install sentence-transformers                               │
+│       │                                                          │
+│       ▼                                                          │
+│  Téléchargé au démarrage du container                           │
+│                                                                  │
+│  Configuration via variables d'environnement :                  │
+│  EMBEDDING_PROVIDER=sentence_transformers                       │
+│  EMBEDDING_MODEL=all-MiniLM-L6-v2                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Pourquoi pas MLflow maintenant ?</strong>
+- Modèles pré-entraînés = pas d'expériences à tracker
+- Pas de fine-tuning = pas de versions custom à gérer
+- HuggingFace Hub versionne déjà les modèles</p>
+<h3>Phase future : Fine-tuning sur données de candidature</h3>
+<h4>Dataset potentiel</h4>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    DONNÉES DISPONIBLES                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Profils (CV parsés)              Offres (France Travail)       │
+│  ─────────────────                ────────────────────          │
+│  • Expériences                    • Titre + Description          │
+│  • Compétences                    • Compétences requises         │
+│  • Formations                     • Formation exigée             │
+│  • Succès STAR                    • Secteur, lieu, contrat       │
+│                                                                  │
+│                    ┌───────────────┐                            │
+│                    │  CANDIDATURES │                            │
+│                    │  (feedback)   │                            │
+│                    └───────┬───────┘                            │
+│                            │                                     │
+│         ┌──────────────────┼──────────────────┐                 │
+│         ▼                  ▼                  ▼                 │
+│    ┌─────────┐       ┌──────────┐      ┌───────────┐           │
+│    │ Postulé │       │ Entretien│      │ Embauché  │           │
+│    │ (weak)  │       │ (medium) │      │ (strong)  │           │
+│    └─────────┘       └──────────┘      └───────────┘           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h4>Types de fine-tuning possibles</h4>
+<table>
+<thead>
+<tr>
+<th>Approche</th>
+<th>Description</th>
+<th>Dataset format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Embedding fine-tuning</strong></td>
+<td>Contrastive learning (triplet loss)</td>
+<td><code>(cv, offre_positive, offre_negative)</code></td>
+</tr>
+<tr>
+<td><strong>Cross-encoder</strong></td>
+<td>Reranker après vector search</td>
+<td><code>(cv, offre, score: 0-1)</code></td>
+</tr>
+<tr>
+<td><strong>Learning to Rank</strong></td>
+<td>Ranking global par utilisateur</td>
+<td><code>{user, [(offre, relevance), ...]}</code></td>
+</tr>
+</tbody>
+</table>
+<h4>Exemple : Fine-tuning embedding (Contrastive Learning)</h4>
+<pre><code class="language-python"># Dataset format: (anchor, positive, negative)
+training_data = [
+    {
+        &quot;anchor&quot;: &quot;Développeur Python 5 ans, Django, API REST&quot;,  # CV
+        &quot;positive&quot;: &quot;Dev Python Senior - Django - Paris&quot;,         # Offre où postulé
+        &quot;negative&quot;: &quot;Comptable junior - Excel - Lyon&quot;             # Offre non pertinente
+    },
+    # ...
+]
+
+# Modèle: sentence-transformers fine-tuné
+# Loss: MultipleNegativesRankingLoss ou TripletLoss
+from sentence_transformers import SentenceTransformer, losses
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+train_loss = losses.MultipleNegativesRankingLoss(model)
+# ... training loop
+</code></pre>
+<h4>Volume de données nécessaire</h4>
+<table>
+<thead>
+<tr>
+<th>Approche</th>
+<th>Minimum viable</th>
+<th>Idéal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Embedding fine-tuning</td>
+<td>~5K paires</td>
+<td>~50K paires</td>
+</tr>
+<tr>
+<td>Cross-encoder</td>
+<td>~10K exemples</td>
+<td>~100K exemples</td>
+</tr>
+<tr>
+<td>Learning to Rank</td>
+<td>~1K users × 10 offres</td>
+<td>~10K users × 50 offres</td>
+</tr>
+</tbody>
+</table>
+<h3>Quand MLflow devient pertinent</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│  AVEC fine-tuning sur vos données → MLflow fait sens            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. EXPERIMENT TRACKING                                         │
+│     ─────────────────────                                       │
+│     • Comparer base model vs fine-tuned                         │
+│     • Hyperparams: learning rate, epochs, batch size            │
+│     • Métriques: MRR, NDCG, Recall@20                          │
+│                                                                  │
+│  2. MODEL REGISTRY                                              │
+│     ──────────────────                                          │
+│     • v1: all-MiniLM-L6-v2 (baseline)                          │
+│     • v2: fine-tuned sur 1K candidatures                        │
+│     • v3: fine-tuned sur 10K candidatures + feedback           │
+│     • Staging → Production workflow                             │
+│                                                                  │
+│  3. A/B TESTING                                                 │
+│     ────────────                                                │
+│     • 50% users: model v2                                       │
+│     • 50% users: model v3                                       │
+│     • Mesurer: taux de clic, taux de candidature               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Roadmap ML</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Action</th>
+<th>Données requises</th>
+<th>MLflow ?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MVP</strong></td>
+<td>Modèle pré-entraîné (MiniLM, Vertex AI)</td>
+<td>Aucune</td>
+<td>❌ Non</td>
+</tr>
+<tr>
+<td><strong>V1</strong></td>
+<td>Collecter candidatures</td>
+<td>6 mois d'usage</td>
+<td>❌ Non</td>
+</tr>
+<tr>
+<td><strong>V2</strong></td>
+<td>Fine-tune embedding sur candidatures</td>
+<td>~5K paires</td>
+<td>✅ Oui</td>
+</tr>
+<tr>
+<td><strong>V3</strong></td>
+<td>A/B test base vs fine-tuned</td>
+<td>Métriques prod</td>
+<td>✅ Oui</td>
+</tr>
+<tr>
+<td><strong>V4</strong></td>
+<td>Cross-encoder reranker</td>
+<td>~10K exemples</td>
+<td>✅ Oui</td>
+</tr>
+</tbody>
+</table>
+<h3>Architecture ML avec MLflow (Phase V2+)</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    ARCHITECTURE ML (future)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────┐     ┌─────────────────┐                    │
+│  │  Training Job   │     │   MLflow Server │                    │
+│  │  (Vertex AI ou  │────►│   (tracking +   │                    │
+│  │   local GPU)    │     │    registry)    │                    │
+│  └─────────────────┘     └────────┬────────┘                    │
+│                                   │                              │
+│                                   ▼                              │
+│                          ┌─────────────────┐                    │
+│                          │  Model Registry │                    │
+│                          │  v1 (baseline)  │                    │
+│                          │  v2 (fine-tuned)│                    │
+│                          │  v3 (improved)  │                    │
+│                          └────────┬────────┘                    │
+│                                   │                              │
+│              ┌────────────────────┼────────────────────┐        │
+│              ▼                    ▼                    ▼        │
+│     ┌─────────────┐      ┌─────────────┐      ┌─────────────┐  │
+│     │  Prod (v2)  │      │ Staging(v3) │      │  A/B Test   │  │
+│     │  matching   │      │   testing   │      │  50/50      │  │
+│     └─────────────┘      └─────────────┘      └─────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Métriques à collecter (dès maintenant)</h3>
+<p>Pour préparer le fine-tuning futur, commencer à logger :</p>
+<pre><code class="language-python"># Dans le GUI, tracker les interactions utilisateur
+class OfferInteraction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    offer_external_id = models.CharField(max_length=50)
+    match_score = models.FloatField()  # Score du matching initial
+
+    # Interactions (feedback implicite)
+    viewed = models.BooleanField(default=False)
+    viewed_at = models.DateTimeField(null=True)
+    time_spent_seconds = models.IntegerField(default=0)
+
+    # Actions (feedback explicite)
+    saved = models.BooleanField(default=False)
+    applied = models.BooleanField(default=False)
+    applied_at = models.DateTimeField(null=True)
+
+    # Outcome (feedback fort - si disponible)
+    got_interview = models.BooleanField(null=True)
+    got_hired = models.BooleanField(null=True)
+
+    class Meta:
+        unique_together = ['user', 'offer_external_id']
+</code></pre>
+<p>Ces données permettront de construire le dataset de fine-tuning quand le volume sera suffisant.</p>
+<hr />
+<h2>Checklist "Top niveau Data Engineer"</h2>
+<h3>Code &amp; Architecture</h3>
+<ul>
+<li>[ ] <strong>pgvector</strong> : Recherche vectorielle en SQL, pas en Python</li>
+<li>[ ] <strong>Pydantic v2</strong> : Validation des schémas d'API</li>
+<li>[ ] <strong>OpenAPI/Swagger</strong> : Documentation auto des APIs</li>
+<li>[ ] <strong>Async everywhere</strong> : FastAPI async, asyncpg pour PostgreSQL</li>
+<li>[ ] <strong>Dependency injection</strong> : Facilite les tests</li>
+</ul>
+<h3>Data Pipeline</h3>
+<ul>
+<li>[ ] <strong>Medallion architecture</strong> : Bronze → Silver → Gold (déjà fait pour offres)</li>
+<li>[ ] <strong>Idempotent jobs</strong> : Re-run sans effets de bord</li>
+<li>[ ] <strong>Data lineage</strong> : Traçabilité des transformations</li>
+<li>[ ] <strong>Schema registry</strong> : Versioning des schémas de données</li>
+</ul>
+<h3>DevOps &amp; Observability</h3>
+<ul>
+<li>[ ] <strong>IaC (Terraform/Pulumi)</strong> : Infrastructure as Code</li>
+<li>[ ] <strong>GitOps (ArgoCD)</strong> : Déploiements déclaratifs</li>
+<li>[ ] <strong>Prometheus + Grafana</strong> : Métriques custom</li>
+<li>[ ] <strong>Structured logging</strong> : JSON logs avec correlation IDs</li>
+<li>[ ] <strong>Distributed tracing</strong> : Jaeger/OpenTelemetry</li>
+</ul>
+<h3>Sécurité</h3>
+<ul>
+<li>[ ] <strong>Secrets management</strong> : GCP Secret Manager, pas de .env</li>
+<li>[ ] <strong>Service accounts</strong> : Principe du moindre privilège</li>
+<li>[ ] <strong>VPC + Private IPs</strong> : Pas d'exposition publique des DBs</li>
+<li>[ ] <strong>IAM policies</strong> : Accès granulaires par service</li>
+</ul>
+<hr />
+<h2>References</h2>
+<ul>
+<li><a href="interface_gui_offers.md">interface_gui_offers.md</a> - Analyse base SQLite offers.db</li>
+<li><a href="https://cloud.google.com/run/docs">GCP Cloud Run Documentation</a></li>
+<li><a href="https://github.com/pgvector/pgvector">pgvector GitHub</a></li>
+<li><a href="https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings">Vertex AI Embeddings</a></li>
+<li>POSTMORTEM.md - Historique des décisions techniques</li>
+</ul>
+</body>
+</html>

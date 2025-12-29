@@ -3,13 +3,14 @@ This module matches a CV description embedding against job offers embeddings sto
 
 """
 import sys
+from os.path import exists
 import numpy as np
 import sqlalchemy as db
 from sqlalchemy import create_engine, text
 from pathlib import Path
 
 # Import de la fonction de similarité depuis le shared module
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "shared" / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "shared" / "src"))
 from shared.embeddings import TextSimilarity
 from shared.embeddings.providers import create_sentence_transformers_embedder
 
@@ -81,12 +82,14 @@ def load_dtb(db_path, mode="gold"):
     return offers
 
 
-def main(cv_embedded, job_offers_db_path, method="description"):
+def match_cv(title_embedded, description_embedded,
+             job_offers_db_path, method="description"):
     """
-    Match a CV embedding against job offers embeddings stored in a sqlite database.
+    Match CV title and description embeddings against job offers embeddings stored in a sqlite database.
 
     Args:
-        cv_embedded (np.ndarray): Embedding of the CV description.
+        title_embedded (np.ndarray): Embedding of the CV title.
+        description_embedded (np.ndarray): Embedding of the CV description.
         job_offers_db_path (str): Path to the job offers sqlite database.
         method (str): "intitule", "description" or "mix" to select matching method.
     Returns:
@@ -99,16 +102,16 @@ def main(cv_embedded, job_offers_db_path, method="description"):
     similarities = []
     for offer in offers:
         if method == "intitule":
-            sim = TextSimilarity.cosine_similarity(cv_embedded, offer["intitule_embedded"])
+            sim = TextSimilarity.cosine_similarity(title_embedded, offer["intitule_embedded"])
         elif method == "description":
-            sim = TextSimilarity.cosine_similarity(cv_embedded, offer["description_embedded"])
+            sim = TextSimilarity.cosine_similarity(description_embedded, offer["description_embedded"])
         elif method == "mix":
             # compute average embedding
             v1 = offer["intitule_embedded"]
             v2 = offer["description_embedded"]
             # avg_embarr = (v1 + v2) / 2
-            sim1 = TextSimilarity.cosine_similarity(cv_embedded, v1)
-            sim2 = TextSimilarity.cosine_similarity(cv_embedded, v2)
+            sim1 = TextSimilarity.cosine_similarity(title_embedded, v1)
+            sim2 = TextSimilarity.cosine_similarity(description_embedded, v2)
             sim = (sim1 + sim2) / 2
 
         similarities.append({"id": offer["id"], "similarity": sim})
@@ -123,33 +126,40 @@ def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
                     job_offers_gold_db_path=SAMPLE_GOLD,
                     job_offers_silver_db_path=SAMPLE_SILVER):
     """Test the matching function with a user-provided CV description."""
+    # 
+    assert exists(job_offers_gold_db_path), f"Gold database not found: {job_offers_gold_db_path}"
+    assert exists(job_offers_silver_db_path), f"Silver database not found: {job_offers_silver_db_path}"
+
     # init embedder    
     embedder = create_sentence_transformers_embedder(model="all-MiniLM-L6-v2", normalize=True)
 
     # Compute embedding for the CV description
-    cv_embedded = embedder([cv_description])
-    cv_embedded = cv_embedded[0]
+    description_embedded = embedder([cv_description])
+    description_embedded = description_embedded[0]
     # test the matching function
 
-    similarites_mix = main(
-        cv_embedded,
-        job_offers_gold_db_path,
+    similarites_mix = match_cv(
+        title_embedded=description_embedded,
+        description_embedded=description_embedded,
+        job_offers_db_path=job_offers_gold_db_path,
         method="mix"
     )
     top_matches_mix = similarites_mix[:5]
     bottom_matches_mix = similarites_mix[-5:]
 
-    similarites_title = main(
-        cv_embedded,
-        job_offers_gold_db_path,
+    similarites_title = match_cv(
+        title_embedded=description_embedded,
+        description_embedded=description_embedded,
+        job_offers_db_path=job_offers_gold_db_path,
         method="intitule"
     )
     top_matches_title = similarites_title[:5]
     bottom_matches_title = similarites_title[-5:]
 
-    similarites_description = main(
-        cv_embedded,
-        job_offers_gold_db_path,
+    similarites_description = match_cv(
+        title_embedded=description_embedded,
+        description_embedded=description_embedded,
+        job_offers_db_path=job_offers_gold_db_path,
         method="description"
     )
     top_matches_description = similarites_description[:5]

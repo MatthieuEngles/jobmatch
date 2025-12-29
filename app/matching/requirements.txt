@@ -1,4 +1,7 @@
-pytest
+fastapi
 numpy
-sqlalchemy
+pydantic
+pytest
 sentence-transformers
+sqlalchemy
+uvicorn

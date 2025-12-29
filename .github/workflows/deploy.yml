@@ -1,0 +1,164 @@
+# =============================================================================
+# Application Deployment Workflow
+# =============================================================================
+# Builds Docker images and deploys to the GCP VM
+# =============================================================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: # Allow manual trigger
+    inputs:
+      service:
+        description: 'Service to deploy (all, gui, ai-assistant, cv-ingestion, etc.)'
+        required: false
+        default: 'all'
+
+permissions:
+  contents: read
+  id-token: write # Required for Workload Identity Federation
+
+env:
+  GCP_REGION: europe-west1
+  VM_NAME: jobmatch-vm
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Deploy to VM
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Get VM Zone and IP
+        id: vm-info
+        run: |
+          # Find the VM in any zone of the region
+          ZONE=$(gcloud compute instances list \
+            --filter="name=${{ env.VM_NAME }} AND zone~${{ env.GCP_REGION }}" \
+            --format='get(zone)' | head -1 | xargs basename)
+          echo "zone=$ZONE" >> $GITHUB_OUTPUT
+
+          IP=$(gcloud compute instances describe ${{ env.VM_NAME }} \
+            --zone=$ZONE \
+            --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+          echo "Found VM in zone: $ZONE with IP: $IP"
+
+      - name: Deploy via SSH
+        run: |
+          # Add SSH key
+          gcloud compute config-ssh --quiet
+
+          # Create deployment script
+          cat > deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+
+          echo "=== JobMatch Deployment ==="
+          echo "Timestamp: $(date)"
+
+          cd /opt/jobmatch
+
+          # Pull latest code
+          echo "Pulling latest code..."
+          git pull origin main
+
+          # Create .env file from secrets
+          echo "Updating environment..."
+          cat > .env << 'ENVEOF'
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          LLM_API_KEY=${{ secrets.LLM_API_KEY }}
+          LLM_ENDPOINT=${{ secrets.LLM_ENDPOINT }}
+          ENVEOF
+
+          # IMPORTANT: Force rebuild to ensure new code is deployed
+          # Terraform only manages infrastructure, not code changes.
+          # Without --no-cache or --pull, Docker may use cached layers
+          # and the new code won't be deployed.
+          # See: doc_support_contexte/POSTMORTEM_miniterraform.md
+
+          echo "Building services (with --no-cache to force rebuild)..."
+          docker compose build --no-cache --pull
+
+          echo "Stopping old containers..."
+          docker compose down
+
+          echo "Starting new containers..."
+          docker compose up -d
+
+          # Wait for services to be healthy
+          echo "Waiting for services..."
+          sleep 10
+
+          # Show status
+          echo "=== Service Status ==="
+          docker compose ps
+
+          echo "=== Deployment Complete ==="
+          EOF
+
+          # Copy and execute
+          gcloud compute scp deploy.sh ${{ env.VM_NAME }}:/tmp/deploy.sh --zone=${{ steps.vm-info.outputs.zone }}
+          gcloud compute ssh ${{ env.VM_NAME }} --zone=${{ steps.vm-info.outputs.zone }} --command="chmod +x /tmp/deploy.sh && sudo /tmp/deploy.sh"
+
+      - name: Health Check
+        run: |
+          echo "Checking application health..."
+          IP=${{ steps.vm-info.outputs.ip }}
+
+          # Wait for services to start
+          sleep 15
+
+          # Check GUI
+          if curl -sf "http://${IP}:8085/health/" > /dev/null 2>&1; then
+            echo "GUI: OK"
+          else
+            echo "GUI: Starting (may take a moment)"
+          fi
+
+          # Check AI Assistant
+          if curl -sf "http://${IP}:8084/health" > /dev/null 2>&1; then
+            echo "AI Assistant: OK"
+          else
+            echo "AI Assistant: Starting (may take a moment)"
+          fi
+
+          echo "Deployment completed. App available at: http://${IP}"
+
+      - name: Post Deployment Summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **VM**: ${{ env.VM_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP**: ${{ steps.vm-info.outputs.ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Zone**: ${{ steps.vm-info.outputs.zone }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

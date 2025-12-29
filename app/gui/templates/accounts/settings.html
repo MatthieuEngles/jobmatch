@@ -364,6 +364,162 @@
         font-size: 0.7rem;
         color: #f59e0b;
     }
+
+    /* Autonomy slider styles */
+    .autonomy-slider-container {
+        margin-top: 0.5rem;
+    }
+
+    .autonomy-slider {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(to right, #e5e7eb 0%, #6366f1 100%);
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .autonomy-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+        transition: transform 0.2s;
+    }
+
+    .autonomy-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    .autonomy-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+    }
+
+    .autonomy-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.75rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    .autonomy-label {
+        text-align: center;
+        flex: 1;
+        transition: color 0.2s, font-weight 0.2s;
+    }
+
+    .autonomy-label.active {
+        color: #6366f1;
+        font-weight: 600;
+    }
+
+    .autonomy-description {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #f5f3ff;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #4c1d95;
+        min-height: 60px;
+    }
+
+    /* Template selector styles */
+    .template-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .template-option {
+        display: block;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        overflow: hidden;
+    }
+
+    .template-option:hover {
+        border-color: #6366f1;
+        background: #faf5ff;
+    }
+
+    .template-option.selected {
+        border-color: #6366f1;
+        background: linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%);
+    }
+
+    .template-option input {
+        display: none;
+    }
+
+    .template-preview {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .template-color-bar {
+        width: 6px;
+        flex-shrink: 0;
+    }
+
+    .template-info {
+        padding: 1rem;
+        flex: 1;
+    }
+
+    .template-name {
+        font-weight: 600;
+        color: #1a1a2e;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .template-check {
+        display: none;
+        width: 18px;
+        height: 18px;
+        color: #10b981;
+    }
+
+    .template-option.selected .template-check {
+        display: inline-block;
+    }
+
+    .template-badge {
+        font-size: 0.65rem;
+        font-weight: 500;
+        background: #6366f1;
+        color: white;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        text-transform: uppercase;
+    }
+
+    .template-details {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    .template-description {
+        font-size: 0.8rem;
+        color: #4b5563;
+        margin-top: 0.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -548,6 +704,92 @@
         </div>
     </section>
 
+    <!-- AI Preferences Section -->
+    <section class="settings-section">
+        <div class="settings-section-header">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <h2>Preferences IA</h2>
+        </div>
+        <div class="settings-section-content">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="ai_preferences">
+                <div class="form-group">
+                    <label class="form-label">Niveau d'autonomie de l'assistant IA</label>
+                    <p class="help-text" style="margin-bottom: 1rem;">
+                        Ajustez le niveau d'initiative de l'IA lors de la creation de vos succes professionnels et pitchs.
+                    </p>
+                    <div class="autonomy-slider-container">
+                        <input type="range" name="ai_autonomy_level" id="ai_autonomy_level"
+                               min="1" max="5" value="{{ user.ai_autonomy_level }}"
+                               class="autonomy-slider">
+                        <div class="autonomy-labels">
+                            <span class="autonomy-label" data-level="1">Guide</span>
+                            <span class="autonomy-label" data-level="2">Assiste</span>
+                            <span class="autonomy-label" data-level="3">Collaboratif</span>
+                            <span class="autonomy-label" data-level="4">Proactif</span>
+                            <span class="autonomy-label" data-level="5">Autonome</span>
+                        </div>
+                        <div class="autonomy-description" id="autonomy-description">
+                            <!-- Filled by JS based on selected level -->
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn-save">Enregistrer</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- DOCX Template Section -->
+    <section class="settings-section">
+        <div class="settings-section-header">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h2>Template d'export Word</h2>
+        </div>
+        <div class="settings-section-content">
+            <p class="help-text" style="margin-bottom: 1rem;">
+                Choisissez le template de mise en forme pour vos CV et lettres de motivation exportes en Word.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="docx_template">
+                <div class="template-selector">
+                    {% for template in docx_templates %}
+                    <label class="template-option {% if user.docx_template_id == template.id or not user.docx_template_id and template.is_default %}selected{% endif %}">
+                        <input type="radio" name="docx_template_id" value="{{ template.id }}"
+                               {% if user.docx_template_id == template.id or not user.docx_template_id and template.is_default %}checked{% endif %}>
+                        <div class="template-preview">
+                            <div class="template-color-bar" style="background-color: {{ template.accent_color }};"></div>
+                            <div class="template-info">
+                                <div class="template-name">
+                                    <svg class="template-check" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    {{ template.name }}
+                                    {% if template.is_default %}<span class="template-badge">Par defaut</span>{% endif %}
+                                </div>
+                                <div class="template-details">{{ template.font_name }} - Corps {{ template.font_size_body|divisibleby:2 }}pt</div>
+                                {% if template.description %}
+                                <div class="template-description">{{ template.description }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </label>
+                    {% empty %}
+                    <p style="color: #6b7280;">Aucun template disponible.</p>
+                    {% endfor %}
+                </div>
+                {% if docx_templates %}
+                <button type="submit" class="btn-save" style="margin-top: 1rem;">Enregistrer</button>
+                {% endif %}
+            </form>
+        </div>
+    </section>
+
     <!-- LLM Configuration Section - Only for Premium+ plans -->
     {% if user.subscription_tier != 'free' and user.subscription_tier != 'basic' %}
     <section class="settings-section">
@@ -650,6 +892,45 @@
     document.querySelectorAll('.plan-option').forEach(option => {
         option.addEventListener('click', function() {
             document.querySelectorAll('.plan-option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+        });
+    });
+
+    // Autonomy slider interactivity
+    const autonomyDescriptions = {
+        1: "<strong>Guide</strong> : L'IA pose des questions ouvertes simples. Vous redigez tout vous-meme.",
+        2: "<strong>Assiste</strong> : L'IA propose des choix multiples bases sur votre profil. Vous choisissez parmi les options.",
+        3: "<strong>Collaboratif</strong> : L'IA suggere des ebauches que vous completez ou modifiez.",
+        4: "<strong>Proactif</strong> : L'IA genere des propositions completes a valider ou ajuster.",
+        5: "<strong>Autonome</strong> : L'IA genere le contenu complet. Vous validez ou demandez des modifications."
+    };
+
+    const autonomySlider = document.getElementById('ai_autonomy_level');
+    const autonomyDescription = document.getElementById('autonomy-description');
+    const autonomyLabels = document.querySelectorAll('.autonomy-label');
+
+    function updateAutonomyDisplay(level) {
+        autonomyDescription.innerHTML = autonomyDescriptions[level];
+        autonomyLabels.forEach(label => {
+            const labelLevel = parseInt(label.dataset.level);
+            label.classList.toggle('active', labelLevel === level);
+        });
+    }
+
+    if (autonomySlider) {
+        // Initial display
+        updateAutonomyDisplay(parseInt(autonomySlider.value));
+
+        // Update on change
+        autonomySlider.addEventListener('input', function() {
+            updateAutonomyDisplay(parseInt(this.value));
+        });
+    }
+
+    // Template selector interactivity
+    document.querySelectorAll('.template-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
             this.classList.add('selected');
         });
     });

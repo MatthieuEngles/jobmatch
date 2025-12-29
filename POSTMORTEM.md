@@ -2,6 +2,926 @@
 
 ## 📅 Sessions
 
+### 2025-12-29 (31) - Infrastructure Terraform GCP + CI/CD GitHub Actions
+
+**Contexte:** Création de l'infrastructure de déploiement V0 sur Google Cloud Platform avec Terraform et CI/CD via GitHub Actions.
+
+**Réalisations:**
+
+- **Documentation architecture** (`infra/docs/`) :
+  - `ARCHITECTURE_V0.md` : Schéma complet de l'infra (VM, VPC, Storage, BigQuery), estimation coûts (~32€/mois), flux de données, CI/CD
+  - `GCP_IAM_GUIDE.md` : Guide complet gestion des droits IAM, Workload Identity Federation, ajout collègues
+
+- **Terraform complet** (`infra/terraform/`) :
+  - `main.tf` : Provider GCP, backend GCS, activation APIs
+  - `variables.tf` : Toutes les variables configurables
+  - `network.tf` : VPC custom, subnet, IP statique, firewall (22, 80, 443)
+  - `vm.tf` : VM e2-medium Ubuntu 22.04 avec startup script (Docker, Caddy, Git)
+  - `storage.tf` : Buckets bronze (offres JSON) + backups avec lifecycle policies
+  - `bigquery.tf` : Datasets silver/gold avec tables offers, skills, formations, etc.
+  - `iam.tf` : 3 Service Accounts (vm, terraform, deploy) + Workload Identity Federation
+  - `outputs.tf` : Outputs utiles (IP, SSH command, secrets GitHub)
+
+- **GitHub Actions CI/CD** (`.github/workflows/`) :
+  - `terraform.yml` : Plan sur PR, Apply sur push main
+  - `deploy.yml` : Build Docker + deploy sur VM via SSH
+
+**Problèmes rencontrés:**
+
+- **Variable `$PROJECT_ID` non définie** :
+  - Symptôme : `gsutil mb` échoue avec "Invalid bucket name"
+  - Solution : Utiliser `$(gcloud config get-value project)` ou hardcoder `job-match-v0`
+
+- **Billing account not linked** :
+  - Symptôme : `gcloud services enable` échoue avec FAILED_PRECONDITION
+  - Solution : Activer la facturation via Console GCP avant d'activer les APIs
+  - Documenté dans GCP_IAM_GUIDE.md comme étape obligatoire
+
+- **Terraform ne déploie pas les changements de code** (cf. POSTMORTEM_miniterraform) :
+  - Cause : Terraform compare la configuration, pas le contenu des images Docker
+  - Solution : `docker compose build --no-cache --pull` + `down` + `up -d` dans deploy.yml
+
+**Décisions techniques:**
+
+- **Workload Identity Federation** (pas de clé JSON) : Méthode recommandée par Google, pas de secret à gérer
+- **VM unique avec docker-compose** : Simple pour V0, migration vers Cloud Run possible en V1
+- **Caddy sur VM** : SSL automatique avec Let's Encrypt, gratuit
+- **IP statique** : Stabilité DNS, gratuit si attachée à une VM
+- **BigQuery pour Silver/Gold** : Analytics, pas de serveur à gérer
+- **Backend GCS pour Terraform** : State partagé entre CI/CD et local
+
+**Fichiers créés:**
+```
+infra/
+├── docs/
+│   ├── ARCHITECTURE_V0.md
+│   └── GCP_IAM_GUIDE.md
+└── terraform/
+    ├── main.tf
+    ├── variables.tf
+    ├── network.tf
+    ├── vm.tf
+    ├── storage.tf
+    ├── bigquery.tf
+    ├── iam.tf
+    ├── outputs.tf
+    ├── terraform.tfvars.example
+    └── .gitignore
+.github/workflows/
+├── terraform.yml
+└── deploy.yml
+```
+
+**Prochaines étapes:**
+1. Créer le bucket Terraform state : `gsutil mb -l EU gs://jobmatch-terraform-state-job-match-v0`
+2. Configurer les secrets GitHub
+3. Premier `terraform init` + `terraform apply`
+4. Configurer DNS vers IP statique
+
+---
+
+### 2025-12-29 (30) - Local Ollama Docker + README + Debug cv-ingestion LLM
+
+**Contexte:** Ajouter un serveur Ollama local en Docker avec modèles Mistral pré-téléchargés, créer le README global du projet, et débugger les problèmes de connexion LLM pour cv-ingestion.
+
+**Réalisations:**
+
+- **Service local-ollama Docker** :
+  - Nouveau dossier `app/local_ollama/` avec Dockerfile et entrypoint
+  - Modèles `mistral:latest` et `mistral:7b` téléchargés au build
+  - Service ajouté dans docker-compose.yml (port 11434)
+  - Volume `ollama_data` pour persister les modèles
+
+- **README.md global** :
+  - Architecture du projet avec arborescence
+  - Table des services avec ports et status (OK/WIP)
+  - Instructions de démarrage (docker-compose + dev.sh)
+  - Documentation de tous les services : gui, ai-assistant, cv-ingestion, offre-ingestion, matching, local-ollama
+  - Configuration et variables d'environnement
+  - Stack technique et conventions
+
+- **Documentation schémas Django** :
+  - Explication du modèle User (AbstractUser avec préférences)
+  - Explication du modèle CandidateProfile
+  - Relation CandidateProfile ↔ ExtractedLine via ProfileItemSelection (N:N)
+
+**Problèmes rencontrés:**
+
+- **cv-ingestion : "model 'ministral-3:14b' not found"** :
+  - Symptôme : Erreur 404 sur l'endpoint `/v1/chat/completions`
+  - Cause : Le serveur distant `llm.molp.fr` expose l'API Ollama native (`/api/tags`, `/api/generate`) mais l'API OpenAI-compatible (`/v1/models`, `/v1/chat/completions`) ne liste aucun modèle
+  - Le SDK OpenAI utilisé par cv-ingestion appelle `/v1/chat/completions` qui retourne "model not found"
+  - `/api/tags` montre les modèles mais `/v1/models` retourne une liste vide
+  - Status : Non résolu - problème côté serveur `llm.molp.fr`
+
+**Décisions techniques:**
+
+- **Modèles téléchargés au build** : Plutôt qu'au runtime (entrypoint), pour un démarrage plus rapide des containers
+- **Volume Docker pour Ollama** : Les modèles sont volumineux (~4GB), évite de re-télécharger à chaque rebuild
+- **README structuré par service** : Chaque microservice a sa section avec exemples curl
+
+**Fichiers créés/modifiés:**
+- `app/local_ollama/Dockerfile` : Image Ollama avec pull des modèles
+- `app/local_ollama/entrypoint.sh` : Script de démarrage simplifié
+- `docker-compose.yml` : Service local-ollama + volume ollama_data
+- `README.md` : Documentation complète du projet (nouveau fichier)
+
+---
+
+### 2025-12-24 (29) - Boutons Voir/Télécharger DOCX pour CV et Lettre
+
+**Contexte:** Améliorer l'UX de la page candidature en ajoutant des boutons d'action (voir/télécharger) pour les documents générés, avec export DOCX.
+
+**Réalisations:**
+
+- **Nouveau layout document-item** :
+  - Remplacé les simples boutons texte par des cartes `.document-item` avec icônes d'action
+  - Deux boutons par document : œil (voir) et flèche (télécharger DOCX)
+  - Design cohérent avec hover effet violet
+
+- **Export DOCX avec docx.js** :
+  - Chargement dynamique de la librairie docx.js depuis unpkg CDN
+  - Parsing intelligent du contenu : détection des headers `--- TITLE ---`, bullet points, paragraphes
+  - Formatage DOCX avec titres colorés (#667eea), bullet points natifs
+  - Nommage fichier avec nom entreprise slugifié
+
+- **Amélioration modal preview** :
+  - Ajout bouton "Télécharger DOCX" dans le footer de la modal
+  - Variable `currentPreviewType` pour savoir quel document est affiché
+
+**Fonctions JavaScript ajoutées:**
+- `downloadDocx(type)` : télécharge CV ou lettre selon le type
+- `downloadCurrentDocx()` : télécharge le document actuellement prévisualisé
+- `generateDocx(content, title, fileName)` : génère et télécharge le DOCX
+
+**Fichiers modifiés:**
+- `app/gui/templates/accounts/application_detail.html` : CSS + JS + HTML pour boutons action
+
+---
+
+### 2025-12-24 (28) - Génération CV/Lettre de motivation + Fix async pattern
+
+**Contexte:** Implémentation de la génération IA de CV et lettres de motivation personnalisés pour les candidatures, avec correction du pattern async pour éviter les timeouts.
+
+**Réalisations:**
+
+- **Génération de CV personnalisé** :
+  - Nouveau prompt `cv_generation.txt` avec optimisation ATS (intitulé proche de l'offre, mots-clés exacts)
+  - Ajout des liens sociaux (LinkedIn, Portfolio, GitHub) dans le CV
+  - Endpoint FastAPI `/generate/cv` avec task_id + polling
+
+- **Génération de lettre de motivation** :
+  - Nouveau prompt `cover_letter_generation.txt`
+  - Utilise le CV généré comme référence pour cohérence
+  - Endpoint FastAPI `/generate/cover-letter`
+
+- **Schémas Pydantic** (schemas.py) :
+  - `CandidateContext` : profil complet avec social_links
+  - `JobOfferContext` : offre cible
+  - `GenerateCVRequest/Response`, `GenerateCoverLetterRequest/Response`
+  - `GenerationTaskStatusResponse` pour le polling
+
+- **UI génération** (application_detail.html) :
+  - Boutons "Générer CV" et "Générer la lettre"
+  - Animation loading pendant la génération
+  - Polling status toutes les 2 secondes
+  - Modal de preview pour visualiser les documents générés
+  - Sauvegarde automatique en base après génération
+
+- **Documentation pattern async** (docs/ASYNC_PATTERNS.md) :
+  - Explication complète du problème de timeout
+  - Diagramme du flow task_id + polling
+  - Exemples code FastAPI, Django, JavaScript
+  - Pièges à éviter (BackgroundTasks vs create_task, to_thread)
+
+**Problèmes rencontrés:**
+
+- **"Service IA indisponible" (timeout 10s)** :
+  - Symptôme : Django timeout après 10s, mais ai-assistant génère bien le CV (30s)
+  - Cause : `BackgroundTasks.add_task()` n'est pas vraiment async - attend la fin de la fonction
+  - Cause 2 : `provider.chat()` est synchrone, bloque l'event loop même dans une fonction `async`
+
+- **Solution double** :
+  1. Remplacer `background_tasks.add_task(fn)` par `asyncio.create_task(fn())` pour retourner immédiatement
+  2. Utiliser `asyncio.to_thread(provider.chat, ...)` pour exécuter l'appel LLM synchrone dans un thread séparé
+
+- **docker-compose KeyError 'ContainerConfig'** :
+  - Bug de docker-compose avec des containers stale
+  - Solution : `docker-compose stop svc && docker-compose rm -f svc && docker-compose up -d svc`
+
+**Décisions techniques:**
+
+- **Task-based polling plutôt que streaming** : Pour génération one-shot (CV, lettre), le polling est plus simple et robuste que SSE
+- **asyncio.create_task() plutôt que BackgroundTasks** : Seule façon d'avoir une vraie exécution non-bloquante avec FastAPI
+- **asyncio.to_thread() pour LLM calls** : Les SDKs OpenAI/Anthropic sont synchrones, nécessitent un thread pool
+- **Documentation dédiée** : Pattern async suffisamment complexe pour mériter un fichier docs/ASYNC_PATTERNS.md
+
+**Fichiers créés/modifiés:**
+- `app/ai-assistant/src/main.py` : asyncio.create_task() pour génération
+- `app/ai-assistant/src/llm/chat_handler.py` : asyncio.to_thread() pour LLM calls + social_links
+- `app/ai-assistant/src/prompts/cv_generation.txt` : prompt CV avec ATS
+- `app/ai-assistant/src/schemas.py` : CandidateContext.social_links
+- `app/gui/accounts/views.py` : endpoints génération + status polling + save
+- `app/gui/templates/accounts/application_detail.html` : UI génération complète
+- `docs/ASYNC_PATTERNS.md` : documentation pattern pending/done
+
+---
+
+### 2025-12-24 (27) - Candidatures sur Home + Fix ENV_MODE Docker + Migrations
+**Contexte:** Afficher les candidatures récentes sur la page d'accueil et résoudre les problèmes de configuration Docker (ENV_MODE, base de données).
+
+**Réalisations:**
+
+- **Affichage candidatures sur page d'accueil** :
+  - Nouvelle vue `HomeView` dans `config/views.py` (remplace `TemplateView` générique)
+  - Passe `recent_applications` (3 dernières) et `applications_count` au template
+  - Mini-cartes dans la section "Suivi des candidatures" avec : entreprise, status coloré, titre
+  - Badge compteur dans le header de la carte
+  - Lien "Voir toutes mes candidatures (N)"
+
+- **Styles CSS pour mini-cartes** :
+  - `.application-mini-card` avec bordure gauche colorée
+  - Badges status colorés : `.app-status-added` (gris), `.app-status-in_progress` (bleu), `.app-status-applied` (orange), `.app-status-interview` (violet), `.app-status-accepted` (vert), `.app-status-rejected` (rouge)
+
+- **Fix ENV_MODE dans docker-compose.yml** :
+  - Ajout `ENV_MODE=dev` pour le service gui
+  - Ajout variables PostgreSQL : `POSTGRES_HOST=db`, `POSTGRES_PORT=5432`, etc.
+  - Suppression dépendances vers services non implémentés (cv-ingestion, ai-assistant)
+
+- **Commande `full-restart` dans dev.sh** :
+  - `./dev.sh full-restart [svc]` : stop + rm + build + up
+  - Message d'aide amélioré avec liste formatée
+
+- **Fix IntegrityError sur import d'offre** :
+  - Remplacé `Application.objects.create()` par `get_or_create()` dans `ImportOfferView`
+  - Évite erreur si l'Application existe déjà pour ce user+offre
+
+**Problèmes rencontrés:**
+- **`no such table: accounts_application`** (SQLite erreur) :
+  - Cause : `ENV_MODE` non défini → Django utilisait mode "local" mais psycopg2 absent → fallback SQLite
+  - Solution : ajouter `ENV_MODE=dev` dans docker-compose.yml pour forcer PostgreSQL
+
+- **`relation "accounts_application" does not exist`** (PostgreSQL erreur) :
+  - Cause : migration créée dans le container mais pas persistée dans le code source
+  - Solution : `docker cp` pour récupérer la migration, puis `makemigrations && migrate`
+
+- **Base de données vide après full-restart** :
+  - Cause : nouveau container avec PostgreSQL vide (pas de user)
+  - Solution : créer superuser via `manage.py shell`
+
+**Décisions techniques:**
+- **Vue HomeView plutôt que TemplateView** : nécessaire pour passer le contexte dynamique (candidatures)
+- **get_or_create pour Application** : idempotent, évite les erreurs de doublon
+- **docker cp pour migrations** : récupérer les fichiers générés dans le container vers le code source
+
+**Fichiers créés/modifiés:**
+- `app/gui/config/views.py` : nouvelle HomeView
+- `app/gui/config/urls.py` : utilise HomeView au lieu de TemplateView
+- `app/gui/templates/home.html` : mini-cartes candidatures + CSS
+- `docker-compose.yml` : ENV_MODE=dev + variables PostgreSQL
+- `dev.sh` : commande full-restart + aide améliorée
+- `app/gui/api/views.py` : get_or_create pour Application
+- `app/gui/accounts/migrations/0016_add_application_model.py` : migration Application
+
+---
+
+### 2025-12-24 (26) - Dev Workflow + Base de données partagée + Script dev.sh
+**Contexte:** Résoudre le problème de perte de données entre les rebuilds Docker et améliorer le workflow de développement.
+
+**Réalisations:**
+
+- **Base de données partagée Local/Docker** :
+  - Avant : Local utilisait SQLite, Docker utilisait PostgreSQL → données séparées
+  - Après : Les deux modes utilisent le même PostgreSQL Docker
+  - Local se connecte via `localhost:5433` (port exposé)
+  - Docker se connecte via `db:5432` (réseau interne)
+  - Modification dans `settings.py` : config DB unifiée
+
+- **Script interactif `dev.sh`** :
+  - Menu interactif avec emojis et couleurs
+  - Affichage du status des containers au démarrage
+  - Sous-menus : Start, Stop, Rebuild, Logs, Shell, Migrations, Reset DB
+  - Mode rapide en ligne de commande : `./dev.sh start`, `./dev.sh rebuild gui`, etc.
+  - Gestion gracieuse des services non implémentés (skip avec warning)
+  - Option "Start core services only" pour ne démarrer que db + gui
+
+- **Commandes rapides disponibles** :
+  ```bash
+  ./dev.sh start              # Démarre db + gui
+  ./dev.sh stop               # Arrête tout (données préservées)
+  ./dev.sh rebuild gui        # Rebuild + restart gui
+  ./dev.sh logs gui           # Voir les logs
+  ./dev.sh migrate            # Appliquer migrations
+  ./dev.sh shell              # Django shell
+  ```
+
+**Problèmes rencontrés:**
+- **Perte de données après rebuild** : causée par l'utilisation de bases différentes (SQLite local vs PostgreSQL Docker)
+  - Solution : unifier sur PostgreSQL, accessible via port exposé en local
+- **Migration manquante** : `no such table: accounts_application` après création du modèle
+  - Solution : `docker-compose exec -T gui python manage.py makemigrations && migrate`
+
+**Décisions techniques:**
+- **PostgreSQL partout** : cohérence des données entre modes de développement
+- **Volume Docker persistant** : `postgres_data` survit aux `docker-compose down` (sans `-v`)
+- **Script interactif** : plus user-friendly que des commandes manuelles
+- **Mode rapide CLI** : pour les actions fréquentes sans passer par le menu
+
+**Fichiers créés/modifiés:**
+- `dev.sh` : script de développement interactif
+- `app/gui/config/settings.py` : config DB unifiée pour local/Docker
+
+---
+
+### 2025-12-24 (25) - Swagger Docs + Application Model + Candidatures UI
+**Contexte:** Documenter l'API REST avec Swagger/OpenAPI, créer le modèle Application (candidature) et afficher les candidatures en cards.
+
+**Réalisations:**
+
+- **Documentation Swagger (drf-spectacular)** :
+  - Ajout `drf-spectacular>=0.27` dans requirements.txt
+  - Configuration dans settings.py : `SPECTACULAR_SETTINGS` avec titre, description, version
+  - Routes ajoutées : `/api/schema/` (JSON), `/api/docs/` (Swagger UI), `/api/redoc/` (ReDoc)
+  - Décorateurs `@extend_schema` sur toutes les vues API (tags, summary, request/response schemas)
+  - Auth JWT intégrée avec `persistAuthorization: True` dans Swagger UI
+
+- **Modèle Application (Candidature)** (migration 0016) :
+  - Workflow status : added → in_progress → applied → interview → accepted/rejected
+  - Liens : `imported_offer` (FK), `candidate_profile` (FK nullable)
+  - Documents : `custom_cv` (TextField), `custom_cv_file` (FileField), `cover_letter`, `cover_letter_file`
+  - Métadonnées : `interview_date`, `notes`, `history` (JSONField pour event tracking)
+  - Helper methods : `add_history_event()`, `has_cv()`, `has_cover_letter()`, `get_completion_status()`
+  - Dynamic upload paths : `applications/{user_id}/{app_id}/cv/` et `.../cover_letter/`
+
+- **Auto-création Application sur import** :
+  - Dans `ImportOfferView.post()` (api/views.py) : création automatique d'une Application après chaque ImportedOffer
+  - Associe le `candidate_profile` si fourni lors de l'import
+
+- **Page liste candidatures** (`/accounts/applications/`) :
+  - Vue `applications_list_view` avec filtrage par status (query param `?status=`)
+  - Compteurs par status : all, added, in_progress, applied, interview, accepted, rejected
+  - Template cards avec : header (entreprise, titre), meta (lieu, contrat, remote), badge status, progress (CV, Lettre)
+  - Grid responsive `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))`
+  - Status badges colorés (vert=accepted, bleu=applied, orange=in_progress, rouge=rejected)
+
+- **Intégration home page** :
+  - Lien "Suivi des candidatures" → `/accounts/applications/`
+  - Suppression du badge "coming soon"
+
+**Problèmes rencontrés:**
+- **Données perdues après rebuild** : l'offre test importée via l'extension a disparu après `docker-compose down/up`
+  - Cause : volumes Docker recréés en dev
+  - Note : comportement attendu, pas un bug
+
+**Décisions techniques:**
+- **drf-spectacular plutôt que drf-yasg** : plus moderne, meilleur support OpenAPI 3, maintenu activement
+- **History en JSONField** : simplicité, pas besoin d'une table séparée pour le POC
+- **Application auto-créée** : chaque offre importée démarre automatiquement le workflow de candidature
+- **Status workflow linéaire** : added → in_progress → applied → interview → {accepted, rejected}
+
+**Fichiers créés/modifiés:**
+- `app/gui/requirements.txt` : ajout drf-spectacular
+- `app/gui/config/settings.py` : config SPECTACULAR_SETTINGS
+- `app/gui/api/urls.py` : routes schema/docs/redoc
+- `app/gui/api/views.py` : extend_schema decorators + Application auto-create
+- `app/gui/accounts/models.py` : Application model
+- `app/gui/accounts/views.py` : applications_list_view
+- `app/gui/accounts/urls.py` : route applications
+- `app/gui/templates/accounts/applications_list.html` : nouveau template
+- `app/gui/templates/home.html` : lien candidatures
+
+---
+
+### 2025-12-24 (24) - API REST Extension Navigateur (DRF + JWT)
+**Contexte:** Créer une API REST pour l'extension navigateur JobMatch qui capture des offres d'emploi depuis n'importe quel site web.
+
+**Réalisations:**
+
+- **Nouvelle app Django `api/`** :
+  - Structure complète : `urls.py`, `views.py`, `serializers.py`, `apps.py`
+  - Séparation claire entre pages web (accounts) et API REST (api)
+  - Prêt pour versioning futur (`/api/v1/`, `/api/v2/`)
+
+- **Authentification JWT (SimpleJWT)** :
+  - `POST /api/auth/token/` - Login → access + refresh tokens
+  - `POST /api/auth/token/refresh/` - Rafraîchir le token
+  - `GET /api/auth/user/` - Infos utilisateur courant
+  - `POST /api/auth/logout/` - Blacklist refresh token
+  - Config : access 15min, refresh 7 jours, rotation automatique
+
+- **Endpoints offres importées** :
+  - `POST /api/offers/import/` - Importer une offre capturée
+  - `GET /api/offers/` - Lister les offres de l'utilisateur
+  - `GET/PATCH/DELETE /api/offers/<id>/` - Détail, mise à jour status, suppression
+  - `GET /api/health/` - Health check
+
+- **Modèle `ImportedOffer`** (migration 0015) :
+  - Champs source : `source_url`, `source_domain`, `captured_at`
+  - Champs offre : `title`, `company`, `location`, `description`, `contract_type`, `remote_type`, `salary` (JSON), `skills` (JSON)
+  - Matching : `match_score`, `matched_at` (TODO: intégration service matching)
+  - Status : new, viewed, saved, applied, rejected
+  - Contrainte unicité : `(user, source_url)` évite les doublons
+
+- **Configuration CORS** :
+  - Dev : `CORS_ALLOW_ALL_ORIGINS = True`
+  - Prod : regex pour `chrome-extension://` et `moz-extension://`
+  - Headers autorisés : authorization, content-type, etc.
+
+- **Dépendances ajoutées** :
+  - `djangorestframework>=3.14`
+  - `djangorestframework-simplejwt>=5.3`
+  - `django-cors-headers>=4.3`
+
+**Problèmes rencontrés:**
+- **ModuleNotFoundError rest_framework** : dépendances non installées en local
+  - Solution : `pip install djangorestframework djangorestframework-simplejwt django-cors-headers`
+- **Port 8085 déjà utilisé** : serveur Django déjà lancé
+  - Solution : `docker-compose down && build && up`
+
+**Décisions techniques:**
+- **App séparée `api/`** : meilleure séparation des responsabilités que tout mettre dans `accounts`
+- **JWT plutôt que sessions** : les sessions Django ne fonctionnent pas cross-origin pour les extensions
+- **Rotation des refresh tokens** : sécurité renforcée, ancien token blacklisté après refresh
+- **camelCase dans API** : convention frontend, snake_case dans les modèles Django
+- **Contrainte unicité sur URL** : un utilisateur ne peut pas importer deux fois la même offre
+
+**TODOs documentés:**
+1. **Matching service integration** : appeler POST /match lors de l'import d'une offre
+2. **CORS security** : restreindre aux IDs d'extensions spécifiques en production
+
+**Fichiers créés:**
+- `app/gui/api/__init__.py`, `apps.py`, `urls.py`, `views.py`, `serializers.py`
+- `app/gui/accounts/migrations/0015_add_imported_offer.py`
+- `docs/api_extension.md` - Documentation complète de l'API
+
+---
+
+### 2025-12-24 (23) - Architecture Offres/Matching + Infrastructure Cloud + Stratégie ML
+**Contexte:** Concevoir l'architecture d'intégration entre le GUI, le service offres (Mohamed) et le service matching (Maxime), avec une vision cloud et stratégie ML long terme.
+
+**Réalisations:**
+
+- **Analyse base offers.db (Silver)** :
+  - 13 tables SQLite : offers (principale), offers_lieu_travail, offers_entreprise, offers_salaire, offers_competences, etc.
+  - 150 offres sample avec format France Travail (codes ROME, NAF)
+  - Champs clés identifiés pour l'UI : intitule, typeContratLibelle, libelle (salaire), competences, formations
+
+- **Architecture offres documentée** (`docs/interface_gui_offers.md`) :
+  - Option 1 (recommandée) : API REST exposée par `offre-ingestion` → GUI consomme
+  - Option 2 (pragmatique court terme) : Base partagée avec modèle Django `managed=False`
+  - Mapping champs UI ↔ tables SQLite
+
+- **Architecture matching documentée** (`docs/interface_gui_offers_match.md`) :
+  - Flux complet : GUI → cv_embedding → Matcher → (id, score) top 20 → GUI → offre-ingestion → détails
+  - Modèle cache `MatchResult` avec TTL 24h et invalidation sur changement profil
+  - Modèles Django : `JobOffer`, `JobOfferSkill`, `MatchResult`
+  - API specs : POST /match (CV embedding → scores), GET /offers/{id} (détail offre)
+
+- **Analyse critique architecture actuelle** :
+  - Points forts : microservices Docker, shared/ package, Factory pattern LLM, Medallion (Bronze→Silver→Gold)
+  - Améliorations suggérées : pgvector, message queue, monitoring/alerting, CI/CD complet
+
+- **Recommandation infrastructure GCP** :
+  - Services : Cloud Run (serverless), Cloud SQL + pgvector, Vertex AI (embeddings), BigQuery, Memorystore
+  - Coûts estimés : MVP ~50-60$/mois, Growth ~300-400$/mois
+  - Migration en 4 phases : Local → GCP MVP → GCP Growth → GCP Scale
+
+- **Stratégie ML & Embeddings** :
+  - MVP : sentence-transformers pre-trained (all-MiniLM-L6-v2), pas de MLflow
+  - V1 : collecte données via `OfferInteraction` model (vues, applications, embauches)
+  - V2 : fine-tuning avec MLflow (contrastive learning, cross-encoder, learning to rank)
+  - Dataset potentiel : profils + offres + candidatures = supervision implicite
+
+- **Modèle OfferInteraction conçu** :
+  ```python
+  class OfferInteraction(models.Model):
+      user = models.ForeignKey(User)
+      offer_external_id = models.CharField(max_length=50)
+      match_score = models.FloatField()  # Score initial du matcher
+      viewed = models.BooleanField()
+      time_spent_seconds = models.IntegerField()
+      saved = models.BooleanField()
+      applied = models.BooleanField()
+      got_interview = models.BooleanField(null=True)
+      got_hired = models.BooleanField(null=True)
+  ```
+
+**Problèmes rencontrés:**
+- **Pandoc LaTeX unicode** : caractères ↔, ✅ non supportés par pdflatex
+  - Solution 1 : xelatex engine
+  - Solution 2 : Python markdown + wkhtmltopdf (sans LaTeX)
+
+**Décisions techniques:**
+- **API REST (Option 1)** : découplage propre GUI/offres, Mohamed contrôle son API
+- **Cache lazy refresh** : TTL 24h avec invalidation explicite (pas de refresh proactif)
+- **pgvector recommandé** : PostgreSQL extension pour recherche vectorielle avec index HNSW
+- **GCP plutôt qu'AWS** : meilleur rapport coût/features pour ML (Vertex AI, BigQuery)
+- **MLflow différé** : overkill pour MVP avec modèles pre-trained, utile uniquement pour fine-tuning
+- **Collecte données implicite** : tracker les interactions dès le MVP pour préparer le fine-tuning futur
+
+**Documents créés:**
+- `docs/interface_gui_offers.md` - Interface GUI ↔ Offres
+- `docs/interface_gui_offers_match.md` - Architecture complète avec matching, cache, cloud, ML
+- `docs/interface_gui_offers_match.pdf` - Export PDF pour l'équipe
+
+---
+
+### 2025-12-24 (22) - UI Success Cards + Export DOCX + Ruff fixes
+**Contexte:** Enrichir les cartes de succès professionnels avec toggle, visualisation et export, et corriger les erreurs Ruff pour le pre-commit hook.
+
+**Réalisations:**
+
+- **Cartes succès enrichies** :
+  - Toggle "Profil candidat" (comme expériences, éducation) pour inclure/exclure du profil
+  - Bouton "voir" (icône œil) → modal de visualisation avec détails STAR
+  - Bouton "supprimer" (icône corbeille) → modal de confirmation
+  - Nouveau champ `is_active` sur `ProfessionalSuccess` (migration 0014)
+  - Endpoint `success_update_view` mis à jour pour gérer `is_active`
+
+- **Modal de visualisation** :
+  - Affichage complet : Titre, Situation, Tâche, Actions, Résultats, Compétences
+  - Largeur 900px (50% plus large que le défaut 600px)
+  - Bouton "Export DOCX" pour téléchargement Word
+
+- **Export DOCX** :
+  - Bibliothèque `docx.js` v8.5.0 chargée dynamiquement depuis CDN (unpkg)
+  - Build UMD (`index.umd.js`) pour compatibilité browser
+  - Génération document Word avec sections STAR formatées (titres en couleur #667eea)
+  - Téléchargement automatique avec nom fichier basé sur le titre
+  - Feedback visuel : "Chargement..." puis "Téléchargé !" avec gestion erreurs
+
+- **Règle #6 généralisée** :
+  - Règle "questions NON AMBIGUËS" appliquée à toutes les phases du coaching STAR
+  - Exemples MAUVAIS/BON génériques (pas seulement Phase 6)
+
+- **Corrections Ruff pre-commit** :
+  - `SIM105` : `contextlib.suppress()` au lieu de `try/except/pass` (2 occurrences dans views.py)
+  - `F841` : variable `initial_message` inutilisée supprimée
+  - `UP028` : `yield from` au lieu de `for/yield` où applicable (providers.py)
+  - `noqa: UP028` ajouté où `yield from` incompatible avec `try/except` fallback (chat_handler.py)
+
+- **Corrections Bandit pre-commit** :
+  - `B104` : `# noqa: S104` ne fonctionne pas pour Bandit → utiliser `# nosec B104`
+  - `B110` : `try/except/pass` supprimé - le `.filter().first()` Django retourne `None` sans exception
+
+**Problèmes rencontrés:**
+- **Export DOCX sans action** :
+  - Cause 1 : mauvais CDN (`jsdelivr` avec path incorrect)
+  - Cause 2 : Build `index.min.js` au lieu de `index.umd.js` (non compatible browser)
+  - Solution : utiliser `unpkg.com/docx@8.5.0/build/index.umd.js`
+- **Ruff SIM105 faux positif** : `try/except/pass` flaggé mais `contextlib.suppress` est plus idiomatique
+- **Ruff UP028 incompatible avec try/except** : `yield from` ne permet pas de catch les exceptions du générateur
+  - Solution : ajouter `# noqa: UP028` avec explication
+- **Bandit B104 non ignoré** : `# noqa: S104` (syntaxe Ruff/flake8) ne fonctionne pas pour Bandit
+  - Solution : utiliser `# nosec B104` (syntaxe Bandit)
+- **Bandit B110 try/except/pass** : code inutile car `.filter().first()` retourne `None` au lieu de lever une exception
+  - Solution : supprimer le try/except
+
+**Décisions techniques:**
+- **CDN unpkg plutôt que jsdelivr** : URLs plus simples et prévisibles pour les libs npm
+- **Build UMD** : nécessaire pour usage browser sans bundler (ESM ne fonctionne pas avec script tag)
+- **Chargement dynamique** : évite d'inclure 500KB de lib si l'utilisateur n'exporte jamais
+- **contextlib.suppress** : plus pythonique que `try/except/pass` pour ignorer une exception spécifique
+- **noqa avec explication** : documenter pourquoi la règle est ignorée pour la maintenance future
+
+---
+
+### 2025-12-24 (21) - Refonte Prompt STAR + Auto-création Succès
+**Contexte:** Le chatbot STAR était trop verbeux (400+ mots par message) et ne permettait pas la création automatique des succès en fin de conversation.
+
+**Réalisations:**
+
+- **Refonte complète `star_coaching.txt`** :
+  - Messages courts : 2-4 phrases max par réponse (vs 400+ mots avant)
+  - 6 phases strictes : Choix expérience → S → T → A → R → Création
+  - Règle "une seule phase à la fois" : le LLM n'évoque jamais la phase suivante
+  - Exemples MAUVAIS/BON dans le prompt pour guider le modèle
+  - Marqueur `[STAR_COMPLETE]` avec JSON structuré à la fin
+
+- **Détection automatique `[STAR_COMPLETE]`** dans `profile.html` :
+  - Nouvelle méthode `handleStarComplete(rawText, contentDiv)` dans `StarChatbot`
+  - Extraction du JSON après le marqueur via regex
+  - Appel API `/accounts/api/successes/create/` avec les données STAR
+  - Message de confirmation "✅ Succès ajouté à ton profil !"
+  - Fermeture automatique du chat après 2 secondes
+
+- **Chat expandable amélioré** :
+  - CSS `position: fixed` avec overlay backdrop (modal-like)
+  - Couvre tout l'écran y compris le titre de section
+  - Centré avec `top/left: 50%` + `transform: translate(-50%, -50%)`
+  - z-index 1000 pour le chat, 999 pour le backdrop
+
+**Problèmes rencontrés:**
+- **Expand ne couvrait pas le titre** : CSS `position: absolute` sur `.achievements-layout` ne remontait pas assez
+  - Solution : passer à `position: fixed` avec comportement modal
+
+**Décisions techniques:**
+- **Marqueur `[STAR_COMPLETE]` plutôt que extraction séparée** : le LLM génère le JSON directement, pas besoin d'un second appel LLM
+- **is_draft: false** envoyé à l'API : le succès est complet quand auto-créé (toutes les infos STAR collectées)
+- **Fermeture après 2s** : donne le temps à l'utilisateur de lire la confirmation avant reset
+
+**Patterns appliqués:**
+- **Marqueur de fin dans le stream** : `[MARKER]` + JSON permet d'extraire des données structurées du stream SSE
+- **Prompt engineering strict** : exemples MAUVAIS/BON explicites pour contraindre le comportement du modèle
+- **Phases séquentielles** : empêcher le LLM de "sauter" des étapes en interdisant de mentionner les phases suivantes
+
+---
+
+### 2025-12-24 (20) - Markdown + Chat Expandable
+**Contexte:** Améliorer l'affichage des réponses du chatbot (rendu markdown) et permettre d'agrandir la fenêtre de chat pour couvrir la sidebar pendant une conversation.
+
+**Réalisations:**
+
+- **Rendu Markdown dans le chat** :
+  - Ajout de `marked.js` (v11.1.1) via CDN pour parser le markdown des réponses LLM
+  - Nouvelle méthode `renderMarkdown(text)` dans StarChatbot et PitchChatbot
+  - Modification de `addMessage()` : markdown pour assistant, `escapeHtml()` pour user
+  - Modification de `appendToStreamingMessage()` : utilise `textContent` pendant le streaming
+  - Modification de `finishStreamingMessage()` : applique `marked.parse()` à la fin du stream
+  - CSS ajouté pour les éléments markdown (p, strong, em, ul, ol, li, blockquote, code, pre, h1-h3)
+
+- **Chat extensible (expand/collapse)** :
+  - CSS `.achievements-layout.chat-expanded` : position absolute pour couvrir la sidebar
+  - Bouton expand dans les headers des deux chats (STAR et Pitch) avec icônes SVG
+  - Méthodes `expandChat()`, `collapseChat()`, `toggleExpand()` dans les deux classes
+  - Auto-expand dans `startConversation()` : le chat s'agrandit automatiquement
+  - Auto-collapse dans `resetChat()` : le chat se réduit quand on clique "Nouvelle conversation"
+  - Toggle manuel via bouton dans le header
+
+**Décisions techniques:**
+- **marked.js** : bibliothèque standard légère (CDN) plutôt que solution custom
+- **textContent pendant streaming** : évite les problèmes d'injection HTML pendant l'accumulation des tokens, markdown appliqué une seule fois à la fin
+- **CSS position absolute** : permet de superposer le chat sur la sidebar sans modifier le layout de base
+
+**Patterns appliqués:**
+- Streaming + markdown : accumuler en texte brut, parser à la fin pour éviter les états intermédiaires cassés
+- UI responsive : un bouton toggle avec deux icônes (expand/collapse) selon l'état CSS
+
+---
+
+### 2025-12-24 (19) - SSE Streaming pour Chat IA + Fix 404 polling
+**Contexte:** Implémenter le streaming SSE (Server-Sent Events) pour afficher les réponses du chatbot token par token, et corriger un bug 404 sur le polling du status.
+
+**Réalisations:**
+
+- **Fix 404 sur chat status polling** :
+  - Bug : `/accounts/api/chat/status/{task_id}/` retournait 404
+  - Cause : `chat_start_view` recevait le `task_id` de ai-assistant mais ne créait pas de `ChatMessage` avec ce task_id
+  - Solution : ajout de `ChatMessage.objects.create(conversation=conversation, role="assistant", content="", status="pending", task_id=task_id)` après réception du task_id
+
+- **Configuration LLM_MAX_TOKENS** :
+  - Ajout dans `app/ai-assistant/.env` : `LLM_MAX_TOKENS=4096`
+  - Valeur récupérée par `config.py` avec fallback à 4096
+
+- **Streaming SSE complet** (architecture 3 couches) :
+  1. **LLM Providers** (`providers.py`) :
+     - Nouvelle méthode abstraite `chat_stream()` sur `LLMProvider`
+     - Implémentation pour OpenAI : `stream=True` + iteration sur `chunk.choices[0].delta.content`
+     - Implémentation pour Anthropic : `messages.stream()` context manager + `stream.text_stream`
+     - Implémentation pour Ollama : même pattern qu'OpenAI (API compatible)
+
+  2. **FastAPI Endpoints** (`main.py`) :
+     - Nouvelle fonction `_sse_generator()` : formate les tokens en SSE (`data: {"token": "..."}`)
+     - Endpoint `/chat/start/stream` : démarre une conversation avec réponse streaming
+     - Endpoint `/chat/message/stream` : envoie un message avec réponse streaming
+     - Headers SSE : `Cache-Control: no-cache`, `X-Accel-Buffering: no` (nginx)
+
+  3. **Django Proxy** (`views.py`) :
+     - `chat_start_stream_view` : crée ChatConversation + ChatMessage, proxy le stream SSE
+     - `chat_message_stream_view` : crée ChatMessage user + assistant, proxy le stream
+     - Accumulation du contenu pendant le stream pour sauvegarder la réponse complète
+     - `StreamingHttpResponse` avec `content_type="text/event-stream"`
+
+- **Frontend JavaScript** (`profile.html`) :
+  - Propriétés ajoutées aux chatbots : `useStreaming = true`, `currentStreamingMessage`
+  - `startConversationStreaming()` : utilise `fetch()` + `response.body.getReader()` pour lire le stream
+  - `sendMessageStreaming()` : même pattern pour les messages suivants
+  - `createStreamingMessage()` : crée une bulle vide avec classe `.streaming`
+  - `appendToStreamingMessage()` : ajoute le token à la bulle courante
+  - `finishStreamingMessage()` : retire la classe `.streaming` et finalise
+  - Pattern `ReadableStream` avec `TextDecoder` pour parser les chunks SSE
+  - Fallback automatique si `useStreaming = false`
+
+**Problèmes rencontrés:**
+- **404 sur /api/chat/status/{task_id}/** :
+  - Cause : ChatMessage avec task_id manquant dans la base
+  - Diagnostic : les logs montraient que le LLM répondait correctement mais la GUI ne recevait rien
+  - Solution : créer le ChatMessage "pending" immédiatement après avoir reçu le task_id
+
+**Décisions techniques:**
+- **Option 1 choisie : Proxy Django** plutôt que WebSocket direct ou connexion directe client→ai-assistant
+  - Avantages : architecture cohérente, auth centralisée, CORS simplifié
+  - Inconvénient : latence légèrement supérieure (hop supplémentaire)
+  - Impact scaling : le serveur Django doit maintenir les connexions ouvertes pendant le streaming
+
+**Impact Scaling** :
+- **Django** : chaque requête streaming bloque un worker pendant toute la durée de génération (10-60s selon le LLM)
+  - Mitigation : utiliser Gunicorn avec workers async (gevent/eventlet) ou passer à ASGI (Daphne/Uvicorn)
+  - Alternative : augmenter le nombre de workers proportionnellement aux users concurrents
+- **ai-assistant FastAPI** : déjà async natif, scale bien avec uvicorn
+- **LLM** : le bottleneck principal reste le temps de génération du LLM
+- **Recommandation prod** : si >100 users concurrents, envisager une connexion WebSocket directe client→ai-assistant avec auth par token JWT
+
+---
+
+### 2025-12-24 (18) - Prompts proactifs + Transmission LLM Config + Logs debug
+**Contexte:** Améliorer les prompts des assistants IA pour qu'ils soient proactifs (proposent au lieu de poser des questions), transmettre la config LLM utilisateur aux assistants, et ajouter des logs de debug pour les appels LLM.
+
+**Réalisations:**
+
+- **Prompts proactifs** (`star_coaching.txt`, `pitch_coaching.txt`) :
+  - Ajout Règle 0 : "Présente-toi et explique le processus" dès le premier message
+  - STAR : se présente comme coach STAR, explique les étapes (choix expérience → S→T→A→R → validation)
+  - Pitch : se présente comme coach pitch, annonce la génération directe des pitchs
+  - Remplacement de `{existing_successes}` par `{professional_successes}` dans le prompt STAR
+
+- **Transmission LLM Config utilisateur** :
+  - Nouveau schema `LLMConfigRequest` avec `llm_endpoint`, `llm_model`, `llm_api_key`
+  - Ajout `llm_config` optionnel dans `ChatStartRequest` et `ChatMessageRequest`
+  - Helper `_build_llm_config()` dans main.py pour convertir en `LLMConfig`
+  - Helper `_get_user_llm_config()` dans views.py pour récupérer la config Premium+
+  - Transmission de la config aux endpoints `/chat/start` et `/chat/message/async`
+  - Les utilisateurs Premium+ peuvent utiliser leur propre LLM dans le chat
+
+- **Logs debug LLM** (`providers.py`) :
+  - Chaque provider (OpenAI, Anthropic, Ollama) loggue maintenant :
+    - `=== LLM CALL (Provider) ===`
+    - Endpoint utilisé
+    - Modèle utilisé
+    - System prompt (500 premiers chars)
+    - Messages utilisateur (300 premiers chars chacun)
+  - Permet de diagnostiquer les problèmes de connexion/configuration
+
+- **Unification des données envoyées aux assistants** :
+  - `build_system_prompt()` passe maintenant les mêmes champs aux deux types de coaching
+  - `professional_successes` (détaillé) envoyé aux deux pour éviter les doublons
+
+**Problèmes rencontrés:**
+- **KeyError 'existing_successes'** : le prompt STAR référençait `{existing_successes}` mais le code ne passait que `{professional_successes}`
+  - Solution : remplacer les références dans le prompt par des textes statiques ("ci-dessus", "déjà formalisés")
+- **GPU non triggered** : les logs n'apparaissaient pas car aucun appel LLM ne se faisait (erreur silencieuse)
+  - Solution : ajout des logs explicites dans chaque provider avant l'appel LLM
+
+**Décisions techniques:**
+- **LLM config optionnel** : si non fourni ou endpoint vide, utilise les env vars du service
+- **Logs avant l'appel** : permet de voir ce qui est envoyé même si l'appel échoue
+- **500/300 chars max** : évite de polluer les logs avec des prompts complets
+
+---
+
+### 2025-12-24 (17) - Interface Chat Pitch + Modèle Pitch Django
+**Contexte:** Créer l'interface utilisateur pour le coaching pitch et le modèle Django pour stocker les pitchs générés.
+
+**Réalisations:**
+
+- **Modèle Pitch Django** (`accounts/models.py`) :
+  - Champs : `title`, `pitch_30s`, `pitch_3min`, `key_strengths` (JSONField), `target_context`
+  - Métadonnées : `source_conversation`, `is_draft`, `is_default`, `created_at`, `updated_at`
+  - Méthodes : `is_complete()`, `get_word_count_30s()`, `get_word_count_3min()`, `get_completion_percentage()`
+  - Un seul pitch par défaut par utilisateur (save() override)
+
+- **Migration 0012_add_pitch_model** : création de la table Pitch
+
+- **5 nouvelles vues API Pitch** (`views.py`) :
+  - `pitch_list_view` - GET `/api/pitches/`
+  - `pitch_create_view` - POST `/api/pitches/create/`
+  - `pitch_detail_view` - GET `/api/pitches/<id>/`
+  - `pitch_update_view` - POST `/api/pitches/<id>/update/`
+  - `pitch_delete_view` - DELETE `/api/pitches/<id>/delete/`
+
+- **Interface Chat Pitch** (`profile.html`) :
+  - Section "Mon pitch" transformée : placeholder → chat IA complet
+  - Classe JavaScript `PitchChatbot` (~350 lignes) basée sur `StarChatbot`
+  - Envoi `coaching_type: 'pitch'` au démarrage de conversation
+  - Couleur violet (#8b5cf6) pour différencier du coaching STAR (bleu)
+  - Sidebar "Mes pitchs" avec compteur de mots 30s/3min
+  - Lazy init avec MutationObserver quand la section devient visible
+
+- **CSS spécifique pitch** :
+  - `.chat-welcome-note` : note italique pour le contexte
+  - `.pitch-list strong` : couleur violette pour les libellés
+  - `.pitch-card-info` : affichage compteurs de mots
+  - `.pitches-sidebar .successes-count` : badge violet
+
+**Problèmes rencontrés:**
+- **docker-compose KeyError 'ContainerConfig'** : erreur récurrente au rebuild
+  - Solution : `docker-compose rm -sf <service> && docker-compose up -d <service>`
+- **Migrations non détectées dans container** : fichiers locaux non visibles
+  - Solution : rebuild complet du container GUI après ajout des migrations
+
+**Décisions techniques:**
+- **Réutilisation pattern StarChatbot** : même architecture JS, seul `coaching_type` change
+- **Couleur différente (violet)** : distinction visuelle claire entre STAR (bleu) et Pitch (violet)
+- **Word count display** : aide l'utilisateur à respecter les durées cibles (75-80 mots pour 30s, 400-450 mots pour 3min)
+- **Lazy initialization** : les chatbots ne sont instanciés que quand leur section est visible (performance)
+
+---
+
+### 2025-12-24 (16) - Extension ai-assistant pour Pitch Coaching
+**Contexte:** Étendre le module ai-assistant pour supporter également le coaching de création de pitch (30s et 3min), en réutilisant l'infrastructure existante du STAR coaching.
+
+**Réalisations:**
+
+- **Extension schemas.py** :
+  - Ajout de `CoachingType` enum (STAR, PITCH)
+  - Ajout du champ `coaching_type` dans `ChatStartRequest` et `ChatMessageRequest`
+  - Nouveaux champs dans `UserContext` : `skills`, `education`
+  - Nouveaux schémas `ExtractPitchRequest` et `ExtractPitchResponse`
+
+- **Nouveau prompt pitch_coaching.txt** :
+  - Structure pitch 30s : accroche, qui je suis, valeur ajoutée, objectif
+  - Structure pitch 3min : accroche, parcours, réalisations STAR, compétences, vision, conclusion
+  - Intègre les succès STAR du candidat comme base pour les exemples concrets
+  - Placeholders : {education}, {skills}, {professional_successes} (données STAR complètes)
+
+- **Mise à jour chat_handler.py** :
+  - `load_system_prompt(coaching_type)` : charge le prompt approprié
+  - `format_education()`, `format_skills()` : nouvelles fonctions de formatage
+  - `format_existing_successes(detailed=True)` : inclut données STAR complètes pour pitch
+  - `extract_pitch_data()` : extraction des pitchs 30s/3min depuis la conversation
+
+- **Mise à jour main.py** :
+  - Endpoints `/chat/start` et `/chat/message/async` acceptent `coaching_type`
+  - Nouvel endpoint `/chat/extract-pitch`
+
+- **Côté Django** :
+  - Ajout de `COACHING_TYPE_CHOICES` dans models.py
+  - Nouveau champ `coaching_type` sur `ChatConversation`
+  - Migration `0011_add_coaching_type_to_conversation`
+  - `_build_user_context(coaching_type)` : pour pitch, inclut education, skills, et données STAR complètes des succès
+  - Vues mises à jour pour passer et utiliser le coaching_type
+
+**Problèmes rencontrés:**
+- **Aucun problème majeur** : l'architecture générique du module a permis une extension facile
+
+**Décisions techniques:**
+- **Enum CoachingType** : permet d'ajouter facilement d'autres types de coaching à l'avenir
+- **Données STAR complètes pour pitch** : le LLM peut citer les résultats chiffrés des succès dans le pitch
+- **Réutilisation des endpoints** : même API, juste un paramètre `coaching_type` différent
+- **Priorité aux succès finalisés** : pour le pitch, on prend d'abord les succès non-draft
+
+---
+
+### 2025-12-24 (15) - AI Assistant STAR Coaching Chatbot
+**Contexte:** Implémenter un chatbot IA pour accompagner les candidats dans la formalisation de leurs succès professionnels avec la méthode STAR (Situation, Task, Action, Result)
+
+**Réalisations:**
+
+- **Nouveau microservice ai-assistant (FastAPI)** :
+  - Structure complète : `app/ai-assistant/src/{main.py, config.py, schemas.py, task_store.py, llm/, prompts/}`
+  - Endpoints : `/health`, `/chat/start`, `/chat/message/async`, `/chat/message/status/{task_id}`, `/chat/extract-success`
+  - Pattern async polling identique à cv-ingestion (task_id + status polling)
+  - Support multi-LLM : OpenAI, Anthropic, Ollama via Factory Pattern
+  - Dockerfile Python 3.12-slim, port 8084
+
+- **LLM Chat Handler pour coaching STAR** :
+  - `build_system_prompt()` : injecte le contexte utilisateur dans le prompt
+  - `get_initial_message()` : message d'accueil personnalisé
+  - `process_chat_message()` : traitement des messages avec historique
+  - `extract_star_data()` : extraction structurée des composants STAR
+
+- **Prompt STAR coaching** (`prompts/star_coaching.txt`) :
+  - Consultant expert en méthode STAR
+  - Guide progressif S → T → A → R
+  - Encourage quantification et utilisation du "je" (pas "nous")
+  - Placeholders pour contexte : {first_name}, {experiences}, {interests}, {existing_successes}
+
+- **3 nouveaux modèles Django** :
+  - `ChatConversation` : user, title, status (active/completed/abandoned), context_snapshot
+  - `ChatMessage` : conversation, role (user/assistant/system), content, status, task_id, extracted_data
+  - `ProfessionalSuccess` : user, title, situation, task, action, result, skills_demonstrated, is_draft
+  - Migration `0010_add_chat_and_professional_success`
+
+- **9 nouvelles vues Django** :
+  - Chat : `chat_start_view`, `chat_message_view`, `chat_status_view`, `chat_history_view`
+  - Succès : `success_list_view`, `success_create_view`, `success_update_view`, `success_delete_view`
+  - Helper `_build_user_context()` pour récupérer les données utilisateur
+
+- **Interface Chat UI** :
+  - Layout deux colonnes : chat à gauche, liste des succès à droite
+  - Classe JavaScript `StarChatbot` (~400 lignes)
+  - Polling status toutes les 2s avec typing indicator
+  - Messages avec bulles stylisées (user bleu, assistant gris)
+  - Lazy initialization avec MutationObserver
+
+- **Intégration Docker** :
+  - Service `ai-assistant` ajouté à docker-compose.yml
+  - Variable `AI_ASSISTANT_URL` dans settings.py GUI
+  - Réseaux partagés jobmatch-network
+
+**Problèmes rencontrés:**
+- **docker-compose exec -T** : flag nécessaire pour commandes non-interactives (migrations)
+- **Contexte compacté** : session continuée après compactage, contexte récupéré du summary
+
+**Décisions techniques:**
+- **Chat intégré** (pas modal) : meilleure UX pour conversations longues
+- **Microservice dédié** : séparation des responsabilités, scalabilité indépendante
+- **Persistance conversations** : historique en base pour reprendre les échanges
+- **Modèle ProfessionalSuccess dédié** : pas d'utilisation d'ExtractedLine pour éviter confusion
+- **Context injection** : le LLM reçoit automatiquement profil, expériences, intérêts, succès existants
+
+---
+
 ### 2025-12-23 (14) - Fix extraction personal_info/social_link + CSS/Text tweaks
 **Contexte:** Bug où les données personnelles et liens sociaux extraits du CV n'étaient pas sauvegardés correctement
 
@@ -600,12 +1520,62 @@ git add -A && git commit -m "message"
 - **Restriction fonctionnalités par tier** : double vérification côté serveur ET côté template
 - **Modal pricing** : CSS natif avec backdrop-filter pour blur, pas besoin de lib JS
 - **Cropper.js** : bibliothèque la plus mature pour recadrage d'images (utilisée par LinkedIn)
+- **Port interne vs externe Docker** : `5433:5432` signifie port 5433 exposé sur l'hôte, port 5432 interne au réseau Docker
+- **TemplateView vs custom View** : pour passer du contexte dynamique (queries DB), il faut une vue personnalisée
+- **get_or_create** : pattern idempotent pour éviter les erreurs IntegrityError sur les contraintes uniques
+- **docker cp** : permet de copier des fichiers du container vers l'hôte (utile pour récupérer des migrations générées)
 - **Two-step modal** : sépare la sélection de l'édition pour une meilleure UX
 - **Canvas toBlob** : conversion côté client avant upload pour optimiser la bande passante
 - **requirements-dev.txt** : permet d'avoir des dépendances uniquement pour le dev local
 - **Conditional INSTALLED_APPS** : `if ENV_MODE == "local"` + try/except pour apps optionnelles
 - **parse_llm_response() extensible** : chaque content_type avec des champs structurés nécessite sa propre branche elif
 - **Rendu manuel checkboxes Django** : pour un contrôle CSS total, utiliser `{% for choice in form.field %}{{ choice.tag }}{% endfor %}` au lieu de `{{ form.field }}`
+- **Microservices FastAPI identiques** : dupliquer le pattern de cv-ingestion pour nouveaux services (task_store, providers, schemas)
+- **MutationObserver** : permet d'initialiser des composants JS quand une section devient visible (lazy init)
+- **Prompt engineering STAR** : instructions claires pour guider progressivement S→T→A→R
+- **Context snapshot** : sauvegarder le contexte utilisateur au début de la conversation pour cohérence
+- **Architecture générique pour coaching** : utiliser un `coaching_type` enum permet d'étendre facilement le module à d'autres types de coaching
+- **Données conditionnelles selon le type** : `_build_user_context(coaching_type)` enrichit les données en fonction du besoin (pitch = données STAR complètes)
+- **Prompts séparés par type** : un fichier .txt par type de coaching pour faciliter l'itération
+- **SSE Streaming** : Server-Sent Events avec format `data: {...}\n\n` pour affichage temps réel
+- **ReadableStream API** : `response.body.getReader()` + `TextDecoder` pour parser les chunks SSE en JavaScript
+- **Django StreamingHttpResponse** : permet de proxyer un stream SSE depuis un service externe
+- **Proxy streaming Django** : accumule le contenu pour sauvegarder la réponse complète en base après le stream
+- **LLM streaming** : OpenAI `stream=True`, Anthropic `messages.stream()` context manager
+- **Headers SSE** : `Cache-Control: no-cache`, `X-Accel-Buffering: no` pour éviter le buffering nginx
+- **marked.js pour markdown** : bibliothèque standard légère pour parser le markdown des réponses LLM
+- **Streaming + markdown** : accumuler en `textContent` pendant le stream, appliquer `marked.parse()` une seule fois à la fin
+- **Chat expandable** : CSS `position: absolute` avec classe toggle pour superposer un élément sur son voisin
+- **Marqueur de fin stream** : `[MARKER]` + JSON dans le prompt permet d'extraire des données structurées du stream SSE sans second appel LLM
+- **Prompt engineering strict** : exemples MAUVAIS/BON explicites pour contraindre le comportement verbeux des LLM
+- **Phases séquentielles en prompt** : "n'évoque JAMAIS la phase suivante" empêche le LLM de sauter des étapes
+- **docx.js browser** : utiliser le build UMD (`index.umd.js`) et non ESM ou min pour compatibilité script tag
+- **contextlib.suppress** : remplace `try/except/pass` de façon plus idiomatique (règle Ruff SIM105)
+- **yield from vs try/except** : `yield from` ne peut pas être utilisé dans un try/except car les exceptions du générateur ne seraient pas catchées
+- **noqa avec explication** : toujours documenter pourquoi une règle est ignorée (ex: `# noqa: UP028 - yield from incompatible with try/except`)
+- **Bandit vs Ruff syntaxe** : Bandit utilise `# nosec BXXX`, Ruff utilise `# noqa: SXXX` - ce sont des outils différents avec syntaxes différentes
+- **Django QuerySet.first()** : retourne `None` si pas de résultat, ne lève jamais d'exception - pas besoin de try/except
+- **drf-spectacular** : documentation OpenAPI 3 automatique pour Django REST Framework, plus moderne que drf-yasg
+- **Auto-création modèles liés** : créer les modèles dépendants (Application) directement dans la vue API d'import pour simplifier le workflow
+- **JSONField pour history** : simple et efficace pour un event log sans nécessiter une table séparée
+- **pgvector** : extension PostgreSQL pour recherche vectorielle, index HNSW pour performances (remplace Faiss/Milvus)
+- **Modèle Django `managed=False`** : permet de lire une table créée par un autre service sans que Django la gère
+- **Cache lazy refresh** : TTL simple avec invalidation explicite, plus simple que refresh proactif
+- **GCP Cloud Run** : serverless containers, scale to zero, idéal pour microservices avec trafic variable
+- **Vertex AI text-embedding-004** : embeddings Google optimisés pour français, alternative à sentence-transformers
+- **MLflow pour fine-tuning uniquement** : overkill pour modèles pre-trained, utile pour experiment tracking et model registry
+- **Contrastive learning** : technique de fine-tuning embeddings avec triplets (anchor, positive, negative)
+- **Cross-encoder** : modèle de re-ranking plus précis que bi-encoder, utilisé en second stage
+- **Learning to Rank** : approche ML pour optimiser l'ordre des résultats de recherche
+- **OfferInteraction pattern** : collecter les interactions utilisateur (vues, clics, applications) pour supervision implicite
+- **wkhtmltopdf** : génération PDF depuis HTML sans LaTeX, supporte unicode nativement
+- **Base de données partagée dev** : utiliser le même PostgreSQL en local et Docker via port exposé (ex: `localhost:5433`)
+- **Script dev interactif** : menu bash avec couleurs + mode CLI rapide pour les commandes fréquentes
+- **`set +e` en bash** : permet de continuer même si une commande échoue (utile pour services manquants)
+- **`asyncio.create_task()` vs `BackgroundTasks`** : BackgroundTasks de FastAPI n'est PAS vraiment async - il attend la fin de la fonction avant de renvoyer la réponse HTTP. Utiliser `asyncio.create_task()` pour une vraie exécution non-bloquante
+- **`asyncio.to_thread()` pour appels synchrones** : Les SDKs LLM (OpenAI, Anthropic) sont synchrones et bloquent l'event loop. Wrapper avec `await asyncio.to_thread(fn, args)` pour exécuter dans un thread pool
+- **Pattern task_id + polling** : Pour les traitements longs (>10s), retourner immédiatement un task_id et laisser le client faire du polling sur `/status/{task_id}`
+- **ATS optimization** : L'intitulé du CV doit être très proche du titre de l'offre, et reprendre les mots-clés exacts (pas de synonymes)
 
 ## ⚠️ Pièges à éviter
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
@@ -633,6 +1603,43 @@ git add -A && git commit -m "message"
   - Solution : `if ENV_MODE == "local": try: import app; INSTALLED_APPS.append(...)`
 - **Nouveaux content_types structurés** : lors de l'ajout d'un content_type avec des champs structurés (comme personal_info ou social_link), ne pas oublier d'ajouter le parsing dans `parse_llm_response()` dans analyzer.py
 - **Django CheckboxSelectMultiple** : le widget génère un `<ul><li>` avec styles qui peuvent override le CSS. Préférer le rendu manuel pour un contrôle total du layout
+- **docx.js CDN jsdelivr** : le path `build/index.min.js` n'existe pas toujours, utiliser unpkg avec `build/index.umd.js` pour browser
+- **yield from dans try/except** : Ruff UP028 suggère `yield from` mais cela empêche de catch les erreurs et faire un fallback - utiliser `# noqa: UP028`
+- **Bandit `# noqa` ne fonctionne pas** : Bandit ignore la syntaxe `# noqa: SXXX`, utiliser `# nosec BXXX` à la place
+- **try/except/pass sur QuerySet** : `.filter().first()` ne lève pas d'exception, retourne `None` - Bandit B110 détecte ce pattern inutile
+- **SQLite vs PostgreSQL en dev** : utiliser des bases différentes entre local et Docker cause des pertes de données et incohérences
+- **ENV_MODE manquant dans docker-compose.yml** : sans `ENV_MODE=dev`, Django utilise le mode "local" qui essaie de se connecter à `localhost:5433` (inaccessible depuis le container)
+- **Migrations créées dans le container** : si `makemigrations` est exécuté dans le container, le fichier de migration n'existe pas dans le code source → utiliser `docker cp` pour récupérer
+- **Volume Docker vs base vide** : `docker-compose down` sans `-v` préserve les données, mais un `full-restart` d'un service ne recrée pas les users → créer un superuser après reset
+- **`docker-compose down -v`** : le flag `-v` supprime les volumes = perte de toutes les données. Ne jamais utiliser sauf pour reset complet
+- **FastAPI BackgroundTasks pour async** : NE PAS utiliser pour les tâches longues car elles bloquent quand même la réponse HTTP. Utiliser `asyncio.create_task()` à la place
+- **Async functions avec appels synchrones** : Marquer une fonction `async` ne la rend pas non-bloquante si elle appelle du code synchrone. Utiliser `asyncio.to_thread()` pour wrapper les appels bloquants
+- **Timeout court sur POST de démarrage** : Le POST qui lance une tâche async doit retourner en <1s. Si ça prend plus longtemps, vérifier que la tâche n'est pas exécutée de manière synchrone
+- **Django `mark_safe()` sans sanitization** : Bandit B703/B308 détecte les risques XSS.
+  - **Problème réel** : `mark_safe()` sur du contenu utilisateur = faille XSS critique (injection de `<script>`)
+  - **Faux positif** : Bandit ne peut pas savoir si le contenu est sanitizé, il alerte toujours
+  - **Solution** : sanitizer avec `bleach.clean()` avant `mark_safe()` avec whitelist stricte de tags/attributs, puis ajouter `# nosec B308 B703` avec un commentaire expliquant pourquoi c'est sécurisé
+  - **Exemple** : `return mark_safe(bleach.clean(html, tags=ALLOWED_TAGS))  # nosec B308 B703`
+- **Exemples JWT dans la documentation** : Gitleaks détecte les tokens JWT même fictifs comme secrets.
+  - **Problème réel** : aucun, ce sont des exemples de documentation, pas de vrais tokens
+  - **Faux positif** : Gitleaks ne distingue pas les exemples des vrais secrets
+  - **Solution** : utiliser des placeholders explicites comme `<JWT_ACCESS_TOKEN>` au lieu de vrais formats JWT `eyJ0eXAi...`
+- **Ollama API OpenAI-compatible vs native** : Ollama expose deux APIs différentes :
+  - `/api/tags`, `/api/generate`, `/api/chat` : API native Ollama
+  - `/v1/models`, `/v1/chat/completions` : API OpenAI-compatible
+  - **Problème** : `/api/tags` peut lister des modèles alors que `/v1/models` retourne une liste vide
+  - **Cause** : Les modèles doivent être explicitement exposés via l'API OpenAI-compatible (config Ollama)
+  - **Solution** : Vérifier les deux endpoints, ou adapter le code pour utiliser l'API native Ollama si nécessaire
+- **GCP Billing account not found** : l'erreur `Billing account for project 'xxx' is not found` survient quand on essaie d'activer des APIs avant d'avoir lié un compte de facturation au projet.
+  - **Prérequis obligatoire** : Console GCP → Facturation → Associer le projet au compte de facturation
+  - **Ordre** : 1) Créer projet, 2) Activer facturation, 3) Activer APIs
+- **Terraform ne déploie pas le code** : Terraform gère l'infrastructure, PAS le code applicatif. Si l'architecture n'a pas changé, `terraform apply` ne fait rien même si le code a changé.
+  - **Problème** : Docker peut utiliser des layers cachées et ne pas intégrer le nouveau code
+  - **Solution** : Dans le workflow de déploiement, utiliser `docker compose build --no-cache --pull` pour forcer la reconstruction
+  - **Workflow correct** : `build --no-cache` → `down` → `up -d`
+- **Variable d'environnement non définie dans gsutil** : `gsutil mb gs://bucket-name-$PROJECT_ID` échoue avec "Invalid bucket name" si `$PROJECT_ID` n'est pas défini.
+  - **Solution 1** : `export PROJECT_ID=mon-projet-id` avant la commande
+  - **Solution 2** : Hardcoder le nom du bucket directement dans les fichiers Terraform
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -677,6 +1684,10 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - **Détection auto PDF texte/image** : heuristique simple (min chars) avant de choisir la méthode d'extraction
 - **Vision LLM + OCR fallback** : robustesse maximale pour tous types de PDF
 - **Pre-commit workflow** : `ruff check --fix . && ruff format .` avant chaque commit pour auto-fix et formatage
+- **Documentation avant code** : rédiger ARCHITECTURE.md et IAM_GUIDE.md avant de coder l'infrastructure permet de valider l'approche et facilite la maintenance
+- **Workload Identity Federation** : évite les clés JSON service account, auth keyless depuis GitHub Actions vers GCP
+- **Terraform modules séparés** : main.tf, variables.tf, network.tf, vm.tf, storage.tf, bigquery.tf, iam.tf, outputs.tf - meilleure lisibilité et maintenance
+- **Deux workflows GitHub Actions séparés** : un pour Terraform (infra/), un pour Deploy (app/) - séparation claire des responsabilités
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python
@@ -724,7 +1735,23 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - [x] **Sélecteur d'abonnement** : choix du plan dans Account Settings
 - [x] **Modal Pricing** : comparaison des plans avec fonctionnalités et tarifs
 - [x] **Restriction LLM Config** : disponible uniquement pour Premium+
+- [x] **AI Assistant STAR Chatbot** : microservice + UI chat pour formalisation succès professionnels
+- [x] **Extension Pitch Coaching** : coaching_type enum, nouveau prompt, données STAR complètes pour pitch
+- [x] **UI Pitch dans profile.html** : interface chat pour section "Mon pitch" (PitchChatbot avec coaching_type=pitch)
+- [x] **Modèle Pitch Django** : stocker les pitchs 30s/3min générés (migration 0012)
+- [ ] **Sauvegarde pitch depuis chat** : bouton pour extraire et sauvegarder le pitch généré
 - [ ] **Édition inline** : permettre de modifier le contenu des lignes extraites
 - [ ] **Regroupement expériences** : afficher les missions d'un même poste ensemble dans l'UI
 - [ ] **Intégration paiement** : Stripe pour les abonnements payants
 - [ ] **Validation email** : confirmation par email lors du changement d'adresse
+- [x] **Auto-création succès STAR** : marqueur `[STAR_COMPLETE]` + extraction JSON + création auto en base
+- [ ] **Tests E2E chatbot STAR** : tester le flux complet conversation → extraction → création succès
+- [x] **Swagger/OpenAPI docs** : drf-spectacular avec `/api/docs/` et `/api/redoc/`
+- [x] **Modèle Application** : workflow candidature (added → in_progress → applied → interview → accepted/rejected)
+- [x] **Auto-création Application** : chaque ImportedOffer crée automatiquement une Application
+- [x] **Page liste candidatures** : cards avec filtrage par status
+- [ ] **Page détail candidature** : vue complète avec actions (modifier status, notes, documents)
+- [ ] **Intégrer matching service** : appeler POST /match lors de l'import d'une offre
+- [ ] **Restreindre CORS production** : limiter aux IDs d'extensions spécifiques
+- [x] **Script dev.sh** : menu interactif + commandes CLI pour le workflow de développement
+- [x] **Base PostgreSQL partagée** : local et Docker utilisent la même base via port exposé

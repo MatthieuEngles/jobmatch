@@ -36,4 +36,57 @@ urlpatterns = [
         views.profile_item_toggle_view,
         name="profile_item_toggle",
     ),
+    # Chat AI Assistant (STAR coaching)
+    path("api/chat/start/", views.chat_start_view, name="chat_start"),
+    path("api/chat/message/", views.chat_message_view, name="chat_message"),
+    path("api/chat/status/<str:task_id>/", views.chat_status_view, name="chat_status"),
+    path("api/chat/history/<int:conversation_id>/", views.chat_history_view, name="chat_history"),
+    # Streaming endpoints (SSE)
+    path("api/chat/start/stream/", views.chat_start_stream_view, name="chat_start_stream"),
+    path("api/chat/message/stream/", views.chat_message_stream_view, name="chat_message_stream"),
+    # Professional successes
+    path("api/successes/", views.success_list_view, name="success_list"),
+    path("api/successes/create/", views.success_create_view, name="success_create"),
+    path("api/successes/<int:success_id>/update/", views.success_update_view, name="success_update"),
+    path("api/successes/<int:success_id>/delete/", views.success_delete_view, name="success_delete"),
+    # Pitches
+    path("api/pitches/", views.pitch_list_view, name="pitch_list"),
+    path("api/pitches/create/", views.pitch_create_view, name="pitch_create"),
+    path("api/pitches/<int:pitch_id>/", views.pitch_detail_view, name="pitch_detail"),
+    path("api/pitches/<int:pitch_id>/update/", views.pitch_update_view, name="pitch_update"),
+    path("api/pitches/<int:pitch_id>/delete/", views.pitch_delete_view, name="pitch_delete"),
+    # Applications (candidatures)
+    path("applications/", views.applications_list_view, name="applications_list"),
+    path("applications/<int:application_id>/", views.application_detail_view, name="application_detail"),
+    path(
+        "applications/<int:application_id>/status/",
+        views.application_update_status_view,
+        name="application_update_status",
+    ),
+    path(
+        "applications/<int:application_id>/notes/", views.application_update_notes_view, name="application_update_notes"
+    ),
+    path("applications/<int:application_id>/delete/", views.application_delete_view, name="application_delete"),
+    # AI generation for applications
+    path(
+        "applications/<int:application_id>/generate/cv/",
+        views.application_generate_cv_view,
+        name="application_generate_cv",
+    ),
+    path(
+        "applications/<int:application_id>/generate/cover-letter/",
+        views.application_generate_cover_letter_view,
+        name="application_generate_cover_letter",
+    ),
+    path(
+        "applications/<int:application_id>/generate/status/<str:task_id>/",
+        views.application_generation_status_view,
+        name="application_generation_status",
+    ),
+    path("applications/<int:application_id>/save/cv/", views.application_save_cv_view, name="application_save_cv"),
+    path(
+        "applications/<int:application_id>/save/cover-letter/",
+        views.application_save_cover_letter_view,
+        name="application_save_cover_letter",
+    ),
 ]

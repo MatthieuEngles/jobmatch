@@ -2,6 +2,132 @@
 
 ## 📅 Sessions
 
+### 2025-12-29 (31) - Infrastructure Terraform GCP + CI/CD GitHub Actions
+
+**Contexte:** Création de l'infrastructure de déploiement V0 sur Google Cloud Platform avec Terraform et CI/CD via GitHub Actions.
+
+**Réalisations:**
+
+- **Documentation architecture** (`infra/docs/`) :
+  - `ARCHITECTURE_V0.md` : Schéma complet de l'infra (VM, VPC, Storage, BigQuery), estimation coûts (~32€/mois), flux de données, CI/CD
+  - `GCP_IAM_GUIDE.md` : Guide complet gestion des droits IAM, Workload Identity Federation, ajout collègues
+
+- **Terraform complet** (`infra/terraform/`) :
+  - `main.tf` : Provider GCP, backend GCS, activation APIs
+  - `variables.tf` : Toutes les variables configurables
+  - `network.tf` : VPC custom, subnet, IP statique, firewall (22, 80, 443)
+  - `vm.tf` : VM e2-medium Ubuntu 22.04 avec startup script (Docker, Caddy, Git)
+  - `storage.tf` : Buckets bronze (offres JSON) + backups avec lifecycle policies
+  - `bigquery.tf` : Datasets silver/gold avec tables offers, skills, formations, etc.
+  - `iam.tf` : 3 Service Accounts (vm, terraform, deploy) + Workload Identity Federation
+  - `outputs.tf` : Outputs utiles (IP, SSH command, secrets GitHub)
+
+- **GitHub Actions CI/CD** (`.github/workflows/`) :
+  - `terraform.yml` : Plan sur PR, Apply sur push main
+  - `deploy.yml` : Build Docker + deploy sur VM via SSH
+
+**Problèmes rencontrés:**
+
+- **Variable `$PROJECT_ID` non définie** :
+  - Symptôme : `gsutil mb` échoue avec "Invalid bucket name"
+  - Solution : Utiliser `$(gcloud config get-value project)` ou hardcoder `job-match-v0`
+
+- **Billing account not linked** :
+  - Symptôme : `gcloud services enable` échoue avec FAILED_PRECONDITION
+  - Solution : Activer la facturation via Console GCP avant d'activer les APIs
+  - Documenté dans GCP_IAM_GUIDE.md comme étape obligatoire
+
+- **Terraform ne déploie pas les changements de code** (cf. POSTMORTEM_miniterraform) :
+  - Cause : Terraform compare la configuration, pas le contenu des images Docker
+  - Solution : `docker compose build --no-cache --pull` + `down` + `up -d` dans deploy.yml
+
+**Décisions techniques:**
+
+- **Workload Identity Federation** (pas de clé JSON) : Méthode recommandée par Google, pas de secret à gérer
+- **VM unique avec docker-compose** : Simple pour V0, migration vers Cloud Run possible en V1
+- **Caddy sur VM** : SSL automatique avec Let's Encrypt, gratuit
+- **IP statique** : Stabilité DNS, gratuit si attachée à une VM
+- **BigQuery pour Silver/Gold** : Analytics, pas de serveur à gérer
+- **Backend GCS pour Terraform** : State partagé entre CI/CD et local
+
+**Fichiers créés:**
+```
+infra/
+├── docs/
+│   ├── ARCHITECTURE_V0.md
+│   └── GCP_IAM_GUIDE.md
+└── terraform/
+    ├── main.tf
+    ├── variables.tf
+    ├── network.tf
+    ├── vm.tf
+    ├── storage.tf
+    ├── bigquery.tf
+    ├── iam.tf
+    ├── outputs.tf
+    ├── terraform.tfvars.example
+    └── .gitignore
+.github/workflows/
+├── terraform.yml
+└── deploy.yml
+```
+
+**Prochaines étapes:**
+1. Créer le bucket Terraform state : `gsutil mb -l EU gs://jobmatch-terraform-state-job-match-v0`
+2. Configurer les secrets GitHub
+3. Premier `terraform init` + `terraform apply`
+4. Configurer DNS vers IP statique
+
+---
+
+### 2025-12-29 (30) - Local Ollama Docker + README + Debug cv-ingestion LLM
+
+**Contexte:** Ajouter un serveur Ollama local en Docker avec modèles Mistral pré-téléchargés, créer le README global du projet, et débugger les problèmes de connexion LLM pour cv-ingestion.
+
+**Réalisations:**
+
+- **Service local-ollama Docker** :
+  - Nouveau dossier `app/local_ollama/` avec Dockerfile et entrypoint
+  - Modèles `mistral:latest` et `mistral:7b` téléchargés au build
+  - Service ajouté dans docker-compose.yml (port 11434)
+  - Volume `ollama_data` pour persister les modèles
+
+- **README.md global** :
+  - Architecture du projet avec arborescence
+  - Table des services avec ports et status (OK/WIP)
+  - Instructions de démarrage (docker-compose + dev.sh)
+  - Documentation de tous les services : gui, ai-assistant, cv-ingestion, offre-ingestion, matching, local-ollama
+  - Configuration et variables d'environnement
+  - Stack technique et conventions
+
+- **Documentation schémas Django** :
+  - Explication du modèle User (AbstractUser avec préférences)
+  - Explication du modèle CandidateProfile
+  - Relation CandidateProfile ↔ ExtractedLine via ProfileItemSelection (N:N)
+
+**Problèmes rencontrés:**
+
+- **cv-ingestion : "model 'ministral-3:14b' not found"** :
+  - Symptôme : Erreur 404 sur l'endpoint `/v1/chat/completions`
+  - Cause : Le serveur distant `llm.molp.fr` expose l'API Ollama native (`/api/tags`, `/api/generate`) mais l'API OpenAI-compatible (`/v1/models`, `/v1/chat/completions`) ne liste aucun modèle
+  - Le SDK OpenAI utilisé par cv-ingestion appelle `/v1/chat/completions` qui retourne "model not found"
+  - `/api/tags` montre les modèles mais `/v1/models` retourne une liste vide
+  - Status : Non résolu - problème côté serveur `llm.molp.fr`
+
+**Décisions techniques:**
+
+- **Modèles téléchargés au build** : Plutôt qu'au runtime (entrypoint), pour un démarrage plus rapide des containers
+- **Volume Docker pour Ollama** : Les modèles sont volumineux (~4GB), évite de re-télécharger à chaque rebuild
+- **README structuré par service** : Chaque microservice a sa section avec exemples curl
+
+**Fichiers créés/modifiés:**
+- `app/local_ollama/Dockerfile` : Image Ollama avec pull des modèles
+- `app/local_ollama/entrypoint.sh` : Script de démarrage simplifié
+- `docker-compose.yml` : Service local-ollama + volume ollama_data
+- `README.md` : Documentation complète du projet (nouveau fichier)
+
+---
+
 ### 2025-12-24 (29) - Boutons Voir/Télécharger DOCX pour CV et Lettre
 
 **Contexte:** Améliorer l'UX de la page candidature en ajoutant des boutons d'action (voir/télécharger) pour les documents générés, avec export DOCX.
@@ -1498,6 +1624,22 @@ git add -A && git commit -m "message"
   - **Problème réel** : aucun, ce sont des exemples de documentation, pas de vrais tokens
   - **Faux positif** : Gitleaks ne distingue pas les exemples des vrais secrets
   - **Solution** : utiliser des placeholders explicites comme `<JWT_ACCESS_TOKEN>` au lieu de vrais formats JWT `eyJ0eXAi...`
+- **Ollama API OpenAI-compatible vs native** : Ollama expose deux APIs différentes :
+  - `/api/tags`, `/api/generate`, `/api/chat` : API native Ollama
+  - `/v1/models`, `/v1/chat/completions` : API OpenAI-compatible
+  - **Problème** : `/api/tags` peut lister des modèles alors que `/v1/models` retourne une liste vide
+  - **Cause** : Les modèles doivent être explicitement exposés via l'API OpenAI-compatible (config Ollama)
+  - **Solution** : Vérifier les deux endpoints, ou adapter le code pour utiliser l'API native Ollama si nécessaire
+- **GCP Billing account not found** : l'erreur `Billing account for project 'xxx' is not found` survient quand on essaie d'activer des APIs avant d'avoir lié un compte de facturation au projet.
+  - **Prérequis obligatoire** : Console GCP → Facturation → Associer le projet au compte de facturation
+  - **Ordre** : 1) Créer projet, 2) Activer facturation, 3) Activer APIs
+- **Terraform ne déploie pas le code** : Terraform gère l'infrastructure, PAS le code applicatif. Si l'architecture n'a pas changé, `terraform apply` ne fait rien même si le code a changé.
+  - **Problème** : Docker peut utiliser des layers cachées et ne pas intégrer le nouveau code
+  - **Solution** : Dans le workflow de déploiement, utiliser `docker compose build --no-cache --pull` pour forcer la reconstruction
+  - **Workflow correct** : `build --no-cache` → `down` → `up -d`
+- **Variable d'environnement non définie dans gsutil** : `gsutil mb gs://bucket-name-$PROJECT_ID` échoue avec "Invalid bucket name" si `$PROJECT_ID` n'est pas défini.
+  - **Solution 1** : `export PROJECT_ID=mon-projet-id` avant la commande
+  - **Solution 2** : Hardcoder le nom du bucket directement dans les fichiers Terraform
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -1542,6 +1684,10 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - **Détection auto PDF texte/image** : heuristique simple (min chars) avant de choisir la méthode d'extraction
 - **Vision LLM + OCR fallback** : robustesse maximale pour tous types de PDF
 - **Pre-commit workflow** : `ruff check --fix . && ruff format .` avant chaque commit pour auto-fix et formatage
+- **Documentation avant code** : rédiger ARCHITECTURE.md et IAM_GUIDE.md avant de coder l'infrastructure permet de valider l'approche et facilite la maintenance
+- **Workload Identity Federation** : évite les clés JSON service account, auth keyless depuis GitHub Actions vers GCP
+- **Terraform modules séparés** : main.tf, variables.tf, network.tf, vm.tf, storage.tf, bigquery.tf, iam.tf, outputs.tf - meilleure lisibilité et maintenance
+- **Deux workflows GitHub Actions séparés** : un pour Terraform (infra/), un pour Deploy (app/) - séparation claire des responsabilités
 
 ## 📋 TODO / Dette technique
 - [x] Choix de la stack technique → architecture microservices Python

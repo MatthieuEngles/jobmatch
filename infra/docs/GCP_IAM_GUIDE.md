@@ -264,25 +264,86 @@ terraform output terraform_service_account
 
 #### A.3 Configurer les GitHub Secrets
 
-Va dans ton repo GitHub : **Settings → Secrets and variables → Actions → New repository secret**
+**IMPORTANT** : Sans ces secrets, les workflows GitHub Actions echoueront avec l'erreur :
+```
+Error: google-github-actions/auth failed with: the GitHub Action workflow must specify exactly one of "workload_identity_provider" or "credentials_json"
+```
 
-| Secret Name | Valeur | Description |
-|-------------|--------|-------------|
-| `GCP_PROJECT_ID` | `job-match-v0` | ID du projet |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | (output terraform) | Format: `projects/123.../providers/github-provider` |
-| `GCP_TERRAFORM_SERVICE_ACCOUNT` | `terraform-sa@job-match-v0.iam.gserviceaccount.com` | Pour workflow Terraform |
-| `GCP_DEPLOY_SERVICE_ACCOUNT` | `deploy-sa@job-match-v0.iam.gserviceaccount.com` | Pour workflow Deploy |
+##### Etape 1 : Acceder aux secrets GitHub
 
-**Secrets applicatifs** (pour le .env sur la VM) :
+1. Va sur ton repo GitHub : https://github.com/MatthieuEngles/jobmatch
+2. Clique sur **Settings** (onglet en haut)
+3. Dans le menu gauche, clique sur **Secrets and variables** → **Actions**
+4. Clique sur **New repository secret**
 
-| Secret Name | Valeur |
-|-------------|--------|
-| `POSTGRES_USER` | `jobmatch` |
-| `POSTGRES_PASSWORD` | (genere un mot de passe fort) |
-| `POSTGRES_DB` | `jobmatch` |
-| `DJANGO_SECRET_KEY` | (genere avec `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`) |
-| `LLM_API_KEY` | (ta cle API LLM) |
-| `LLM_ENDPOINT` | `https://llm.molp.fr/v1` |
+##### Etape 2 : Ajouter les secrets GCP (Infrastructure)
+
+Pour chaque secret, clique "New repository secret", entre le nom et la valeur :
+
+| Secret Name | Valeur | Comment l'obtenir |
+|-------------|--------|-------------------|
+| `GCP_PROJECT_ID` | `job-match-v0` | Ton ID de projet GCP |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/XXXXXX/locations/global/workloadIdentityPools/github-pool/providers/github-provider` | `terraform output workload_identity_provider` |
+| `GCP_SERVICE_ACCOUNT` | `terraform-sa@job-match-v0.iam.gserviceaccount.com` | Pour le workflow Terraform |
+| `GCP_DEPLOY_SERVICE_ACCOUNT` | `deploy-sa@job-match-v0.iam.gserviceaccount.com` | Pour le workflow Deploy |
+
+**Pour obtenir `GCP_WORKLOAD_IDENTITY_PROVIDER`** :
+```bash
+cd infra/terraform
+terraform output workload_identity_provider
+# Copie la valeur complete (sans les guillemets)
+```
+
+##### Etape 3 : Ajouter les secrets applicatifs (Deploiement)
+
+Ces secrets seront injectes dans le fichier `.env` sur la VM :
+
+| Secret Name | Valeur | Comment generer |
+|-------------|--------|-----------------|
+| `POSTGRES_USER` | `jobmatch` | Nom d'utilisateur PostgreSQL |
+| `POSTGRES_PASSWORD` | `MotDePasseSecurise123!` | Genere un mot de passe fort |
+| `POSTGRES_DB` | `jobmatch` | Nom de la base de donnees |
+| `DJANGO_SECRET_KEY` | (voir ci-dessous) | Cle secrete Django |
+| `LLM_API_KEY` | (ta cle API) | Cle API de ton service LLM |
+| `LLM_ENDPOINT` | `https://llm.molp.fr/v1` | URL de ton endpoint LLM |
+
+**Pour generer `DJANGO_SECRET_KEY`** :
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+# Exemple de sortie : 4&5@#k2!9x$m7n3p1q8r6t0w
+```
+
+Ou avec openssl :
+```bash
+openssl rand -base64 50
+```
+
+##### Etape 4 : Verifier les secrets
+
+Apres avoir ajoute tous les secrets, tu devrais voir cette liste :
+
+```
+Repository secrets (8)
+├── GCP_PROJECT_ID
+├── GCP_WORKLOAD_IDENTITY_PROVIDER
+├── GCP_SERVICE_ACCOUNT
+├── GCP_DEPLOY_SERVICE_ACCOUNT
+├── POSTGRES_USER
+├── POSTGRES_PASSWORD
+├── POSTGRES_DB
+├── DJANGO_SECRET_KEY
+├── LLM_API_KEY
+└── LLM_ENDPOINT
+```
+
+##### Etape 5 : Relancer le workflow
+
+Apres avoir configure les secrets :
+1. Va dans l'onglet **Actions** de ton repo
+2. Clique sur le workflow qui a echoue
+3. Clique sur **Re-run all jobs**
+
+Ou push un nouveau commit pour declencher automatiquement le workflow.
 
 #### A.4 Creer un Environment "production" (optionnel mais recommande)
 

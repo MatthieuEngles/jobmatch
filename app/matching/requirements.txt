@@ -5,3 +5,4 @@ pytest
 sentence-transformers
 sqlalchemy
 uvicorn
+httpx

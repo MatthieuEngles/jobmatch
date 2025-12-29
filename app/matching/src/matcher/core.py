@@ -2,24 +2,29 @@
 This module matches a CV description embedding against job offers embeddings stored in a sqlite database.
 
 """
+
 import sys
+from dataclasses import dataclass
 from os.path import exists
+from pathlib import Path
+
 import numpy as np
 import sqlalchemy as db
 from sqlalchemy import create_engine, text
-from pathlib import Path
 
 # Import de la fonction de similarité depuis le shared module
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "shared" / "src"))
 from shared.embeddings import TextSimilarity
 from shared.embeddings.providers import create_sentence_transformers_embedder
 
-
+SAMPLE_SQLITE_DB = Path(__file__).resolve().parents[1] / "sample_data" / "top10.db"
 SAMPLE_GOLD = Path(__file__).resolve().parents[1] / "sample_data" / "job_offers_gold.db"
 SAMPLE_SILVER = Path(__file__).resolve().parents[1] / "sample_data" / "job_offers_silver.db"
-SAMPLE_CV_DESCRIPTION_ENGINEER = "Ingénieur logiciel expérimenté avec une expertise en Python et apprentissage automatique."
-SAMPLE_CV_DESCRIPTION_CARISTE = \
-    """Cariste avec expérience en gestion de stocks et conduite de chariots élévateurs.
+SAMPLE_CV_DESCRIPTION_ENGINEER = (
+    "Ingénieur logiciel expérimenté avec une expertise en Python et apprentissage automatique."
+)
+SAMPLE_CV_TITLE_CARISTE = "Cariste"
+SAMPLE_CV_DESCRIPTION_CARISTE = """Cariste avec expérience en gestion de stocks et conduite de chariots élévateurs.
     Je suis certifié pour la conduite de chariots de catégorie 1, 3 et 5.
     J'ai travaillé dans des entrepôts à haut volume et je suis familier avec les systèmes de gestion d'inventaire.
     Rigoureux et soucieux de la sécurité, je cherche à contribuer à une équipe dynamique
@@ -29,14 +34,28 @@ SAMPLE_CV_DESCRIPTION_CARISTE = \
 SAMPLE_CV_DESCRIPTION = SAMPLE_CV_DESCRIPTION_CARISTE
 
 
+@dataclass
+class MatchResult:
+    """
+    Dataclass representing a match result with job offer id and similarity score.
+
+    Attributes:
+        id (str): Job offer ID.
+        similarity (float): Similarity score.
+    """
+
+    id: str
+    similarity: float
+
+
 def load_dtb(db_path, mode="gold"):
     """
     Load job offers embeddings from a sqlite database.
-    
+
     Args:
         db_path (str): Path to the sqlite database.
         mode (str): "gold" to load embeddings from gold database,
-            
+
                     "silver" to load raw text from silver database.
     Returns:
         List of dicts with keys:
@@ -51,7 +70,7 @@ def load_dtb(db_path, mode="gold"):
 
     # Check tables
     inspector = db.inspect(engine)
-    assert "offers" in inspector.get_table_names(), "Table 'offers' not found in database."
+    assert "offers" in inspector.get_table_names(), f"Table 'offers' not found in database: {db_path}"
 
     if mode == "gold":
         query = text("SELECT id, intitule_embedded, description_embedded FROM offers")
@@ -65,16 +84,13 @@ def load_dtb(db_path, mode="gold"):
     for row in result:
         offer_id = row[0]
         if mode == "silver":
-            offers.append({"id": offer_id,
-                           "intitule": row[1],
-                           "description": row[2]})
+            offers.append({"id": offer_id, "intitule": row[1], "description": row[2]})
         elif mode == "gold":
             embedded_blob = row[1]
             i_embedded = np.frombuffer(embedded_blob, dtype=np.float64)
             embedded_blob = row[2]
             d_embedded = np.frombuffer(embedded_blob, dtype=np.float64)
-            offers.append({"id": offer_id, "description_embedded": d_embedded,
-                           "intitule_embedded": i_embedded})
+            offers.append({"id": offer_id, "description_embedded": d_embedded, "intitule_embedded": i_embedded})
         else:
             raise ValueError("mode must be 'gold' or 'silver'")
 
@@ -82,8 +98,7 @@ def load_dtb(db_path, mode="gold"):
     return offers
 
 
-def match_cv(title_embedded, description_embedded,
-             job_offers_db_path, method="description"):
+def match_cv(title_embedded, description_embedded, job_offers_db_path, method="description"):
     """
     Match CV title and description embeddings against job offers embeddings stored in a sqlite database.
 
@@ -93,7 +108,10 @@ def match_cv(title_embedded, description_embedded,
         job_offers_db_path (str): Path to the job offers sqlite database.
         method (str): "intitule", "description" or "mix" to select matching method.
     Returns:
-        
+        list[MatchResult]: List of MatchResult dataclasses with:
+            - "id": offer id (str)
+            - "similarity": similarity score (float)
+
     """
     # load job offers embeddings sqlite database
     offers = load_dtb(job_offers_db_path, mode="gold")
@@ -114,23 +132,23 @@ def match_cv(title_embedded, description_embedded,
             sim2 = TextSimilarity.cosine_similarity(description_embedded, v2)
             sim = (sim1 + sim2) / 2
 
-        similarities.append({"id": offer["id"], "similarity": sim})
+        similarities.append(MatchResult(id=offer["id"], similarity=sim))
 
     # sort by similarity descending
-    similarities.sort(key=lambda x: x["similarity"], reverse=True)
+    similarities.sort(key=lambda x: x.similarity, reverse=True)
 
     return similarities
 
 
-def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
-                    job_offers_gold_db_path=SAMPLE_GOLD,
-                    job_offers_silver_db_path=SAMPLE_SILVER):
+def test_user_input(
+    cv_description=SAMPLE_CV_DESCRIPTION, job_offers_gold_db_path=SAMPLE_GOLD, job_offers_silver_db_path=SAMPLE_SILVER
+):
     """Test the matching function with a user-provided CV description."""
-    # 
+    #
     assert exists(job_offers_gold_db_path), f"Gold database not found: {job_offers_gold_db_path}"
     assert exists(job_offers_silver_db_path), f"Silver database not found: {job_offers_silver_db_path}"
 
-    # init embedder    
+    # init embedder
     embedder = create_sentence_transformers_embedder(model="all-MiniLM-L6-v2", normalize=True)
 
     # Compute embedding for the CV description
@@ -138,11 +156,19 @@ def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
     description_embedded = description_embedded[0]
     # test the matching function
 
+    # title_embedded = embedder([SAMPLE_CV_TITLE_CARISTE])
+    # title_embedded = title_embedded[0]
+    # description_embedded = embedder([SAMPLE_CV_DESCRIPTION_CARISTE])
+    # description_embedded = description_embedded[0]
+    # np.save("desc_embedded.npy", description_embedded)
+    # np.save("title_embedded.npy", title_embedded)
+    # print("done.")
+
     similarites_mix = match_cv(
         title_embedded=description_embedded,
         description_embedded=description_embedded,
         job_offers_db_path=job_offers_gold_db_path,
-        method="mix"
+        method="mix",
     )
     top_matches_mix = similarites_mix[:5]
     bottom_matches_mix = similarites_mix[-5:]
@@ -151,7 +177,7 @@ def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
         title_embedded=description_embedded,
         description_embedded=description_embedded,
         job_offers_db_path=job_offers_gold_db_path,
-        method="intitule"
+        method="intitule",
     )
     top_matches_title = similarites_title[:5]
     bottom_matches_title = similarites_title[-5:]
@@ -160,7 +186,7 @@ def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
         title_embedded=description_embedded,
         description_embedded=description_embedded,
         job_offers_db_path=job_offers_gold_db_path,
-        method="description"
+        method="description",
     )
     top_matches_description = similarites_description[:5]
     bottom_matches_description = similarites_description[-5:]
@@ -173,44 +199,52 @@ def test_user_input(cv_description=SAMPLE_CV_DESCRIPTION,
 
     print("\nDetails of bottom matched job offers from Silver database:")
     for i_m, (match_d, match_t, match_m) in enumerate(
-        zip(bottom_matches_description, bottom_matches_title, bottom_matches_mix)):
-        offer_id_d = match_d["id"]
-        offer_id_t = match_t["id"]
-        offer_id_m = match_m["id"]
-        for offer_id, mode, match in zip([offer_id_d, offer_id_t, offer_id_m],
-                                  ["description", "intitule", "mix"],
-                                  [match_d, match_t, match_m]):
+        zip(bottom_matches_description, bottom_matches_title, bottom_matches_mix, strict=True)
+    ):
+        offer_id_d = match_d.id
+        offer_id_t = match_t.id
+        offer_id_m = match_m.id
+        for offer_id, mode, match in zip(
+            [offer_id_d, offer_id_t, offer_id_m],
+            ["description", "intitule", "mix"],
+            [match_d, match_t, match_m],
+            strict=True,
+        ):
             for offer in silver_data:
                 if offer["id"] == offer_id:
                     if mode == "description":
-                        print(f"--- Bottom {i_m+1} ---")
-                    print(f"[{mode}] Offer ID: {offer_id}, Similarity: {match['similarity']:.4f}")
+                        print(f"--- Bottom {i_m + 1} ---")
+                    print(f"[{mode}] Offer ID: {offer_id}, Similarity: {match.similarity:.4f}")
                     print(f"[{mode}] Intitule: {offer.get('intitule', 'N/A')}")
-                    #print(f"Description: {offer.get('description', 'N/A')}\n")
+                    # print(f"Description: {offer.get('description', 'N/A')}\n")
                     break
 
-    
     print("\nDetails of top matched job offers from Silver database:")
     for i_m, (match_d, match_t, match_m) in enumerate(
-        zip(top_matches_description, top_matches_title, top_matches_mix)):
-        offer_id_d = match_d["id"]
-        offer_id_t = match_t["id"]
-        offer_id_m = match_m["id"]
-        for offer_id, mode, match in zip([offer_id_d, offer_id_t, offer_id_m],
-                                         ["description", "intitule", "mix"],
-                                         [match_d, match_t, match_m]):
+        zip(top_matches_description, top_matches_title, top_matches_mix, strict=True)
+    ):
+        offer_id_d = match_d.id
+        offer_id_t = match_t.id
+        offer_id_m = match_m.id
+        for offer_id, mode, match in zip(
+            [offer_id_d, offer_id_t, offer_id_m],
+            ["description", "intitule", "mix"],
+            [match_d, match_t, match_m],
+            strict=True,
+        ):
             for offer in silver_data:
                 if offer["id"] == offer_id:
                     if mode == "description":
-                        print(f"--- Top {i_m+1} ---")
-                    print(f"[{mode}] Offer ID: {offer_id}, Similarity: {match['similarity']:.4f}")
+                        print(f"--- Top {i_m + 1} ---")
+                    print(f"[{mode}] Offer ID: {offer_id}, Similarity: {match.similarity:.4f}")
                     print(f"[{mode}] Intitule: {offer.get('intitule', 'N/A')}")
-                    #print(f"Description: {offer.get('description', 'N/A')}\n")
+                    # print(f"Description: {offer.get('description', 'N/A')}\n")
                     break
 
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
+
     parser = ArgumentParser(description="Match CV description against job offers embeddings.")
     parser.add_argument(
         "--cv_description",
@@ -230,9 +264,10 @@ if __name__ == "__main__":
         default=str(SAMPLE_SILVER),
         help="Path to the job offers silver database (sqlite).",
     )
-    args = parser.parse_args() 
+    args = parser.parse_args()
     print(args)
-    test_user_input(cv_description=args.cv_description,
-                    job_offers_gold_db_path=args.job_offers_gold_db_path,
-                    job_offers_silver_db_path=args.job_offers_silver_db_path
-                    )
+    test_user_input(
+        cv_description=args.cv_description,
+        job_offers_gold_db_path=args.job_offers_gold_db_path,
+        job_offers_silver_db_path=args.job_offers_silver_db_path,
+    )

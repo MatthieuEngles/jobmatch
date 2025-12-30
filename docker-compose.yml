@@ -61,9 +61,11 @@ services:
       - jobmatch-network
 
   matching:
-    build: ./app/matching
+    build:
+      context: .
+      dockerfile: app/matching/Dockerfile
     ports:
-      - "${MATCHING_PORT:-8083}:8083"
+      - "${MATCHING_PORT:-8083}:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - CV_INGESTION_URL=${CV_INGESTION_URL}

@@ -89,4 +89,8 @@ urlpatterns = [
         views.application_save_cover_letter_view,
         name="application_save_cover_letter",
     ),
+    # Top offers - personalized recommendations
+    path("api/top-offers/refresh/", views.top_offers_refresh_view, name="top_offers_refresh"),
+    path("api/offers/<str:offer_id>/", views.offer_details_view, name="offer_details"),
+    path("api/offers/<str:offer_id>/add/", views.add_offer_to_applications_view, name="add_offer_to_applications"),
 ]

@@ -17,6 +17,10 @@ services:
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - MATCHING_URL=${MATCHING_URL}
       - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
+      # Top offers feature configuration
+      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING:-true}
+      - USE_SQLITE_OFFERS=${USE_SQLITE_OFFERS:-true}
+      - MATCHING_SERVICE_URL=${MATCHING_SERVICE_URL:-http://matching:8086}
     depends_on:
       - db
     networks:

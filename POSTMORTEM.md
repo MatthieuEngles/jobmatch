@@ -2,6 +2,155 @@
 
 ## 📅 Sessions
 
+### 2025-12-30 (34) - Top Offres : Correction Ajout Candidatures + Documentation Architecture
+
+**Contexte:** Correction des bugs dans le flux d'ajout d'offres aux candidatures et création de la documentation technique d'architecture du système Top Offres.
+
+**Réalisations:**
+
+- **Fix ImportError** : Ajout de `ImportedOffer` aux imports dans `accounts/views.py` (ligne 36)
+  - Erreur : `name 'ImportedOffer' is not defined`
+
+- **Fix création Application manquante** : Modification de `add_offer_to_applications_view`
+  - Bug : L'offre était importée (`ImportedOffer.objects.create()`) mais aucune `Application` n'était créée
+  - Fix : Ajout de `Application.objects.create()` après la création de l'ImportedOffer
+  - L'utilisateur peut maintenant voir l'offre dans "Suivi des candidatures"
+
+- **Fix rechargement sidebar** : Ajout de `window.location.reload()` dans le handler JS
+  - Bug : Après ajout d'une offre, la carte "Suivi des candidatures" ne se mettait pas à jour
+  - Fix : Rechargement complet de la page après 1s (solution simple et efficace)
+
+- **Documentation Architecture** : Création de `docs/top_offers_architecture.md`
+  - Schéma flux utilisateur complet
+  - Architecture mode mock (USE_MOCK_MATCHING=true) avec SQLite Silver DB
+  - Architecture mode production avec BigQuery et matching API
+  - Modèles de données (CandidateProfile, MatchResult, TopOfferResult, ImportedOffer, Application)
+  - Endpoints API documentés
+  - Structure table BigQuery `gold.offers` avec colonnes embeddings
+
+- **Export PDF** : Génération de `docs/top_offers_architecture.pdf` via pandoc
+
+**Problèmes rencontrés:**
+
+- **Docker ContainerConfig KeyError** : Erreur récurrente au rebuild
+  - Solution : `docker rm -f <container_id>` puis `docker-compose up -d`
+
+- **Offres non ajoutées aux candidatures** :
+  - Diagnostic : Query SQL confirmant ImportedOffer créé (id=13) mais Application manquante
+  - Cause : `add_offer_to_applications_view` créait seulement ImportedOffer
+  - Solution : Ajout de la création d'Application dans la même vue
+
+**Décisions techniques:**
+
+- **Deux embeddings séparés** : `title_embedding` (384 dims) + `cv_embedding` (384 dims)
+  - title_embedding : généré depuis profile.description ou profile.title
+  - cv_embedding : généré depuis les lignes CV sélectionnées du profil
+
+- **Embeddings dans BigQuery** : Colonnes `ARRAY<FLOAT64>` dans `gold.offers` (pas de vector DB séparée)
+
+- **Rechargement page** : Choisi plutôt qu'AJAX partiel pour simplicité et fiabilité
+
+**Fichiers modifiés:**
+- `app/gui/accounts/views.py` : Import ImportedOffer + création Application
+- `app/gui/templates/home.html` : Reload page après ajout offre
+- `docs/top_offers_architecture.md` : Nouvelle documentation (créé)
+- `docs/top_offers_architecture.pdf` : Export PDF (créé)
+
+---
+
+### 2025-12-29 (33) - Feature Top Offres Pour Vous (Design + Documentation)
+
+**Contexte:** Ajout d'une nouvelle fonctionnalite permettant aux utilisateurs de rafraichir leurs recommandations d'offres d'emploi personnalisees.
+
+**Realisations:**
+
+- **Bouton Rafraichir** : Ajout du bouton dans la carte "Top offres pour vous" sur la homepage
+  - CSS avec animation de rotation au survol
+  - Structure HTML modifiee (`<a>` → `<div>` + bouton separe)
+  - ID `refresh-offers-btn` pour la future implementation JS
+
+- **Documentation technique** : Creation de `doc_support_contexte/FEATURE_TOP_OFFERS.md`
+  - Architecture complete du flux (GUI → Shared → Matching → Gold DB)
+  - Contrat API matching defini (POST `/api/match` avec embeddings + top_k)
+  - Schemas de base de donnees Gold (embeddings + details)
+  - Responsabilites par composant (Matthieu: GUI/Shared, Maxime: Matching)
+
+**Decisions techniques:**
+
+- **Gold DB unifie** : Les details des offres (intitule, description, entreprise) seront dans Gold DB (pas Silver)
+- **Embeddings calcules cote GUI** : La GUI utilise `app/shared/` pour generer les embeddings avant d'appeler matching
+- **API Matching simple** : Entree = 2 embeddings + top_k, Sortie = liste (offer_id, score)
+- **Fusion multi-profils** : GUI fusionne les resultats de tous les profils, dedup par meilleur score
+
+**Fichiers modifies:**
+- `app/gui/templates/home.html` : Bouton rafraichir + CSS
+- `doc_support_contexte/FEATURE_TOP_OFFERS.md` : Documentation complete (nouveau fichier)
+
+**Prochaines etapes:**
+1. Implementation du backend Django (endpoint AJAX)
+2. Implementation du frontend JS (appel AJAX, loading state, affichage resultats)
+3. Coordination avec Maxime pour l'API matching
+4. Tests d'integration
+
+---
+
+### 2025-12-29 (32) - Exécution Terraform + Configuration GitHub Secrets
+
+**Contexte:** Suite de la session 31, exécution du Terraform et résolution des problèmes de déploiement.
+
+**Réalisations:**
+
+- **Terraform apply réussi** : Infrastructure GCP créée (VM europe-west1, VPC, Storage, BigQuery, IAM)
+- **Zone dynamique** : Ajout de `data.google_compute_zones.available` pour sélectionner automatiquement une zone disponible
+- **Documentation enrichie** : Section détaillée configuration GitHub Secrets dans GCP_IAM_GUIDE.md avec erreur exacte et étapes pas à pas
+- **Workflow deploy.yml corrigé** : Récupération dynamique de la zone VM via `gcloud compute instances list`
+
+**Problèmes rencontrés:**
+
+- **VM unavailable europe-west9** :
+  - Symptôme : `e2-standard-2 is currently unavailable in europe-west9-b zone`
+  - Solution : Changement région vers `europe-west1` (Belgique) + zone dynamique
+
+- **BigQuery dataset "already exists"** :
+  - Symptôme : `Error 409: Already Exists: Dataset job-match-v0:jobmatch_gold`
+  - Cause : Bug provider Google, dataset créé mais pas dans le state
+  - Solution : `terraform import google_bigquery_dataset.gold job-match-v0/jobmatch_gold`
+
+- **GitHub Actions "workload_identity_provider" error** :
+  - Symptôme : `google-github-actions/auth failed with: must specify exactly one of "workload_identity_provider" or "credentials_json"`
+  - Cause : Secrets GitHub non configurés
+  - Solution : Documenter la configuration complète des secrets dans GCP_IAM_GUIDE.md
+
+- **Terraform --classic snap** :
+  - Symptôme : `error: This revision of snap "terraform" was published using classic confinement`
+  - Solution : `sudo snap install terraform --classic`
+
+- **Application Default Credentials manquantes** :
+  - Symptôme : `storage.NewClient() failed: could not find default credentials`
+  - Cause : `gcloud auth login` ≠ `gcloud auth application-default login`
+  - Solution : Exécuter les deux commandes, documenter la différence
+
+**Décisions techniques:**
+
+- **europe-west1** au lieu de europe-west9 : Plus de disponibilité VM
+- **Zone dynamique** : `data.google_compute_zones.available.names[0]` évite les erreurs de capacité
+- **Deux types d'auth gcloud** : Documenter `auth login` (CLI) vs `auth application-default login` (SDK/Terraform)
+
+**Fichiers modifiés:**
+- `infra/terraform/vm.tf` : Ajout data source zones dynamique
+- `infra/terraform/outputs.tf` : Références zone dynamique
+- `infra/terraform/terraform.tfvars.example` : Région europe-west1, suppression variable zone
+- `.github/workflows/deploy.yml` : GCP_REGION + récupération zone dynamique
+- `infra/docs/GCP_IAM_GUIDE.md` : Section détaillée GitHub Secrets
+
+**Prochaines étapes:**
+1. Configurer les secrets GitHub (voir GCP_IAM_GUIDE.md section A.3)
+2. Donner accès GCP à Mohamed (Storage + BigQuery)
+3. Intégration BigQuery dans offre-ingestion
+4. Déploiement initial sur la VM
+
+---
+
 ### 2025-12-29 (31) - Infrastructure Terraform GCP + CI/CD GitHub Actions
 
 **Contexte:** Création de l'infrastructure de déploiement V0 sur Google Cloud Platform avec Terraform et CI/CD via GitHub Actions.
@@ -1640,6 +1789,23 @@ git add -A && git commit -m "message"
 - **Variable d'environnement non définie dans gsutil** : `gsutil mb gs://bucket-name-$PROJECT_ID` échoue avec "Invalid bucket name" si `$PROJECT_ID` n'est pas défini.
   - **Solution 1** : `export PROJECT_ID=mon-projet-id` avant la commande
   - **Solution 2** : Hardcoder le nom du bucket directement dans les fichiers Terraform
+- **Deux types d'authentification gcloud** : `gcloud auth login` et `gcloud auth application-default login` sont DIFFÉRENTS.
+  - `gcloud auth login` : Authentifie le CLI gcloud (pour les commandes `gcloud`, `gsutil`)
+  - `gcloud auth application-default login` : Crée les credentials pour les SDKs (Terraform, Python, etc.)
+  - **Piège** : Faire `gcloud auth login` ne suffit pas pour Terraform, il faut aussi `gcloud auth application-default login`
+- **Zone GCP indisponible** : Certains types de VM ne sont pas disponibles dans toutes les zones.
+  - **Symptôme** : `e2-standard-2 VM instance is currently unavailable in the europe-west9-b zone`
+  - **Solution** : Utiliser `data.google_compute_zones.available` pour sélectionner automatiquement une zone disponible
+- **terraform import pour ressources existantes** : Si une ressource existe dans GCP mais pas dans le state Terraform.
+  - **Symptôme** : `Error 409: Already Exists`
+  - **Solution** : `terraform import google_bigquery_dataset.gold job-match-v0/jobmatch_gold`
+- **GitHub Actions secrets non configurés** : Erreur cryptique si les secrets manquent.
+  - **Symptôme** : `google-github-actions/auth failed with: must specify exactly one of "workload_identity_provider" or "credentials_json"`
+  - **Cause** : Les secrets `GCP_WORKLOAD_IDENTITY_PROVIDER` ou `GCP_DEPLOY_SERVICE_ACCOUNT` ne sont pas définis
+  - **Solution** : Configurer tous les secrets dans GitHub Settings → Secrets → Actions
+- **Terraform snap --classic** : Terraform via snap nécessite le mode classic.
+  - **Symptôme** : `error: This revision of snap "terraform" was published using classic confinement`
+  - **Solution** : `sudo snap install terraform --classic`
 
 ## 🏗️ Patterns qui fonctionnent
 - Documentation structurée dans Google Drive
@@ -1755,3 +1921,18 @@ git checkout dev && git pull && git branch -d feature/ma-branche
 - [ ] **Restreindre CORS production** : limiter aux IDs d'extensions spécifiques
 - [x] **Script dev.sh** : menu interactif + commandes CLI pour le workflow de développement
 - [x] **Base PostgreSQL partagée** : local et Docker utilisent la même base via port exposé
+- [x] **Infrastructure GCP Terraform** : VM, VPC, Cloud Storage, BigQuery, IAM, Workload Identity Federation
+- [ ] **Configurer GitHub Secrets** : GCP_PROJECT_ID, GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT, etc.
+- [ ] **Donner accès GCP à Mohamed** : Storage Object Admin + BigQuery Data Editor + BigQuery Job User pour offre-ingestion
+- [ ] **Intégration BigQuery** :
+  - [ ] Ajouter dépendance `google-cloud-bigquery` aux services concernés
+  - [ ] Créer client BigQuery partagé dans shared/
+  - [ ] Adapter offre-ingestion pour écrire dans silver.offers
+  - [ ] Adapter offre-ingestion pour écrire JSON bruts dans Cloud Storage bronze
+  - [ ] Créer schémas BigQuery (skills, formations, languages) dans silver
+  - [ ] Adapter matching pour lire depuis BigQuery silver
+  - [ ] Créer tables gold (daily_stats, skills_ranking)
+  - [ ] Configurer credentials BigQuery dans docker-compose
+  - [ ] Tester écriture/lecture BigQuery
+- [ ] **Déploiement initial VM** : SSH, clone repo, docker-compose up
+- [ ] **Configurer domaine + HTTPS** : Caddy avec Let's Encrypt

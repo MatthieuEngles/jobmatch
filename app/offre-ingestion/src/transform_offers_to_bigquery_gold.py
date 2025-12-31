@@ -2,28 +2,21 @@
 Transformation des offres d'emploi : Silver (BigQuery) → Gold (BigQuery) avec embeddings
 
 Ce script lit les offres depuis BigQuery Silver, génère des embeddings vectoriels
-pour les champs 'intitule' et 'description', puis les stocke dans BigQuery Gold
-pour permettre la recherche sémantique optimisée.
+pour les champs 'intitule' et 'description', puis alimente BigQuery Gold dans 3 tables :
+- offers (données métier)
+- offers_intitule_embeddings (embeddings + métadonnées)
+- offers_description_embeddings (embeddings + métadonnées)
 
 Usage:
     # Par défaut, traite les offres de la veille (J-1)
     python transform_offers_to_bigquery_gold.py
 
-    # Pour une date spécifique
+    # Pour une date spécifique (format YYYY-MM-DD)
     python transform_offers_to_bigquery_gold.py 2025-12-28
 
 Architecture médaillon :
     Bronze (GCS) → Silver (BigQuery) → Gold (BigQuery + Vector Search)
 
-Structure BigQuery Gold:
-    - offers_embeddings : Offres avec embeddings vectoriels pour recherche sémantique
-        * id, intitule, description (données en clair)
-        * intitule_embedded, description_embedded (vecteurs ARRAY<FLOAT64>)
-        * embedding_model, embedding_dimension (métadonnées)
-        * ingestion_date, created_at (traçabilité)
-
-Variables d'environnement requises:
-    - GCP_PROJECT_ID : ID du projet GCP
 """
 
 from __future__ import annotations
@@ -82,7 +75,12 @@ GCP_PROJECT_ID = require_env("GCP_PROJECT_ID")
 DATASET_SILVER = "jobmatch_silver"
 DATASET_GOLD = "jobmatch_gold"
 
-# Configuration du modèle d'embedding
+# Tables Gold
+TABLE_GOLD_OFFERS = "offers"
+TABLE_GOLD_TITLE = "offers_intitule_embeddings"
+TABLE_GOLD_DESC = "offers_description_embeddings"
+
+# Embeddings
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384  # Dimension pour all-MiniLM-L6-v2
 BATCH_SIZE = 32
@@ -132,6 +130,7 @@ def read_offers_from_silver(client: bigquery.Client, target_date: date) -> list[
     job_config = bigquery.QueryJobConfig(
         query_parameters=[bigquery.ScalarQueryParameter("target_date", "DATE", target_date)]
     )
+
     print(f"Lecture des offres depuis Silver (date: {target_date.isoformat()})...")
     query_job = client.query(query, job_config=job_config)
     results = query_job.result()
@@ -204,81 +203,134 @@ def generate_embeddings(offers: list[dict[str, Any]]) -> tuple[list[str], np.nda
 
 
 # ----------------------------
-# Conversion et insertion dans Gold
+# Helpers insertion
 # ----------------------------
 def numpy_to_list(arr: np.ndarray) -> list[float]:
     """Convertit un array numpy en liste Python pour BigQuery."""
     return arr.tolist()
 
 
-def insert_embeddings_to_gold(
+def delete_existing_partition(client: bigquery.Client, dataset: str, table: str, target_date: date) -> None:
+    """Supprime les lignes de la partition ingestion_date = target_date (idempotence)."""
+    table_id = f"{GCP_PROJECT_ID}.{dataset}.{table}"
+    query = f"DELETE FROM `{table_id}` WHERE ingestion_date = @target_date"  # nosec B608
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("target_date", "DATE", target_date)]
+    )
+    client.query(query, job_config=job_config).result()
+
+
+def load_json_rows(client: bigquery.Client, full_table_id: str, rows: list[dict[str, Any]]) -> int:
+    """Charge des lignes JSON dans une table BigQuery."""
+    if not rows:
+        return 0
+
+    job_config = bigquery.LoadJobConfig(
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+    )
+    job = client.load_table_from_json(rows, full_table_id, job_config=job_config)
+    job.result()
+    return len(rows)
+
+
+# ----------------------------
+# Insertion dans Gold (3 tables)
+# ----------------------------
+def insert_to_gold(
     client: bigquery.Client,
     offers: list[dict[str, Any]],
     ids: list[str],
     intitules_embeddings: np.ndarray,
     descriptions_embeddings: np.ndarray,
     target_date: date,
-) -> int:
+) -> tuple[int, int, int]:
     """
-    Insère les offres avec embeddings dans BigQuery Gold.
-
+    Insère les données dans les 3 tables BigQuery Gold.
     Args:
         client: Client BigQuery
-        offers: Liste des offres originales (pour récupérer intitule et description)
-        ids: Liste des IDs
-        intitules_embeddings: Array numpy des embeddings des intitulés
-        descriptions_embeddings: Array numpy des embeddings des descriptions
+        offers: Liste des offres (id, intitule, description)
+        ids: Liste des ids des offres
+        intitules_embeddings: Embeddings des intitulés
+        descriptions_embeddings: Embeddings des descriptions
         target_date: Date d'ingestion
 
     Returns:
-        Nombre de lignes insérées
+        Tuple (n_offers, n_title, n_desc) nombre de lignes insérées dans chaque table
     """
     if not ids:
-        return 0
+        return 0, 0, 0
 
     print("\nPréparation des données pour insertion...")
 
     # Créer un mapping id -> offer pour récupérer les textes
     offers_by_id = {offer["id"]: offer for offer in offers}
 
-    # Préparer les lignes pour l'insertion
-    rows = []
-    current_timestamp = datetime.now(UTC).isoformat()
-
-    for i, offer_id in enumerate(ids):
+    # 1) Table offers (métier)
+    offers_rows: list[dict[str, Any]] = []
+    for offer_id in ids:
         offer = offers_by_id[offer_id]
-        rows.append(
+        offers_rows.append(
             {
                 "id": offer_id,
                 "intitule": offer["intitule"],
                 "description": offer["description"],
+                "ingestion_date": target_date.isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+
+    # 2) Table offers_intitule_embeddings
+    title_rows: list[dict[str, Any]] = []
+    for i, offer_id in enumerate(ids):
+        title_rows.append(
+            {
+                "id": offer_id,
                 "intitule_embedded": numpy_to_list(intitules_embeddings[i]),
+                "embedding_model": EMBEDDING_MODEL,
+                "embedding_dimension": EMBEDDING_DIMENSION,
+                "ingestion_date": target_date.isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+
+    # 3) Table offers_description_embeddings
+    desc_rows: list[dict[str, Any]] = []
+    for i, offer_id in enumerate(ids):
+        desc_rows.append(
+            {
+                "id": offer_id,
                 "description_embedded": numpy_to_list(descriptions_embeddings[i]),
                 "embedding_model": EMBEDDING_MODEL,
                 "embedding_dimension": EMBEDDING_DIMENSION,
                 "ingestion_date": target_date.isoformat(),
-                "created_at": current_timestamp,
+                "created_at": datetime.now(UTC).isoformat(),
             }
         )
 
-    # Configuration de l'insertion
-    table_id = f"{GCP_PROJECT_ID}.{DATASET_GOLD}.offers_embeddings"
+    # Idempotence: on purge la partition de la date cible dans chaque table
+    print("\nPurge des partitions existantes (idempotence)...")
+    delete_existing_partition(client, DATASET_GOLD, TABLE_GOLD_OFFERS, target_date)
+    delete_existing_partition(client, DATASET_GOLD, TABLE_GOLD_TITLE, target_date)
+    delete_existing_partition(client, DATASET_GOLD, TABLE_GOLD_DESC, target_date)
+    print("✓ Partitions purgées")
 
-    job_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
-    )
+    # Chargements
+    full_offers_id = f"{GCP_PROJECT_ID}.{DATASET_GOLD}.{TABLE_GOLD_OFFERS}"
+    full_title_id = f"{GCP_PROJECT_ID}.{DATASET_GOLD}.{TABLE_GOLD_TITLE}"
+    full_desc_id = f"{GCP_PROJECT_ID}.{DATASET_GOLD}.{TABLE_GOLD_DESC}"
 
-    print(f"Insertion dans BigQuery Gold: {table_id}")
-    print(f"  - Nombre de lignes: {len(rows)}")
-    print(f"  - Taille embedding: {EMBEDDING_DIMENSION} dimensions")
+    print("\nInsertion dans BigQuery Gold...")
+    print(f"  - offers: {full_offers_id}")
+    print(f"  - intitule: {full_title_id}")
+    print(f"  - description: {full_desc_id}")
+    print(f"  - lignes: {len(ids)}")
 
-    # Lancer le job d'insertion
-    job = client.load_table_from_json(rows, table_id, job_config=job_config)
-    job.result()  # Attendre la fin de l'insertion
+    n1 = load_json_rows(client, full_offers_id, offers_rows)
+    n2 = load_json_rows(client, full_title_id, title_rows)
+    n3 = load_json_rows(client, full_desc_id, desc_rows)
 
-    print(f"✓ {len(rows)} lignes insérées avec succès dans Gold")
-    return len(rows)
+    print(f"✓ Insertions terminées: offers={n1}, intitule_embeddings={n2}, description_embeddings={n3}")
+    return n1, n2, n3
 
 
 # ----------------------------
@@ -297,6 +349,7 @@ def main() -> int:
     print(f"Projet GCP         : {GCP_PROJECT_ID}")
     print(f"Dataset Silver     : {DATASET_SILVER}")
     print(f"Dataset Gold       : {DATASET_GOLD}")
+    print(f"Tables Gold        : {TABLE_GOLD_OFFERS}, {TABLE_GOLD_TITLE}, {TABLE_GOLD_DESC}")
     print(f"Modèle embedding   : {EMBEDDING_MODEL}")
     print(f"Dimension vecteurs : {EMBEDDING_DIMENSION}")
     print("=" * 80)
@@ -317,17 +370,17 @@ def main() -> int:
         return 0
 
     # 4. Générer les embeddings
-    debut_embedding = datetime.now(UTC)
     print("\n[2/3] Génération des embeddings vectoriels...")
     print("-" * 80)
+    debut_embedding = datetime.now(UTC)
     ids, intitules_embeddings, descriptions_embeddings = generate_embeddings(offers)
     fin_embedding = datetime.now(UTC)
 
     # 5. Insérer dans Gold
-    debut_insertion = datetime.now(UTC)
     print("\n[3/3] Insertion dans BigQuery Gold...")
     print("-" * 80)
-    nb_inserted = insert_embeddings_to_gold(
+    debut_insertion = datetime.now(UTC)
+    n_offers, n_title, n_desc = insert_to_gold(
         bq_client,
         offers,
         ids,
@@ -340,22 +393,21 @@ def main() -> int:
     # 6. Résumé
     print()
     print("=" * 80)
-    print("✓ Transformation Silver → Gold terminée avec succès !")
-    print(f"  Offres traitées: {len(offers)}")
-    print(f"  Embeddings créés: {nb_inserted * 2} (intitulé + description)")
-    print(f"  Lignes insérées: {nb_inserted}")
+    print("✓ Transformation Silver → Gold terminée !")
+    print(f"  Offres traitées            : {len(offers)}")
+    print(f"  Lignes insérées offers     : {n_offers}")
+    print(f"  Lignes insérées intitulé   : {n_title}")
+    print(f"  Lignes insérées description: {n_desc}")
+    print(f"  Embeddings créés           : {len(offers) * 2}")
     print()
 
     # 7. Durée d'exécution
     fin = datetime.now(UTC)
-    duree = (fin - debut).total_seconds()
-    duree_lecture = (fin_lecture - debut_lecture).total_seconds()
-    duree_embedding = (fin_embedding - debut_embedding).total_seconds()
-    duree_insertion = (fin_insertion - debut_insertion).total_seconds()
-    print(f"Durée d'exécution: {duree:.2f} secondes")
-    print(f"  - Lecture Silver : {duree_lecture:.2f} secondes")
-    print(f"  - Génération embeddings : {duree_embedding:.2f} secondes")
-    print(f"  - Insertion Gold : {duree_insertion:.2f} secondes")
+    print("Durée d'exécution:")
+    print(f"  - Total              : {(fin - debut).total_seconds():.2f} s")
+    print(f"  - Lecture Silver     : {(fin_lecture - debut_lecture).total_seconds():.2f} s")
+    print(f"  - Génération embeds  : {(fin_embedding - debut_embedding).total_seconds():.2f} s")
+    print(f"  - Insertion Gold     : {(fin_insertion - debut_insertion).total_seconds():.2f} s")
     print("=" * 80)
     return 0
 

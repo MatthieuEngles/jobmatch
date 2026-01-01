@@ -18,9 +18,9 @@ COPY app/matching /app/matching
 #RUN pip install --no-cache-dir -r /app/matching/requirements.txt
 RUN pip install -r /app/matching/requirements.txt
 
-EXPOSE 8000
+EXPOSE 8086
 
 WORKDIR /app/matching
 RUN pip install -e .
 
-CMD ["python", "-m", "uvicorn", "matcher.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["python", "-m", "uvicorn", "matcher.main:app", "--host", "0.0.0.0", "--port", "8086", "--reload"]

@@ -167,6 +167,24 @@ def parse_timestamp(ts_str: str | None) -> str | None:
         return None
 
 
+def delete_existing_partition(client: bigquery.Client, dataset: str, table: str, target_date: date) -> None:
+    """
+    Supprime les lignes de la partition ingestion_date = target_date (idempotence).
+
+    Args:
+        client: Client BigQuery
+        dataset: Nom du dataset
+        table: Nom de la table
+        target_date: Date de la partition à supprimer
+    """
+    table_id = f"{GCP_PROJECT_ID}.{dataset}.{table}"
+    query = f"DELETE FROM `{table_id}` WHERE ingestion_date = @target_date"  # nosec B608
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("target_date", "DATE", target_date)]
+    )
+    client.query(query, job_config=job_config).result()
+
+
 def transform_offers_to_bigquery(
     offers: list[dict[str, Any]], target_date: date, client: bigquery.Client
 ) -> dict[str, int]:
@@ -403,6 +421,28 @@ def transform_offers_to_bigquery(
                         "ingestion_date": ingestion_date_str,
                     }
                 )
+
+    # Purge des partitions existantes (idempotence)
+    print("\nPurge des partitions existantes (idempotence)...")
+    tables_to_purge = [
+        "offers",
+        "offers_lieu_travail",
+        "offers_entreprise",
+        "offers_salaire",
+        "offers_salaire_complements",
+        "offers_competences",
+        "offers_qualites_professionnelles",
+        "offers_formations",
+        "offers_permis",
+        "offers_langues",
+        "offers_contact",
+        "offers_origine",
+        "offers_contexte_travail_horaires",
+    ]
+
+    for table_name in tables_to_purge:
+        delete_existing_partition(client, DATASET_ID, table_name, target_date)
+    print("✓ Partitions purgées")
 
     # Insertion dans BigQuery
     print("\nInsertion dans BigQuery...")

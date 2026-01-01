@@ -31,7 +31,6 @@ import numpy as np
 from google.cloud import bigquery
 
 # Import de la fonction d'embedding depuis le shared module
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "shared" / "src"))
 from shared.embeddings.providers import create_sentence_transformers_embedder
 
 

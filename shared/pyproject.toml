@@ -18,7 +18,7 @@ dev = [
 ]
 embeddings = [
     "sentence-transformers>=2.0.0",
-    "vec2vec>=0.1.0",
+    "vec2vec>=0.0.5",
 ]
 
 [tool.setuptools.packages.find]

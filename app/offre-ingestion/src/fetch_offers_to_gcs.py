@@ -82,7 +82,7 @@ def parse_target_date(argv: list[str]) -> date:
 
     s = argv[1]
     try:
-        return datetime.strptime(s, "%Y-%m-%d").date() - timedelta(days=1)
+        return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
         print("Erreur: argument date invalide. Format attendu: YYYY-MM-DD (ex: 2025-12-20)")
         sys.exit(1)

@@ -18,7 +18,7 @@ services:
       - MATCHING_URL=${MATCHING_URL}
       - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
       # Top offers feature configuration
-      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING:-true}
+      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING:-false}
       - USE_SQLITE_OFFERS=${USE_SQLITE_OFFERS:-true}
       - MATCHING_SERVICE_URL=${MATCHING_SERVICE_URL:-http://matching:8086}
     depends_on:
@@ -51,7 +51,9 @@ services:
       - jobmatch-network
 
   offre-ingestion:
-    build: ./app/offre-ingestion
+    build:
+      context: .
+      dockerfile: app/offre-ingestion/Dockerfile
     ports:
       - "${OFFRE_INGESTION_PORT:-8082}:8082"
     environment:
@@ -65,7 +67,7 @@ services:
       context: .
       dockerfile: app/matching/Dockerfile
     ports:
-      - "${MATCHING_PORT:-8083}:8000"
+      - "${MATCHING_PORT:-8086}:8086"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
@@ -96,18 +98,18 @@ services:
     networks:
       - jobmatch-network
 
-  local-ollama:
-    build:
-      context: .
-      dockerfile: app/local_ollama/Dockerfile
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - jobmatch-network
+  #local-ollama:
+  #  build:
+  #    context: .
+  #    dockerfile: app/local_ollama/Dockerfile
+  #  ports:
+  #    - "${OLLAMA_PORT:-11434}:11434"
+  #  environment:
+  #    - OLLAMA_HOST=0.0.0.0
+  #  volumes:
+  #    - ollama_data:/root/.ollama
+  #  networks:
+  #    - jobmatch-network
 
 networks:
   jobmatch-network:

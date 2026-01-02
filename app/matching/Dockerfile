@@ -8,10 +8,9 @@ RUN pip install --upgrade pip
 #RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-# Copy shared package and install
+# Copy shared package and install with embeddings support
 COPY shared /app/shared
-#RUN pip install --no-cache-dir -e /app/shared
-RUN pip install -e /app/shared
+RUN pip install -e "/app/shared[embeddings]"
 
 # Copy matcher app and install requirements
 COPY app/matching /app/matching

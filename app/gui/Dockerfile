@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy shared package and install
+# Copy shared package and install with embeddings support
 COPY shared /app/shared
-RUN pip install -e /app/shared
+RUN pip install -e "/app/shared[embeddings]"
 
 # Install Python dependencies
 COPY app/gui/requirements.txt .

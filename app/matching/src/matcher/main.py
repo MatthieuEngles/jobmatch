@@ -22,7 +22,7 @@ app = FastAPI(
 # -----------------------------
 # Include routers
 # -----------------------------
-app.include_router(matching_router, prefix="/matching", tags=["matching"])
+app.include_router(matching_router, prefix="/api", tags=["matching"])
 
 
 # -----------------------------

@@ -31,7 +31,7 @@ def test_match_endpoint():
         "job_offers_sqlite": SAMPLE_SQLITE_DB,
     }
 
-    response = client.post("/matching/match", json=payload)
+    response = client.post("/api/match", json=payload)
 
     assert response.status_code == 200
     data = response.json()

@@ -3,6 +3,8 @@ API routes for the matching service.
 
 """
 
+import os
+
 import numpy as np
 from fastapi import APIRouter
 from matcher.api.schemas import MatchRequest, MatchResponse
@@ -18,20 +20,28 @@ def match(request: MatchRequest) -> MatchResponse:
     Match embedded title and description from a cv to a job offer.
 
     :param request: Description
-        title_embedded: profile title embedded (list[float])
-        description_embedded: profile description embedded (list[float])
-        job_offers_sqlite: Path to the job offers embeddings database (sqlite).
+        title_embedding: profile title embedding (list[float])
+        cv_embedding: profile description embedding (list[float])
+        top_k: number of top matches to return (int)
     :type request: MatchRequest
     """
-    logger.info("Received match request for DB: %s", request.job_offers_sqlite)
-    logger.debug("Title embedding length: %d", len(request.title_embedded))
-    logger.debug("Description embedding length: %d", len(request.description_embedded))
+    # Get database path from environment variable
+    job_offers_db = os.getenv("JOB_OFFERS_DB_PATH", "/app/matching/data/job_offers_gold.db")
+
+    logger.info("Received match request for DB: %s", job_offers_db)
+    logger.debug("Title embedding length: %d", len(request.title_embedding))
+    logger.debug("CV embedding length: %d", len(request.cv_embedding))
+    logger.debug("Top K: %d", request.top_k)
 
     result = match_cv(
-        np.array(request.title_embedded, dtype=np.float32),
-        np.array(request.description_embedded, dtype=np.float32),
-        request.job_offers_sqlite,
+        np.array(request.title_embedding, dtype=np.float32),
+        np.array(request.cv_embedding, dtype=np.float32),
+        job_offers_db,
     )
 
-    logger.info("Returning %d match results", len(result))
-    return {"result": result}
+    # Return top_k results
+    top_results = result[: request.top_k]
+
+    logger.info("Returning %d match results (top %d)", len(top_results), request.top_k)
+
+    return {"matches": [{"offer_id": r.id, "score": r.similarity} for r in top_results]}

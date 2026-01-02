@@ -1,7 +1,12 @@
 # tests/test_api.py
+import os
+
 import numpy as np
 from fastapi.testclient import TestClient
 from matcher.main import app
+
+# Set the database path environment variable for tests
+os.environ["JOB_OFFERS_DB_PATH"] = "tests/data/top10.db"
 
 client = TestClient(app)
 
@@ -26,20 +31,20 @@ def load_test_embeddings():
 def test_match_endpoint():
     title_embedded, description_embedded = load_test_embeddings()
     payload = {
-        "title_embedded": title_embedded.tolist(),
-        "description_embedded": description_embedded.tolist(),
-        "job_offers_sqlite": SAMPLE_SQLITE_DB,
+        "title_embedding": title_embedded.tolist(),
+        "cv_embedding": description_embedded.tolist(),
+        "top_k": 5,
     }
 
     response = client.post("/api/match", json=payload)
 
     assert response.status_code == 200
     data = response.json()
-    assert "result" in data
-    assert isinstance(data["result"], list)
-    if data["result"]:
-        item = data["result"][0]
-        assert "id" in item
-        assert "similarity" in item
-        assert isinstance(item["similarity"], float)
+    assert "matches" in data
+    assert isinstance(data["matches"], list)
+    if data["matches"]:
+        item = data["matches"][0]
+        assert "offer_id" in item
+        assert "score" in item
+        assert isinstance(item["score"], float)
         print(pretty_print_response(data))

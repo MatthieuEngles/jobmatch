@@ -41,15 +41,23 @@ jobmatch/
 ### Lancer les services
 
 ```bash
-# Demarrer les services principaux
-docker-compose up -d db gui
+# Demarrer tous les services (SAUF local-ollama par defaut)
+docker compose up -d
+
+# Demarrer les services principaux uniquement
+docker compose up -d db gui
 
 # Demarrer avec l'assistant IA
-docker-compose up -d db gui ai-assistant
+docker compose up -d db gui ai-assistant
 
-# Demarrer Ollama local (modeles Mistral)
-docker-compose up -d local-ollama
+# Demarrer TOUT y compris Ollama local (utilise le profil 'full')
+docker compose --profile full up -d
+
+# Demarrer uniquement Ollama local
+docker compose --profile ollama up -d local-ollama
 ```
+
+**Note**: Le service `local-ollama` est desactive par defaut (gourmand en ressources). Utilisez `--profile full` ou `--profile ollama` pour le demarrer.
 
 ### Script de developpement
 

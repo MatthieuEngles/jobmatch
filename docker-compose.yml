@@ -99,6 +99,9 @@ services:
       - jobmatch-network
 
   local-ollama:
+    profiles:
+      - ollama
+      - full
     build:
       context: .
       dockerfile: app/local_ollama/Dockerfile

@@ -98,18 +98,18 @@ services:
     networks:
       - jobmatch-network
 
-  #local-ollama:
-  #  build:
-  #    context: .
-  #    dockerfile: app/local_ollama/Dockerfile
-  #  ports:
-  #    - "${OLLAMA_PORT:-11434}:11434"
-  #  environment:
-  #    - OLLAMA_HOST=0.0.0.0
-  #  volumes:
-  #    - ollama_data:/root/.ollama
-  #  networks:
-  #    - jobmatch-network
+  local-ollama:
+    build:
+      context: .
+      dockerfile: app/local_ollama/Dockerfile
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - jobmatch-network
 
 networks:
   jobmatch-network:

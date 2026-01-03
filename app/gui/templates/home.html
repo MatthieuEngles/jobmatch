@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}JobMatch - Trouvez le job qui vous correspond{% endblock %}
 
@@ -8,7 +9,7 @@
 {% endif %}
 {% endblock %}
 
-{% block main_attrs %}{% if user.is_authenticated %}class="container mt-4"{% endif %}{% endblock %}
+{% block main_attrs %}{% if user.is_authenticated %}class="container"{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -19,6 +20,16 @@
         --accent: #f59e0b;
         --dark: #0f172a;
         --light: #f8fafc;
+    }
+
+    /* Prevent page scroll for authenticated view */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+    }
+
+    main {
+        overflow: hidden !important;
     }
 
     /* Hero section styles */
@@ -385,9 +396,15 @@
     .welcome-section {
         height: calc(100vh - 76px);
         display: flex;
-        align-items: center;
+        align-items: stretch;
         padding: 16px 0;
         overflow: hidden;
+    }
+
+    .welcome-section > .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
     }
 
     .dashboard-grid {
@@ -395,8 +412,8 @@
         grid-template-columns: 1fr 1fr 1fr;
         grid-template-rows: 1fr 1fr 1fr;
         gap: 16px;
-        height: calc(100vh - 120px);
-        max-height: 600px;
+        flex: 1;
+        min-height: 0;
     }
 
     .welcome-card {
@@ -411,6 +428,8 @@
         gap: 12px;
         text-decoration: none;
         transition: all 0.3s ease;
+        height: 100%;
+        min-height: 0;
     }
 
     .welcome-card:hover {
@@ -821,6 +840,9 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .action-card:hover {
@@ -860,6 +882,67 @@
         color: #64748b;
         font-size: 0.85rem;
         line-height: 1.4;
+    }
+
+    .browser-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .main-browser {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .main-browser img {
+        width: 72px;
+        height: 72px;
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+        transition: transform 0.2s ease;
+        cursor: pointer;
+    }
+
+    .main-browser img:hover {
+        transform: scale(1.08);
+    }
+
+    .main-browser-label {
+        font-size: 0.85rem;
+        color: var(--primary);
+        font-weight: 600;
+    }
+
+    .other-browsers {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .other-browsers-label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    #other-browsers-icons {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    #other-browsers-icons img {
+        width: 28px;
+        height: 28px;
+        opacity: 0.7;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        cursor: pointer;
+    }
+
+    #other-browsers-icons img:hover {
+        transform: scale(1.15);
+        opacity: 1;
     }
 
     .action-arrow {
@@ -1151,22 +1234,55 @@
                     </span>
                 </a>
 
-                <!-- Column 1, Row 3: Importer une offre et postuler -->
+                <!-- Column 1, Row 3: Plugins navigateurs -->
                 <a href="#" class="action-card">
                     <div class="card-header">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
                             </svg>
                         </div>
-                        <h3 class="action-title">Importer une offre et postuler</h3>
+                        <h3 class="action-title">Telecharger nos plugins</h3>
                     </div>
                     <span class="coming-soon-badge">Bientot disponible</span>
-                    <p class="action-desc">Collez le lien d'une offre et generez une candidature personnalisee</p>
+                    <p class="action-desc">Importez des offres directement depuis votre navigateur</p>
+                    <div class="browser-section" id="browser-section">
+                        <!-- Main browser (detected) -->
+                        <div class="main-browser" id="main-browser"></div>
+                        <!-- Other browsers -->
+                        <div class="other-browsers">
+                            <span class="other-browsers-label">Autres :</span>
+                            <div id="other-browsers-icons"></div>
+                        </div>
+                    </div>
+                    <script>
+                    (function() {
+                        const basePath = '{% static "img/browsers/" %}';
+                        const browsers = ['chrome', 'firefox', 'edge', 'safari'];
+                        const browserNames = { chrome: 'Chrome', firefox: 'Firefox', edge: 'Edge', safari: 'Safari' };
+                        function detectBrowser() {
+                            const ua = navigator.userAgent;
+                            if (ua.indexOf('Edg') > -1) return 'edge';
+                            if (ua.indexOf('Chrome') > -1) return 'chrome';
+                            if (ua.indexOf('Firefox') > -1) return 'firefox';
+                            if (ua.indexOf('Safari') > -1) return 'safari';
+                            return 'chrome';
+                        }
+                        const currentBrowser = detectBrowser();
+                        const mainEl = document.getElementById('main-browser');
+                        const othersEl = document.getElementById('other-browsers-icons');
+                        mainEl.innerHTML = '<img src="' + basePath + currentBrowser + '.svg" alt="' + browserNames[currentBrowser] + '"><span class="main-browser-label">Pour ' + browserNames[currentBrowser] + '</span>';
+                        let othersHtml = '';
+                        browsers.forEach(function(b) {
+                            if (b !== currentBrowser) othersHtml += '<img src="' + basePath + b + '.svg" alt="' + browserNames[b] + '">';
+                        });
+                        othersEl.innerHTML = othersHtml;
+                    })();
+                    </script>
                     <span class="action-arrow">
-                        Postuler
+                        Telecharger
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                     </span>
                 </a>

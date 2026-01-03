@@ -1,26 +1,31 @@
-version: '3.8'
-
 services:
   gui:
     build:
       context: .
       dockerfile: app/gui/Dockerfile
     ports:
-      - "${GUI_PORT:-8085}:8080"
+      - "${GUI_PORT}:8080"
+    env_file:
+      - .env
     environment:
-      - ENV_MODE=dev
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
-      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
+      - ENV_MODE=${ENV_MODE}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - MATCHING_URL=${MATCHING_URL}
-      - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
-      # Top offers feature configuration
-      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING:-false}
-      - USE_SQLITE_OFFERS=${USE_SQLITE_OFFERS:-true}
-      - MATCHING_SERVICE_URL=${MATCHING_SERVICE_URL:-http://matching:8086}
+      - AI_ASSISTANT_URL=${AI_ASSISTANT_URL}
+      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING}
+      - USE_SQLITE_OFFERS=${USE_SQLITE_OFFERS}
+      - MATCHING_SERVICE_URL=${MATCHING_SERVICE_URL}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - BIGQUERY_SILVER_DATASET=${BIGQUERY_SILVER_DATASET}
+      - BIGQUERY_GOLD_DATASET=${BIGQUERY_GOLD_DATASET}
+      # Auth via ADC (local/VM) or Workload Identity (CI/CD) - no JSON key needed
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
     depends_on:
       - db
     networks:
@@ -31,11 +36,17 @@ services:
       context: .
       dockerfile: app/cv-ingestion/Dockerfile
     ports:
-      - "${CV_INGESTION_PORT:-8081}:8081"
+      - "${CV_INGESTION_PORT}:8081"
     env_file:
-      - app/cv-ingestion/.env
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - LLM_TYPE=${LLM_TYPE}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
+      - DEBUG=${DEBUG}
     networks:
       - jobmatch-network
 
@@ -44,9 +55,16 @@ services:
       context: .
       dockerfile: app/ai-assistant/Dockerfile
     ports:
-      - "${AI_ASSISTANT_PORT:-8084}:8084"
+      - "${AI_ASSISTANT_PORT}:8084"
     env_file:
-      - app/ai-assistant/.env
+      - .env
+    environment:
+      - DEBUG=${DEBUG}
+      - LLM_TYPE=${LLM_TYPE}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
     networks:
       - jobmatch-network
 
@@ -55,7 +73,9 @@ services:
       context: .
       dockerfile: app/offre-ingestion/Dockerfile
     ports:
-      - "${OFFRE_INGESTION_PORT:-8082}:8082"
+      - "${OFFRE_INGESTION_PORT}:8082"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - FRANCE_TRAVAIL_API_KEY=${FRANCE_TRAVAIL_API_KEY}
@@ -67,12 +87,14 @@ services:
       context: .
       dockerfile: app/matching/Dockerfile
     ports:
-      - "${MATCHING_PORT:-8086}:8086"
+      - "${MATCHING_PORT}:8086"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - OFFRE_INGESTION_URL=${OFFRE_INGESTION_URL}
-      - JOB_OFFERS_DB_PATH=${JOB_OFFERS_DB_PATH:-/app/matching/data/job_offers_gold.db}
+      - JOB_OFFERS_DB_PATH=${JOB_OFFERS_DB_PATH}
     depends_on:
       - cv-ingestion
       - offre-ingestion
@@ -82,11 +104,13 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - "${DB_PORT:-5433}:5432"
+      - "${DB_PORT}:5432"
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
-      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -95,7 +119,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - jobmatch-network
 
@@ -107,7 +131,7 @@ services:
       context: .
       dockerfile: app/local_ollama/Dockerfile
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      - "${OLLAMA_PORT}:11434"
     environment:
       - OLLAMA_HOST=0.0.0.0
     volumes:

@@ -80,6 +80,8 @@ def _build_llm_config(config_request: LLMConfigRequest | None) -> LLMConfig | No
         endpoint=config_request.llm_endpoint,
         model=config_request.llm_model,
         api_key=config_request.llm_api_key,
+        api_mode=config_request.llm_api_mode,
+        max_tokens=config_request.llm_max_tokens,
     )
 
 

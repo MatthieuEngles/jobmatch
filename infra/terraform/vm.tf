@@ -63,7 +63,7 @@ resource "google_compute_instance" "main" {
     apt-get upgrade -y
 
     # Install Docker
-    apt-get install -y ca-certificates curl gnupg
+    apt-get install -y ca-certificates curl gnupg jq
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
@@ -90,8 +90,9 @@ resource "google_compute_instance" "main" {
     # Install Git
     apt-get install -y git
 
-    # Create app directory
+    # Create app directories
     mkdir -p /opt/jobmatch
+    mkdir -p /opt/jobmatch/secrets
     chown -R 1000:1000 /opt/jobmatch
 
     # Create Caddy config placeholder
@@ -106,6 +107,84 @@ resource "google_compute_instance" "main" {
 
     # Reload Caddy
     systemctl reload caddy
+
+    # Clone the repository (public repo, no auth needed)
+    echo "Cloning repository..."
+    cd /opt/jobmatch
+    if [ ! -d ".git" ]; then
+      git clone https://github.com/${var.github_org}/${var.github_repo}.git .
+    fi
+    chown -R 1000:1000 /opt/jobmatch
+
+    # Create script to fetch secrets from Secret Manager
+    cat > /opt/jobmatch/fetch-secrets.sh <<'FETCHSCRIPT'
+    #!/bin/bash
+    set -e
+
+    PROJECT_ID="${var.project_id}"
+    SECRETS_DIR="/opt/jobmatch/secrets"
+    ENV_FILE="/opt/jobmatch/.env"
+
+    echo "Fetching secrets from GCP Secret Manager..."
+
+    # Fetch secrets using gcloud (VM has access via service account)
+    POSTGRES_PASSWORD=$(gcloud secrets versions access latest --secret="postgres-password" --project="$PROJECT_ID" 2>/dev/null || echo "")
+    DJANGO_SECRET_KEY=$(gcloud secrets versions access latest --secret="django-secret-key" --project="$PROJECT_ID" 2>/dev/null || echo "")
+
+    # Fetch BigQuery Gold SA key and save to file
+    gcloud secrets versions access latest --secret="bigquery-gold-sa-key" --project="$PROJECT_ID" > "$SECRETS_DIR/bigquery-gold-key.json" 2>/dev/null || echo "{}" > "$SECRETS_DIR/bigquery-gold-key.json"
+    chmod 600 "$SECRETS_DIR/bigquery-gold-key.json"
+
+    # Create .env file for docker-compose
+    cat > "$ENV_FILE" <<ENVFILE
+    # Auto-generated from GCP Secret Manager
+    POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+    DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
+
+    # GCP Configuration (for Vertex AI - no API key needed, uses ADC)
+    GCP_PROJECT_ID=${var.project_id}
+    GCP_LOCATION=europe-west1
+
+    # BigQuery Gold cross-project access
+    BIGQUERY_GOLD_PROJECT_ID=${var.bigquery_gold_project_id}
+    BIGQUERY_GOLD_CROSS_PROJECT_DATASET=${var.bigquery_gold_dataset}
+
+    # LLM Configuration (Vertex AI Gemini)
+    LLM_MODEL=gemini-1.5-flash-002
+    LLM_MAX_TOKENS=4096
+
+    # Embeddings
+    EMBEDDINGS_PROVIDER=sentence-transformers
+    EMBEDDINGS_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+    ENVFILE
+
+    chmod 600 "$ENV_FILE"
+    echo "Secrets fetched successfully."
+    FETCHSCRIPT
+    chmod +x /opt/jobmatch/fetch-secrets.sh
+
+    # Create deploy script
+    cat > /opt/jobmatch/deploy.sh <<'DEPLOYSCRIPT'
+    #!/bin/bash
+    set -e
+
+    cd /opt/jobmatch
+
+    # Fetch latest secrets
+    ./fetch-secrets.sh
+
+    # Pull latest code (if git repo exists)
+    if [ -d ".git" ]; then
+        git pull origin main
+    fi
+
+    # Build and start services
+    docker compose -f docker-compose.prod.yml build
+    docker compose -f docker-compose.prod.yml up -d
+
+    echo "Deployment completed at $(date)"
+    DEPLOYSCRIPT
+    chmod +x /opt/jobmatch/deploy.sh
 
     echo "Startup script completed at $(date)"
   EOF

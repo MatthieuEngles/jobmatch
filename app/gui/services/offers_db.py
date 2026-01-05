@@ -115,7 +115,7 @@ class SQLiteOffersDB(OffersDB):
                 FROM offers o
                 LEFT JOIN offers_entreprise e ON o.id = e.offer_id
                 WHERE o.id IN ({placeholders})
-                """,
+                """,  # nosec B608 - placeholders from len(), values parameterized
                 offer_ids,
             )
 
@@ -245,26 +245,26 @@ class BigQueryOffersDB(OffersDB):
         return self._client
 
     def get_offers_by_ids(self, offer_ids: list[str]) -> dict[str, OfferDetails]:
-        """Get offer details from BigQuery."""
+        """Get offer details from BigQuery Gold.
+
+        Note: BigQuery Gold schema only has: id, intitule, description, ingestion_date, created_at
+        No separate tables for entreprise, lieu, salaire, etc.
+        """
         if not offer_ids:
             return {}
 
         try:
-            # Build query with parameterized values
-            query = f"""
-                SELECT
-                    o.id,
-                    o.intitule,
-                    o.description,
-                    e.nom as entreprise
-                FROM `{self.project_id}.{self.dataset}.offers` o
-                LEFT JOIN `{self.project_id}.{self.dataset}.offers_entreprise` e
-                    ON o.id = e.offer_id
-                WHERE o.id IN UNNEST(@offer_ids)
-            """
+            from google.cloud import bigquery
 
-            job_config = self.client.QueryJobConfig(
-                query_parameters=[self.client.ArrayQueryParameter("offer_ids", "STRING", offer_ids)]
+            # Query directly from offers table (no joins - simplified Gold schema)
+            query = f"""
+                SELECT id, intitule, description
+                FROM `{self.project_id}.{self.dataset}.offers`
+                WHERE id IN UNNEST(@offer_ids) AND ingestion_date = "2025-10-01"
+            """  # nosec B608 - project/dataset from config, offer_ids parameterized
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[bigquery.ArrayQueryParameter("offer_ids", "STRING", offer_ids)]
             )
 
             results = {}
@@ -272,7 +272,7 @@ class BigQueryOffersDB(OffersDB):
                 results[row.id] = OfferDetails(
                     id=row.id,
                     intitule=row.intitule or "Sans titre",
-                    entreprise=row.entreprise,
+                    entreprise=None,  # Not available in Gold schema
                     description=row.description,
                 )
 
@@ -283,31 +283,20 @@ class BigQueryOffersDB(OffersDB):
             return {}
 
     def get_offer_full_details(self, offer_id: str) -> OfferFullDetails | None:
-        """Get complete offer details from BigQuery."""
-        try:
-            # Main query with all details
-            query = f"""
-                SELECT
-                    o.id,
-                    o.intitule,
-                    o.description,
-                    o.typeContratLibelle,
-                    o.experienceLibelle,
-                    o.dureeTravailLibelleConverti,
-                    o.dateCreation,
-                    o.romeLibelle,
-                    o.secteurActiviteLibelle,
-                    e.nom as entreprise,
-                    l.libelle as lieu,
-                    s.libelle as salaire
-                FROM `{self.project_id}.{self.dataset}.offers` o
-                LEFT JOIN `{self.project_id}.{self.dataset}.offers_entreprise` e ON o.id = e.offer_id
-                LEFT JOIN `{self.project_id}.{self.dataset}.offers_lieu_travail` l ON o.id = l.offer_id
-                LEFT JOIN `{self.project_id}.{self.dataset}.offers_salaire` s ON o.id = s.offer_id
-                WHERE o.id = @offer_id
-            """
+        """Get complete offer details from BigQuery Gold.
 
+        Note: BigQuery Gold schema only has: id, intitule, description, ingestion_date, created_at
+        Other fields are not available in this simplified schema.
+        """
+        try:
             from google.cloud import bigquery
+
+            # Query from offers table (simplified Gold schema)
+            query = f"""
+                SELECT id, intitule, description, created_at
+                FROM `{self.project_id}.{self.dataset}.offers`
+                WHERE id = @offer_id
+            """  # nosec B608 - project/dataset from config, offer_id parameterized
 
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[bigquery.ScalarQueryParameter("offer_id", "STRING", offer_id)]
@@ -319,35 +308,22 @@ class BigQueryOffersDB(OffersDB):
 
             row = rows[0]
 
-            # Get competences
-            comp_query = f"""
-                SELECT libelle FROM `{self.project_id}.{self.dataset}.offers_competences`
-                WHERE offer_id = @offer_id AND libelle IS NOT NULL
-            """
-            competences = [r.libelle for r in self.client.query(comp_query, job_config=job_config)]
-
-            # Get qualites
-            qual_query = f"""
-                SELECT libelle FROM `{self.project_id}.{self.dataset}.offers_qualites_professionnelles`
-                WHERE offer_id = @offer_id AND libelle IS NOT NULL
-            """
-            qualites = [r.libelle for r in self.client.query(qual_query, job_config=job_config)]
-
+            # Return with available fields only (Gold schema is simplified)
             return OfferFullDetails(
                 id=row.id,
                 intitule=row.intitule or "Sans titre",
                 description=row.description,
-                entreprise=row.entreprise,
-                type_contrat=row.typeContratLibelle,
-                experience=row.experienceLibelle,
-                duree_travail=row.dureeTravailLibelleConverti,
-                lieu=row.lieu,
-                salaire=row.salaire,
-                date_creation=row.dateCreation,
-                rome_libelle=row.romeLibelle,
-                secteur_activite=row.secteurActiviteLibelle,
-                competences=competences if competences else None,
-                qualites=qualites if qualites else None,
+                entreprise=None,
+                type_contrat=None,
+                experience=None,
+                duree_travail=None,
+                lieu=None,
+                salaire=None,
+                date_creation=str(row.created_at) if row.created_at else None,
+                rome_libelle=None,
+                secteur_activite=None,
+                competences=None,
+                qualites=None,
             )
 
         except Exception as e:
@@ -367,7 +343,7 @@ def get_offers_db() -> OffersDB:
 
     Uses USE_SQLITE_OFFERS environment variable to determine which implementation.
     - USE_SQLITE_OFFERS=true -> SQLiteOffersDB (uses Silver DB)
-    - USE_SQLITE_OFFERS=false (or not set) -> BigQueryOffersDB
+    - USE_SQLITE_OFFERS=false (or not set) -> BigQueryOffersDB (cross-project Gold)
 
     Returns:
         OffersDB implementation
@@ -380,7 +356,8 @@ def get_offers_db() -> OffersDB:
         logger.info(f"Using SQLiteOffersDB with: {silver_db_path}")
         return SQLiteOffersDB(silver_db_path)
     else:
-        project_id = os.environ.get("GCP_PROJECT_ID", "job-match-v0")
-        dataset = os.environ.get("BIGQUERY_GOLD_DATASET", "gold")
+        # Use cross-project BigQuery Gold (colleague's project)
+        project_id = os.environ.get("BIGQUERY_GOLD_PROJECT_ID", "jobmatch-482415")
+        dataset = os.environ.get("BIGQUERY_GOLD_CROSS_PROJECT_DATASET", "jobmatch_gold")
         logger.info(f"Using BigQueryOffersDB: {project_id}.{dataset}")
         return BigQueryOffersDB(project_id, dataset)

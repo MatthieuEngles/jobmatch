@@ -507,6 +507,22 @@ class UserLLMConfig(models.Model):
         blank=True,
         help_text="API key (stored encrypted in production)",
     )
+
+    LLM_API_MODE_CHOICES = [
+        ("openai_compatible", "OpenAI Compatible (/v1/chat/completions)"),
+        ("ollama_native", "Ollama Native (/api/chat)"),
+    ]
+    llm_api_mode = models.CharField(
+        max_length=20,
+        choices=LLM_API_MODE_CHOICES,
+        default="openai_compatible",
+        help_text="API mode: OpenAI compatible or native Ollama",
+    )
+    llm_max_tokens = models.IntegerField(
+        default=8192,
+        help_text="Max tokens for LLM response (2048-32768)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -525,6 +541,8 @@ class UserLLMConfig(models.Model):
             "endpoint": self.llm_endpoint,
             "model": self.llm_model,
             "api_key": self.llm_api_key,
+            "api_mode": self.llm_api_mode,
+            "max_tokens": self.llm_max_tokens,
         }
 
 

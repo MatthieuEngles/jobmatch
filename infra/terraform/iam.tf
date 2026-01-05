@@ -34,6 +34,13 @@ resource "google_project_iam_member" "vm_monitoring_writer" {
   member  = "serviceAccount:${google_service_account.vm.email}"
 }
 
+# VM SA - Vertex AI User (for Gemini via Vertex AI)
+resource "google_project_iam_member" "vm_vertexai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.vm.email}"
+}
+
 # -----------------------------------------------------------------------------
 # Service Account for Terraform (GitHub Actions)
 # -----------------------------------------------------------------------------

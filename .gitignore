@@ -72,6 +72,7 @@ docker-compose.override.yml
 credentials.json
 secrets.json
 service-account.json
+jobmatch-482415-*.json
 
 # Database
 *.sqlite

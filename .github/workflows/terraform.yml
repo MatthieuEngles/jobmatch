@@ -11,12 +11,18 @@ name: Terraform
 
 on:
   push:
-    branches: [main, staging]
+
+    branches:
+      - main
+      # - staging  # TODO: Enable when staging environment is ready
     paths:
       - 'infra/terraform/**'
       - '.github/workflows/terraform.yml'
   pull_request:
-    branches: [main, staging]
+
+    branches:
+      - main
+      # - staging  # TODO: Enable when staging environment is ready
     paths:
       - 'infra/terraform/**'
       - '.github/workflows/terraform.yml'
@@ -27,7 +33,7 @@ on:
         required: true
         type: choice
         options:
-          - staging
+          # - staging  # TODO: Enable when staging environment is ready
           - prod
       action:
         description: 'Action to perform'

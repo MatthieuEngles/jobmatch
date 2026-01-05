@@ -67,18 +67,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Determine environment from branch or manual input
+      # Determine environment - always prod (no staging)
       - name: Determine Environment
         id: env
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "name=${{ inputs.environment }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "name=prod" >> $GITHUB_OUTPUT
-          else
-            echo "name=staging" >> $GITHUB_OUTPUT
-          fi
-          echo "Environment: $(cat $GITHUB_OUTPUT | grep name | cut -d= -f2)"
+          echo "name=prod" >> $GITHUB_OUTPUT
+          echo "Environment: prod"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2

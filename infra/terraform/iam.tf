@@ -141,6 +141,13 @@ resource "google_project_iam_member" "deploy_os_login" {
   member  = "serviceAccount:${google_service_account.deploy.email}"
 }
 
+# Deploy SA - Compute Viewer (to list VMs and get zones)
+resource "google_project_iam_member" "deploy_compute_viewer" {
+  project = var.project_id
+  role    = "roles/compute.viewer"
+  member  = "serviceAccount:${google_service_account.deploy.email}"
+}
+
 # Allow GitHub repo to impersonate Deploy SA
 resource "google_service_account_iam_member" "deploy_workload_identity" {
   service_account_id = google_service_account.deploy.name

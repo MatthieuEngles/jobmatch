@@ -18,6 +18,7 @@ class MatchResultSchema(BaseModel):
 
     offer_id: str = Field(..., description="Job offer ID")
     score: float = Field(..., description="Similarity score")
+    ingestion_date: str | None = Field(None, description="Ingestion date (ISO format) for partitioned queries")
 
 
 class MatchResponse(BaseModel):

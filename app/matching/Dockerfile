@@ -22,4 +22,7 @@ EXPOSE 8086
 WORKDIR /app/matching
 RUN pip install -e .
 
+# Copy .env file
+COPY app/matching/.env /app/matching/.env
+
 CMD ["python", "-m", "uvicorn", "matcher.main:app", "--host", "0.0.0.0", "--port", "8086", "--reload"]

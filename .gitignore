@@ -73,6 +73,10 @@ credentials.json
 secrets.json
 service-account.json
 
+# Private documentation (DO NOT COMMIT)
+**/PRIVATE_*.md
+PRIVATE_*.md
+
 # Database
 *.sqlite
 *.sqlite3

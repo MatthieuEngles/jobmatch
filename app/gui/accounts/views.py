@@ -33,6 +33,7 @@ from .models import (
     ChatMessage,
     DocxTemplate,
     ExtractedLine,
+    ImportedOffer,
     Pitch,
     ProfessionalSuccess,
     ProfileItemSelection,
@@ -315,7 +316,11 @@ def cv_upload_view(request):
                     data["llm_endpoint"] = llm_config.llm_endpoint
                     data["llm_model"] = llm_config.llm_model
                     data["llm_api_key"] = llm_config.llm_api_key
-                    logger.info(f"Using custom LLM config for user {user.id}")
+                    data["llm_api_mode"] = llm_config.llm_api_mode
+                    data["llm_max_tokens"] = llm_config.llm_max_tokens
+                    logger.info(
+                        f"Using custom LLM config for user {user.id}, mode: {llm_config.llm_api_mode}, max_tokens: {llm_config.llm_max_tokens}"
+                    )
             except UserLLMConfig.DoesNotExist:
                 pass  # No custom config, use server defaults
 
@@ -1136,7 +1141,7 @@ def _build_user_context(user, coaching_type: str = "star") -> dict:
 def _get_user_llm_config(user) -> dict | None:
     """Get user's custom LLM config if they are Premium+ and have it enabled.
 
-    Returns dict with llm_endpoint, llm_model, llm_api_key or None.
+    Returns dict with llm_endpoint, llm_model, llm_api_key, llm_api_mode, llm_max_tokens or None.
     """
     if user.subscription_tier in ("free", "basic"):
         return None
@@ -1147,6 +1152,8 @@ def _get_user_llm_config(user) -> dict | None:
                 "llm_endpoint": llm_config.llm_endpoint,
                 "llm_model": llm_config.llm_model,
                 "llm_api_key": llm_config.llm_api_key,
+                "llm_api_mode": llm_config.llm_api_mode,
+                "llm_max_tokens": llm_config.llm_max_tokens,
             }
     except UserLLMConfig.DoesNotExist:
         pass
@@ -2394,3 +2401,224 @@ def application_save_cover_letter_view(request, application_id):
     application.save()
 
     return JsonResponse({"success": True, "message": "Lettre enregistree"})
+
+
+# =============================================================================
+# Top Offers - Personalized job recommendations
+# =============================================================================
+
+
+@login_required
+@require_GET
+def top_offers_refresh_view(request):
+    """
+    Refresh personalized top offers for the authenticated user.
+
+    Returns JSON with list of top matching offers based on user's candidate profiles.
+    """
+    from services.top_offers import get_top_offers_for_user
+
+    try:
+        top_offers = get_top_offers_for_user(request.user, top_k=20)
+
+        # Format response
+        offers_data = [
+            {
+                "id": offer.offer_id,
+                "intitule": offer.intitule,
+                "entreprise": offer.entreprise,
+                "description": (
+                    offer.description[:200] + "..."
+                    if offer.description and len(offer.description) > 200
+                    else offer.description
+                ),
+                "score": round(offer.score * 100, 1),  # Convert to percentage
+                "profiles": offer.matching_profiles,
+            }
+            for offer in top_offers
+        ]
+
+        return JsonResponse(
+            {
+                "success": True,
+                "offers": offers_data,
+                "count": len(offers_data),
+            }
+        )
+
+    except ValueError as e:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": str(e),
+                "offers": [],
+            },
+            status=400,
+        )
+
+    except Exception as e:
+        logger.error(f"Error refreshing top offers for user {request.user.id}: {e}")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Une erreur est survenue lors du chargement des offres.",
+                "offers": [],
+            },
+            status=500,
+        )
+
+
+@login_required
+@require_GET
+def offer_details_view(request, offer_id):
+    """
+    Get full details for a specific offer.
+
+    Returns JSON with complete offer information for modal display.
+    """
+    from services.offers_db import get_offers_db
+
+    try:
+        offers_db = get_offers_db()
+        details = offers_db.get_offer_full_details(offer_id)
+
+        if not details:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Offre non trouvee",
+                },
+                status=404,
+            )
+
+        # Format date for display
+        date_display = None
+        if details.date_creation:
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(details.date_creation.replace("Z", "+00:00"))
+                date_display = dt.strftime("%d/%m/%Y")
+            except (ValueError, AttributeError):
+                date_display = details.date_creation[:10] if details.date_creation else None
+
+        return JsonResponse(
+            {
+                "success": True,
+                "offer": {
+                    "id": details.id,
+                    "intitule": details.intitule,
+                    "description": details.description,
+                    "entreprise": details.entreprise,
+                    "type_contrat": details.type_contrat,
+                    "experience": details.experience,
+                    "duree_travail": details.duree_travail,
+                    "lieu": details.lieu,
+                    "salaire": details.salaire,
+                    "date_creation": date_display,
+                    "rome_libelle": details.rome_libelle,
+                    "secteur_activite": details.secteur_activite,
+                    "competences": details.competences,
+                    "qualites": details.qualites,
+                },
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting offer details {offer_id}: {e}")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Une erreur est survenue.",
+            },
+            status=500,
+        )
+
+
+@login_required
+@require_POST
+def add_offer_to_applications_view(request, offer_id):
+    """
+    Add an offer from the Gold/Silver database to user's applications.
+
+    Creates an ImportedOffer and optionally an Application from the offer data.
+    """
+    from django.utils import timezone
+    from services.offers_db import get_offers_db
+
+    try:
+        # Get offer details
+        offers_db = get_offers_db()
+        details = offers_db.get_offer_full_details(offer_id)
+
+        if not details:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Offre non trouvee",
+                },
+                status=404,
+            )
+
+        # Check if offer already imported by this user
+        existing = ImportedOffer.objects.filter(
+            user=request.user,
+            source_url__endswith=f"/offre/{offer_id}",
+        ).first()
+
+        if existing:
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Offre deja dans vos candidatures",
+                    "offer_id": existing.id,
+                    "already_exists": True,
+                }
+            )
+
+        # Get user's default profile
+        default_profile = request.user.candidate_profiles.filter(is_default=True).first()
+
+        # Create ImportedOffer
+        imported_offer = ImportedOffer.objects.create(
+            user=request.user,
+            candidate_profile=default_profile,
+            source_url=f"https://francetravail.fr/offre/{offer_id}",
+            source_domain="francetravail.fr",
+            captured_at=timezone.now(),
+            title=details.intitule,
+            company=details.entreprise or "",
+            location=details.lieu or "",
+            description=details.description or "",
+            contract_type=details.type_contrat or "",
+            skills=details.competences or [],
+            status="new",
+        )
+
+        # Create associated Application
+        application = Application.objects.create(
+            user=request.user,
+            candidate_profile=default_profile,
+            imported_offer=imported_offer,
+            status="new",
+        )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Offre ajoutee a vos candidatures",
+                "offer_id": imported_offer.id,
+                "application_id": application.id,
+                "already_exists": False,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error adding offer {offer_id} to applications: {e}")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Une erreur est survenue lors de l'ajout.",
+            },
+            status=500,
+        )

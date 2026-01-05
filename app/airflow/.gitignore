@@ -1,0 +1,25 @@
+# Logs Airflow
+logs/
+
+# Base de données PostgreSQL
+postgres-db-volume/
+
+# Credentials
+credentials/
+*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env.local
+.env

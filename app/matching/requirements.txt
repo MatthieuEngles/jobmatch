@@ -1,0 +1,8 @@
+fastapi
+numpy
+pydantic
+pytest
+sentence-transformers
+sqlalchemy
+uvicorn
+httpx

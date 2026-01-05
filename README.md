@@ -11,7 +11,7 @@ jobmatch/
 │   ├── ai-assistant/        # Service IA - generation CV/LM (port 8084)
 │   ├── cv-ingestion/        # Ingestion et parsing de CV (port 8081)
 │   ├── offre-ingestion/     # Ingestion offres France Travail (port 8082)
-│   ├── matching/            # Service de matching CV/offres (port 8083)
+│   ├── matching/            # Service de matching CV/offres (port 8086)
 │   └── local_ollama/        # Ollama local avec modeles Mistral (port 11434)
 ├── shared/                  # Code partage entre services
 ├── docs/                    # Documentation technique
@@ -26,7 +26,7 @@ jobmatch/
 | **ai-assistant** | 8084 | OK | FastAPI pour generation IA (CV, lettres) |
 | **cv-ingestion** | 8081 | OK | Extraction de donnees structurees depuis CV |
 | **offre-ingestion** | 8082 | OK | Pipeline d'ingestion offres France Travail |
-| **matching** | 8083 | WIP | Service de matching CV/offres |
+| **matching** | 8086 | WIP | Service de matching CV/offres |
 | **local-ollama** | 11434 | OK | Serveur Ollama avec modeles Mistral |
 | **db** | 5433 | OK | PostgreSQL 16 |
 | **redis** | 6379 | OK | Cache et files d'attente |
@@ -41,15 +41,23 @@ jobmatch/
 ### Lancer les services
 
 ```bash
-# Demarrer les services principaux
-docker-compose up -d db gui
+# Demarrer tous les services (SAUF local-ollama par defaut)
+docker compose up -d
+
+# Demarrer les services principaux uniquement
+docker compose up -d db gui
 
 # Demarrer avec l'assistant IA
-docker-compose up -d db gui ai-assistant
+docker compose up -d db gui ai-assistant
 
-# Demarrer Ollama local (modeles Mistral)
-docker-compose up -d local-ollama
+# Demarrer TOUT y compris Ollama local (utilise le profil 'full')
+docker compose --profile full up -d
+
+# Demarrer uniquement Ollama local
+docker compose --profile ollama up -d local-ollama
 ```
+
+**Note**: Le service `local-ollama` est desactive par defaut (gourmand en ressources). Utilisez `--profile full` ou `--profile ollama` pour le demarrer.
 
 ### Script de developpement
 

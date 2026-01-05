@@ -19,12 +19,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from sqlalchemy import BLOB, Column, String, create_engine, text
-from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Import de la fonction d'embedding depuis le shared module
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "shared" / "src"))
 from shared.embeddings.providers import create_sentence_transformers_embedder
+from sqlalchemy import BLOB, Column, String, create_engine, text
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # ----------------------------
 # Configuration

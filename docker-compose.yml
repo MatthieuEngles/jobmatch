@@ -1,4 +1,48 @@
-version: '3.8'
+# =============================================================================
+# Airflow Common Configuration (YAML anchor)
+# =============================================================================
+x-airflow-common:
+  &airflow-common
+  build:
+    context: ./app/airflow
+    dockerfile: Dockerfile
+  image: jobmatch-airflow:latest
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    # SMTP configuration for email notifications
+    AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+    AIRFLOW__SMTP__SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+    AIRFLOW__SMTP__SMTP_SSL: ${SMTP_SSL:-false}
+    AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER:-}
+    AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT:-587}
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM:-}
+    # Custom variables
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/credentials/gcp-key.json
+    HOST_AIRFLOW_PATH: ${HOST_AIRFLOW_PATH:-}
+    GCP_VM_NAME: ${GCP_VM_NAME:-}
+    GCP_VM_ZONE: ${GCP_VM_ZONE:-europe-west9-b}
+  volumes:
+    - ./app/airflow/dags:/opt/airflow/dags
+    - ./app/airflow/logs:/opt/airflow/logs
+    - ./app/airflow/plugins:/opt/airflow/plugins
+    - ./app/airflow/config:/opt/airflow/config
+    # Docker socket access for DockerOperator
+    - /var/run/docker.sock:/var/run/docker.sock
+    # GCP credentials
+    - ${AIRFLOW_GCP_CREDENTIALS_PATH:-./app/airflow/credentials/gcp-service-account-key.json}:/opt/airflow/credentials/gcp-key.json:ro
+    # .env file for offre-ingestion pipeline
+    - ./app/offre-ingestion/.env:/opt/airflow/offre-ingestion/.env:ro
+  user: "0:0"  # Root access for Docker socket
+  networks:
+    - jobmatch-network
 
 services:
   gui:
@@ -6,17 +50,35 @@ services:
       context: .
       dockerfile: app/gui/Dockerfile
     ports:
-      - "${GUI_PORT:-8085}:8080"
+      - "${GUI_PORT}:8080"
+    env_file:
+      - .env
     environment:
-      - ENV_MODE=dev
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
-      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
+      - ENV_MODE=${ENV_MODE}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - MATCHING_URL=${MATCHING_URL}
-      - AI_ASSISTANT_URL=${AI_ASSISTANT_URL:-http://ai-assistant:8084}
+      - AI_ASSISTANT_URL=${AI_ASSISTANT_URL}
+      - USE_MOCK_MATCHING=${USE_MOCK_MATCHING}
+      - USE_SQLITE_OFFERS=${USE_SQLITE_OFFERS}
+      - MATCHING_SERVICE_URL=${MATCHING_SERVICE_URL}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - BIGQUERY_SILVER_DATASET=${BIGQUERY_SILVER_DATASET}
+      - BIGQUERY_GOLD_DATASET=${BIGQUERY_GOLD_DATASET}
+      # Cross-project Gold (colleague's project with offers)
+      - BIGQUERY_GOLD_PROJECT_ID=${BIGQUERY_GOLD_PROJECT_ID}
+      - BIGQUERY_GOLD_CROSS_PROJECT_DATASET=${BIGQUERY_GOLD_CROSS_PROJECT_DATASET}
+      # BigQuery credentials for cross-project access
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/bigquery-gold-key.json
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
+    volumes:
+      # Mount credentials for local dev (cross-project BigQuery access)
+      - ${BIGQUERY_GOLD_CREDENTIALS_PATH}:/app/credentials/bigquery-gold-key.json:ro
     depends_on:
       - db
     networks:
@@ -27,11 +89,17 @@ services:
       context: .
       dockerfile: app/cv-ingestion/Dockerfile
     ports:
-      - "${CV_INGESTION_PORT:-8081}:8081"
+      - "${CV_INGESTION_PORT}:8081"
     env_file:
-      - app/cv-ingestion/.env
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - LLM_TYPE=${LLM_TYPE}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
+      - DEBUG=${DEBUG}
     networks:
       - jobmatch-network
 
@@ -40,30 +108,69 @@ services:
       context: .
       dockerfile: app/ai-assistant/Dockerfile
     ports:
-      - "${AI_ASSISTANT_PORT:-8084}:8084"
+      - "${AI_ASSISTANT_PORT}:8084"
     env_file:
-      - app/ai-assistant/.env
+      - .env
+    environment:
+      - DEBUG=${DEBUG}
+      - LLM_TYPE=${LLM_TYPE}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
     networks:
       - jobmatch-network
 
   offre-ingestion:
-    build: ./app/offre-ingestion
+    build:
+      context: .
+      dockerfile: app/offre-ingestion/Dockerfile
+    image: offre-ingestion-pipeline:latest
     ports:
-      - "${OFFRE_INGESTION_PORT:-8082}:8082"
+      - "${OFFRE_INGESTION_PORT}:8082"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - FRANCE_TRAVAIL_API_KEY=${FRANCE_TRAVAIL_API_KEY}
+      # France Travail API
+      - FT_CLIENT_ID=${FT_CLIENT_ID}
+      - FT_CLIENT_SECRET=${FT_CLIENT_SECRET}
+      - FT_SCOPE=${FT_SCOPE}
+      - FT_OAUTH_URL=${FT_OAUTH_URL}
+      - FT_API_URL_BASE=${FT_API_URL_BASE}
+      - FT_ROMECODES_PATH=${FT_ROMECODES_PATH}
+      - FT_OUTPUT_FILE=${FT_OUTPUT_FILE}
+      # GCS Bronze layer
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GCS_PREFIX=${GCS_PREFIX}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      # BigQuery Silver/Gold
+      - BIGQUERY_SILVER_DATASET=${BIGQUERY_SILVER_DATASET}
+      - BIGQUERY_GOLD_DATASET=${BIGQUERY_GOLD_DATASET}
+      # Cross-project Gold (colleague's project)
+      - BIGQUERY_GOLD_PROJECT_ID=${BIGQUERY_GOLD_PROJECT_ID}
+      - BIGQUERY_GOLD_CROSS_PROJECT_DATASET=${BIGQUERY_GOLD_CROSS_PROJECT_DATASET}
+      # Embeddings
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
+    volumes:
+      # Mount credentials for local dev (cross-project access)
+      - ${BIGQUERY_GOLD_CREDENTIALS_PATH}:/app/credentials/bigquery-gold-key.json:ro
     networks:
       - jobmatch-network
 
   matching:
-    build: ./app/matching
+    build:
+      context: .
+      dockerfile: app/matching/Dockerfile
     ports:
-      - "${MATCHING_PORT:-8083}:8083"
+      - "${MATCHING_PORT}:8086"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - OFFRE_INGESTION_URL=${OFFRE_INGESTION_URL}
+      - JOB_OFFERS_DB_PATH=${JOB_OFFERS_DB_PATH}
     depends_on:
       - cv-ingestion
       - offre-ingestion
@@ -73,11 +180,13 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - "${DB_PORT:-5433}:5432"
+      - "${DB_PORT}:5432"
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-jobmatch}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jobmatch}
-      - POSTGRES_DB=${POSTGRES_DB:-jobmatch}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -86,22 +195,124 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - jobmatch-network
 
   local-ollama:
+    profiles:
+      - ollama
+      - full
     build:
       context: .
       dockerfile: app/local_ollama/Dockerfile
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      - "${OLLAMA_PORT}:11434"
     environment:
       - OLLAMA_HOST=0.0.0.0
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - jobmatch-network
+
+  # ===========================================================================
+  # Airflow Services (profile: airflow)
+  # ===========================================================================
+  airflow-db:
+    profiles:
+      - airflow
+      - full
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - jobmatch-network
+
+  airflow-init:
+    <<: *airflow-common
+    profiles:
+      - airflow
+      - full
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_WWW_USER:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_WWW_PASSWORD:-airflow}
+    user: "0:0"
+    volumes:
+      - ./app/airflow:/sources
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *airflow-common
+    profiles:
+      - airflow
+      - full
+    command: webserver
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    profiles:
+      - airflow
+      - full
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-cli:
+    <<: *airflow-common
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    command:
+      - bash
+      - -c
+      - airflow
 
 networks:
   jobmatch-network:
@@ -110,3 +321,4 @@ networks:
 volumes:
   postgres_data:
   ollama_data:
+  airflow_postgres_data:

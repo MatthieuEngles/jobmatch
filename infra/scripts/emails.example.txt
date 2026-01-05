@@ -1,0 +1,2 @@
+# Liste des emails des collaborateurs (un par ligne)
+# test@gmail.com

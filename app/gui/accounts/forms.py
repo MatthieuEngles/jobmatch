@@ -218,12 +218,14 @@ class UserLLMConfigForm(forms.ModelForm):
 
     class Meta:
         model = UserLLMConfig
-        fields = ["is_enabled", "llm_endpoint", "llm_model", "llm_api_key"]
+        fields = ["is_enabled", "llm_endpoint", "llm_model", "llm_api_key", "llm_api_mode", "llm_max_tokens"]
         labels = {
             "is_enabled": "Activer ma configuration LLM personnalisée",
             "llm_endpoint": "URL de l'endpoint LLM",
             "llm_model": "Nom du modèle",
             "llm_api_key": "Clé API",
+            "llm_api_mode": "Mode d'API",
+            "llm_max_tokens": "Taille du contexte",
         }
         widgets = {
             "llm_api_key": forms.PasswordInput(
@@ -231,6 +233,10 @@ class UserLLMConfigForm(forms.ModelForm):
             ),
             "llm_endpoint": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://api.openai.com/v1"}),
             "llm_model": forms.TextInput(attrs={"class": "form-control", "placeholder": "gpt-4o"}),
+            "llm_api_mode": forms.RadioSelect(attrs={"class": "form-check-input"}),
+            "llm_max_tokens": forms.NumberInput(
+                attrs={"type": "range", "class": "context-slider", "min": 2048, "max": 32768, "step": 1024}
+            ),
         }
 
     def clean(self):

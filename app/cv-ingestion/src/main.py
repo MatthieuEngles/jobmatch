@@ -121,6 +121,8 @@ async def submit_cv_extraction(
     llm_endpoint: Annotated[str | None, Form(description="Custom LLM endpoint URL")] = None,
     llm_model: Annotated[str | None, Form(description="LLM model name")] = None,
     llm_api_key: Annotated[str | None, Form(description="LLM API key")] = None,
+    llm_api_mode: Annotated[str | None, Form(description="API mode: openai_compatible or ollama_native")] = None,
+    llm_max_tokens: Annotated[int | None, Form(description="Max tokens for LLM response")] = None,
 ):
     """
     Submit a CV for asynchronous extraction.
@@ -160,13 +162,17 @@ async def submit_cv_extraction(
 
     # Build LLM config if any custom parameters provided
     llm_config = None
-    if llm_endpoint or llm_model or llm_api_key:
+    if llm_endpoint or llm_model or llm_api_key or llm_api_mode or llm_max_tokens:
         llm_config = LLMConfig(
             endpoint=llm_endpoint,
             model=llm_model,
             api_key=llm_api_key,
+            api_mode=llm_api_mode,
+            max_tokens=llm_max_tokens,
         )
-        logger.info(f"Using custom LLM config: endpoint={llm_endpoint}, model={llm_model}")
+        logger.info(
+            f"Using custom LLM config: endpoint={llm_endpoint}, model={llm_model}, api_mode={llm_api_mode}, max_tokens={llm_max_tokens}"
+        )
 
     # Create task and start background processing
     task_id = await task_store.create_task(filename=file.filename)

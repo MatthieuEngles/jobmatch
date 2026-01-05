@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}JobMatch - Trouvez le job qui vous correspond{% endblock %}
 
@@ -8,7 +9,7 @@
 {% endif %}
 {% endblock %}
 
-{% block main_attrs %}{% if user.is_authenticated %}class="container mt-4"{% endif %}{% endblock %}
+{% block main_attrs %}{% if user.is_authenticated %}class="container"{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -19,6 +20,16 @@
         --accent: #f59e0b;
         --dark: #0f172a;
         --light: #f8fafc;
+    }
+
+    /* Prevent page scroll for authenticated view */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+    }
+
+    main {
+        overflow: hidden !important;
     }
 
     /* Hero section styles */
@@ -385,9 +396,15 @@
     .welcome-section {
         height: calc(100vh - 76px);
         display: flex;
-        align-items: center;
+        align-items: stretch;
         padding: 16px 0;
         overflow: hidden;
+    }
+
+    .welcome-section > .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
     }
 
     .dashboard-grid {
@@ -395,8 +412,8 @@
         grid-template-columns: 1fr 1fr 1fr;
         grid-template-rows: 1fr 1fr 1fr;
         gap: 16px;
-        height: calc(100vh - 120px);
-        max-height: 600px;
+        flex: 1;
+        min-height: 0;
     }
 
     .welcome-card {
@@ -411,6 +428,8 @@
         gap: 12px;
         text-decoration: none;
         transition: all 0.3s ease;
+        height: 100%;
+        min-height: 0;
     }
 
     .welcome-card:hover {
@@ -456,6 +475,369 @@
         margin: 0;
     }
 
+    .card-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .refresh-btn {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .refresh-btn:hover {
+        transform: rotate(180deg);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    }
+
+    .refresh-btn:active {
+        transform: rotate(180deg) scale(0.95);
+    }
+
+    .refresh-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .refresh-btn.spinning svg {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    /* Top offers states and results */
+    .top-offers-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 10px;
+        min-height: 0;
+    }
+
+    .top-offers-results {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 0;
+        padding-right: 5px;
+    }
+
+    .top-offers-results::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .top-offers-results::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    .top-offers-results::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .offer-item {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .offer-item:hover {
+        background: #f1f5f9;
+        border-color: var(--primary);
+    }
+
+    .offer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+
+    .offer-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--dark);
+        line-height: 1.3;
+        flex: 1;
+        min-width: 0;
+        word-wrap: break-word;
+    }
+
+    .offer-score {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 20px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    .offer-company {
+        color: #64748b;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+
+    .offer-description {
+        color: #475569;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 8px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .offer-profiles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .profile-badge {
+        background: #e0e7ff;
+        color: var(--primary);
+        font-size: 0.7rem;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #e2e8f0;
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-bottom: 12px;
+    }
+
+    .error-text {
+        color: #ef4444;
+    }
+
+    .no-offers-message {
+        color: #64748b;
+        font-style: italic;
+    }
+
+    /* Offer modal styles */
+    .offer-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        padding: 20px;
+    }
+
+    .offer-modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .offer-modal {
+        background: white;
+        border-radius: 20px;
+        max-width: 700px;
+        width: 100%;
+        max-height: 85vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transform: translateY(20px) scale(0.95);
+        transition: all 0.3s ease;
+    }
+
+    .offer-modal-overlay.active .offer-modal {
+        transform: translateY(0) scale(1);
+    }
+
+    .offer-modal-header {
+        padding: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .offer-modal-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--dark);
+        line-height: 1.3;
+        margin: 0;
+    }
+
+    .offer-modal-close {
+        background: #f1f5f9;
+        border: none;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
+
+    .offer-modal-close:hover {
+        background: #e2e8f0;
+    }
+
+    .offer-modal-close svg {
+        width: 20px;
+        height: 20px;
+        color: #64748b;
+    }
+
+    .offer-modal-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .offer-modal-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .offer-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        color: #475569;
+    }
+
+    .offer-meta-item svg {
+        width: 18px;
+        height: 18px;
+        color: var(--primary);
+        flex-shrink: 0;
+    }
+
+    .offer-modal-section {
+        margin-bottom: 20px;
+    }
+
+    .offer-modal-section-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .offer-modal-description {
+        color: #334155;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .offer-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .offer-tag {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        border-radius: 20px;
+    }
+
+    .offer-modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .offer-modal-btn {
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+    }
+
+    .offer-modal-btn-primary {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+    }
+
+    .offer-modal-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+    }
+
+    .offer-modal-btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .offer-modal-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+    }
+
     .action-card {
         background: white;
         border-radius: 20px;
@@ -467,6 +849,9 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .action-card:hover {
@@ -478,6 +863,46 @@
 
     .action-card.tall {
         grid-row: span 3;
+    }
+
+    /* Make top-offers-card content fill the card */
+    #top-offers-card {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #top-offers-card .card-header-row {
+        flex-shrink: 0;
+    }
+
+    #top-offers-card .top-offers-results,
+    #top-offers-card .top-offers-state {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    /* Make applications-card content fill the card */
+    #applications-card {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #applications-card .card-header {
+        flex-shrink: 0;
+    }
+
+    #applications-card .applications-preview {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    #applications-card .action-arrow {
+        flex-shrink: 0;
+        margin-top: auto;
     }
 
     .action-icon {
@@ -508,6 +933,67 @@
         line-height: 1.4;
     }
 
+    .browser-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .main-browser {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .main-browser img {
+        width: 72px;
+        height: 72px;
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+        transition: transform 0.2s ease;
+        cursor: pointer;
+    }
+
+    .main-browser img:hover {
+        transform: scale(1.08);
+    }
+
+    .main-browser-label {
+        font-size: 0.85rem;
+        color: var(--primary);
+        font-weight: 600;
+    }
+
+    .other-browsers {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .other-browsers-label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    #other-browsers-icons {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    #other-browsers-icons img {
+        width: 28px;
+        height: 28px;
+        opacity: 0.7;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        cursor: pointer;
+    }
+
+    #other-browsers-icons img:hover {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+
     .action-arrow {
         margin-top: auto;
         color: var(--primary);
@@ -515,6 +1001,11 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        text-decoration: none;
+    }
+
+    .action-arrow:hover {
+        color: var(--secondary);
     }
 
     .action-card:hover .action-arrow svg {
@@ -554,7 +1045,8 @@
         flex-direction: column;
         gap: 10px;
         flex: 1;
-        overflow: hidden;
+        overflow-y: auto;
+        min-height: 0;
     }
 
     .application-mini-card {
@@ -562,6 +1054,7 @@
         border-radius: 10px;
         padding: 12px;
         border-left: 3px solid var(--primary);
+        flex-shrink: 0;
     }
 
     .app-mini-header {
@@ -695,7 +1188,7 @@
                 </a>
 
                 <!-- Column 2: Suivi des candidatures (tall) -->
-                <div class="action-card tall" style="cursor: default;">
+                <div class="action-card tall" id="applications-card" style="cursor: default;">
                     <div class="card-header">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -742,24 +1235,36 @@
                 </div>
 
                 <!-- Column 3: Top offres pour vous (tall) -->
-                <a href="#" class="action-card tall">
-                    <div class="card-header">
-                        <div class="action-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
+                <div class="action-card tall" id="top-offers-card">
+                    <div class="card-header-row">
+                        <div class="card-header">
+                            <div class="action-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                </svg>
+                            </div>
+                            <h3 class="action-title">Top offres pour vous</h3>
                         </div>
-                        <h3 class="action-title">Top offres pour vous</h3>
+                        <button type="button" class="refresh-btn" id="refresh-offers-btn" title="Rafraichir les offres">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
                     </div>
-                    <span class="coming-soon-badge">Bientot disponible</span>
-                    <p class="action-desc">Decouvrez les offres qui matchent le mieux avec votre profil, selectionnees par notre algorithme IA</p>
-                    <span class="action-arrow">
-                        Voir les offres
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                    </span>
-                </a>
+                    <!-- Initial state (hidden, kept for JS compatibility) -->
+                    <div id="top-offers-initial" class="top-offers-state" style="display: none;"></div>
+                    <!-- Loading state (shown by default) -->
+                    <div id="top-offers-loading" class="top-offers-state">
+                        <div class="loading-spinner"></div>
+                        <p class="action-desc">Analyse de vos profils en cours...</p>
+                    </div>
+                    <!-- Error state -->
+                    <div id="top-offers-error" class="top-offers-state" style="display: none;">
+                        <p class="action-desc error-text"></p>
+                    </div>
+                    <!-- Results container -->
+                    <div id="top-offers-results" class="top-offers-results" style="display: none;"></div>
+                </div>
 
                 <!-- Column 1, Row 2: Importer mon CV -->
                 <a href="{% url 'accounts:profile' %}#documents" class="action-card">
@@ -780,28 +1285,387 @@
                     </span>
                 </a>
 
-                <!-- Column 1, Row 3: Importer une offre et postuler -->
+                <!-- Column 1, Row 3: Plugins navigateurs -->
                 <a href="#" class="action-card">
                     <div class="card-header">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
                             </svg>
                         </div>
-                        <h3 class="action-title">Importer une offre et postuler</h3>
+                        <h3 class="action-title">Telecharger nos plugins</h3>
                     </div>
                     <span class="coming-soon-badge">Bientot disponible</span>
-                    <p class="action-desc">Collez le lien d'une offre et generez une candidature personnalisee</p>
+                    <p class="action-desc">Importez des offres directement depuis votre navigateur</p>
+                    <div class="browser-section" id="browser-section">
+                        <!-- Main browser (detected) -->
+                        <div class="main-browser" id="main-browser"></div>
+                        <!-- Other browsers -->
+                        <div class="other-browsers">
+                            <span class="other-browsers-label">Autres :</span>
+                            <div id="other-browsers-icons"></div>
+                        </div>
+                    </div>
+                    <script>
+                    (function() {
+                        const basePath = '{% static "img/browsers/" %}';
+                        const browsers = ['chrome', 'firefox', 'edge', 'safari'];
+                        const browserNames = { chrome: 'Chrome', firefox: 'Firefox', edge: 'Edge', safari: 'Safari' };
+                        function detectBrowser() {
+                            const ua = navigator.userAgent;
+                            if (ua.indexOf('Edg') > -1) return 'edge';
+                            if (ua.indexOf('Chrome') > -1) return 'chrome';
+                            if (ua.indexOf('Firefox') > -1) return 'firefox';
+                            if (ua.indexOf('Safari') > -1) return 'safari';
+                            return 'chrome';
+                        }
+                        const currentBrowser = detectBrowser();
+                        const mainEl = document.getElementById('main-browser');
+                        const othersEl = document.getElementById('other-browsers-icons');
+                        mainEl.innerHTML = '<img src="' + basePath + currentBrowser + '.svg" alt="' + browserNames[currentBrowser] + '"><span class="main-browser-label">Pour ' + browserNames[currentBrowser] + '</span>';
+                        let othersHtml = '';
+                        browsers.forEach(function(b) {
+                            if (b !== currentBrowser) othersHtml += '<img src="' + basePath + b + '.svg" alt="' + browserNames[b] + '">';
+                        });
+                        othersEl.innerHTML = othersHtml;
+                    })();
+                    </script>
                     <span class="action-arrow">
-                        Postuler
+                        Telecharger
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                     </span>
                 </a>
             </div>
         </div>
     </div>
+
+    <!-- Offer Details Modal -->
+    <div id="offer-modal-overlay" class="offer-modal-overlay">
+        <div class="offer-modal">
+            <div class="offer-modal-header">
+                <h2 id="offer-modal-title" class="offer-modal-title"></h2>
+                <button type="button" class="offer-modal-close" id="offer-modal-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="offer-modal-body" id="offer-modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="offer-modal-footer">
+                <button type="button" class="offer-modal-btn offer-modal-btn-primary" id="offer-modal-add-btn">
+                    Ajouter a mes candidatures
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const refreshBtn = document.getElementById('refresh-offers-btn');
+        const initialState = document.getElementById('top-offers-initial');
+        const loadingState = document.getElementById('top-offers-loading');
+        const errorState = document.getElementById('top-offers-error');
+        const resultsContainer = document.getElementById('top-offers-results');
+
+        // Modal elements
+        const modalOverlay = document.getElementById('offer-modal-overlay');
+        const modalTitle = document.getElementById('offer-modal-title');
+        const modalBody = document.getElementById('offer-modal-body');
+        const modalCloseBtn = document.getElementById('offer-modal-close');
+        const modalAddBtn = document.getElementById('offer-modal-add-btn');
+        let currentOfferId = null;
+
+        if (!refreshBtn) return;
+
+        function showState(state) {
+            initialState.style.display = 'none';
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            resultsContainer.style.display = 'none';
+            state.style.display = 'flex';
+        }
+
+        function showResults() {
+            initialState.style.display = 'none';
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            resultsContainer.style.display = 'flex';
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderOffers(offers) {
+            if (offers.length === 0) {
+                resultsContainer.innerHTML = '<p class="no-offers-message">Aucune offre correspondante trouvee. Creez ou modifiez vos profils de candidature pour ameliorer les recommandations.</p>';
+                showResults();
+                return;
+            }
+
+            let html = '';
+            offers.forEach(function(offer) {
+                const profileBadges = offer.profiles.map(function(p) {
+                    return '<span class="profile-badge">' + escapeHtml(p) + '</span>';
+                }).join('');
+
+                html += '<div class="offer-item" data-offer-id="' + escapeHtml(offer.id) + '" style="cursor: pointer;">' +
+                    '<div class="offer-header">' +
+                        '<span class="offer-title">' + escapeHtml(offer.intitule) + '</span>' +
+                        '<span class="offer-score">' + offer.score + '%</span>' +
+                    '</div>' +
+                    (offer.entreprise ? '<div class="offer-company">' + escapeHtml(offer.entreprise) + '</div>' : '') +
+                    (offer.description ? '<div class="offer-description">' + escapeHtml(offer.description) + '</div>' : '') +
+                    '<div class="offer-profiles">' + profileBadges + '</div>' +
+                '</div>';
+            });
+
+            resultsContainer.innerHTML = html;
+            showResults();
+
+            // Add click handlers to offer items
+            resultsContainer.querySelectorAll('.offer-item').forEach(function(item) {
+                item.addEventListener('click', function() {
+                    const offerId = this.dataset.offerId;
+                    openOfferModal(offerId);
+                });
+            });
+        }
+
+        // Modal functions
+        function openOfferModal(offerId) {
+            currentOfferId = offerId;
+            modalOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Show loading state
+            modalTitle.textContent = 'Chargement...';
+            modalBody.innerHTML = '<div class="offer-modal-loading"><div class="loading-spinner"></div><p>Chargement des details...</p></div>';
+            modalAddBtn.disabled = true;
+
+            // Fetch offer details
+            fetch('/accounts/api/offers/' + offerId + '/', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    renderOfferModal(data.offer);
+                    modalAddBtn.disabled = false;
+                } else {
+                    modalBody.innerHTML = '<p class="error-text">' + escapeHtml(data.error) + '</p>';
+                }
+            })
+            .catch(function(error) {
+                console.error('Error loading offer:', error);
+                modalBody.innerHTML = '<p class="error-text">Erreur de chargement des details.</p>';
+            });
+        }
+
+        function renderOfferModal(offer) {
+            modalTitle.textContent = offer.intitule;
+
+            let html = '<div class="offer-modal-meta">';
+
+            if (offer.entreprise) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>' + escapeHtml(offer.entreprise) + '</div>';
+            }
+            if (offer.lieu) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>' + escapeHtml(offer.lieu) + '</div>';
+            }
+            if (offer.type_contrat) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>' + escapeHtml(offer.type_contrat) + '</div>';
+            }
+            if (offer.duree_travail) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' + escapeHtml(offer.duree_travail) + '</div>';
+            }
+            if (offer.salaire) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' + escapeHtml(offer.salaire) + '</div>';
+            }
+            if (offer.experience) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>' + escapeHtml(offer.experience) + '</div>';
+            }
+            if (offer.date_creation) {
+                html += '<div class="offer-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Publiee le ' + escapeHtml(offer.date_creation) + '</div>';
+            }
+
+            html += '</div>';
+
+            // Description
+            if (offer.description) {
+                html += '<div class="offer-modal-section"><div class="offer-modal-section-title">Description du poste</div><div class="offer-modal-description">' + escapeHtml(offer.description) + '</div></div>';
+            }
+
+            // Competences
+            if (offer.competences && offer.competences.length > 0) {
+                html += '<div class="offer-modal-section"><div class="offer-modal-section-title">Competences</div><div class="offer-tags">';
+                offer.competences.forEach(function(c) {
+                    html += '<span class="offer-tag">' + escapeHtml(c) + '</span>';
+                });
+                html += '</div></div>';
+            }
+
+            // Qualites
+            if (offer.qualites && offer.qualites.length > 0) {
+                html += '<div class="offer-modal-section"><div class="offer-modal-section-title">Qualites professionnelles</div><div class="offer-tags">';
+                offer.qualites.forEach(function(q) {
+                    html += '<span class="offer-tag">' + escapeHtml(q) + '</span>';
+                });
+                html += '</div></div>';
+            }
+
+            // Additional info
+            if (offer.rome_libelle || offer.secteur_activite) {
+                html += '<div class="offer-modal-section"><div class="offer-modal-section-title">Informations complementaires</div><div class="offer-tags">';
+                if (offer.rome_libelle) {
+                    html += '<span class="offer-tag">' + escapeHtml(offer.rome_libelle) + '</span>';
+                }
+                if (offer.secteur_activite) {
+                    html += '<span class="offer-tag">' + escapeHtml(offer.secteur_activite) + '</span>';
+                }
+                html += '</div></div>';
+            }
+
+            modalBody.innerHTML = html;
+        }
+
+        function closeOfferModal() {
+            modalOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            currentOfferId = null;
+        }
+
+        // Modal event listeners
+        modalCloseBtn.addEventListener('click', closeOfferModal);
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                closeOfferModal();
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
+                closeOfferModal();
+            }
+        });
+
+        // Add to applications button
+        modalAddBtn.addEventListener('click', function() {
+            if (!currentOfferId) return;
+
+            modalAddBtn.disabled = true;
+            modalAddBtn.textContent = 'Ajout en cours...';
+
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                              document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+
+            fetch('/accounts/api/offers/' + currentOfferId + '/add/', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    if (data.already_exists) {
+                        modalAddBtn.textContent = 'Deja dans vos candidatures';
+                        modalAddBtn.style.background = '#94a3b8';
+                        // Reset button after delay
+                        setTimeout(function() {
+                            modalAddBtn.disabled = false;
+                            modalAddBtn.textContent = 'Ajouter a mes candidatures';
+                            modalAddBtn.style.background = '';
+                            closeOfferModal();
+                        }, 1500);
+                    } else {
+                        modalAddBtn.textContent = 'Ajoute !';
+                        modalAddBtn.style.background = '#22c55e';
+                        // Reload page to show new application in sidebar
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } else {
+                    modalAddBtn.textContent = 'Erreur';
+                    modalAddBtn.style.background = '#ef4444';
+                    setTimeout(function() {
+                        modalAddBtn.disabled = false;
+                        modalAddBtn.textContent = 'Ajouter a mes candidatures';
+                        modalAddBtn.style.background = '';
+                    }, 2000);
+                }
+            })
+            .catch(function(error) {
+                console.error('Error adding offer:', error);
+                modalAddBtn.textContent = 'Erreur';
+                modalAddBtn.style.background = '#ef4444';
+                setTimeout(function() {
+                    modalAddBtn.disabled = false;
+                    modalAddBtn.textContent = 'Ajouter a mes candidatures';
+                    modalAddBtn.style.background = '';
+                }, 2000);
+            });
+        });
+
+        // Load offers function (used on page load and refresh)
+        function loadOffers() {
+            refreshBtn.classList.add('spinning');
+            refreshBtn.disabled = true;
+            showState(loadingState);
+
+            fetch('{% url "accounts:top_offers_refresh" %}', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                refreshBtn.classList.remove('spinning');
+                refreshBtn.disabled = false;
+
+                if (data.success) {
+                    renderOffers(data.offers);
+                } else {
+                    errorState.querySelector('.error-text').textContent = data.error || 'Une erreur est survenue.';
+                    showState(errorState);
+                }
+            })
+            .catch(function(error) {
+                refreshBtn.classList.remove('spinning');
+                refreshBtn.disabled = false;
+                console.error('Top offers error:', error);
+                errorState.querySelector('.error-text').textContent = 'Erreur de connexion. Veuillez reessayer.';
+                showState(errorState);
+            });
+        }
+
+        // Refresh button handler
+        refreshBtn.addEventListener('click', loadOffers);
+
+        // Load offers automatically on page load
+        loadOffers();
+    });
+    </script>
 
 {% else %}
     <!-- Public landing page -->

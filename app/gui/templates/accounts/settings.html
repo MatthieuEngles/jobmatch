@@ -435,6 +435,65 @@
         min-height: 60px;
     }
 
+    /* Context slider styles */
+    .context-slider-container {
+        margin-top: 0.5rem;
+    }
+
+    .context-slider {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(to right, #10b981 0%, #6366f1 50%, #ef4444 100%);
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .context-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+        transition: transform 0.2s;
+    }
+
+    .context-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    .context-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+    }
+
+    .context-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    .context-value {
+        margin-top: 0.75rem;
+        padding: 0.5rem 1rem;
+        background: #f5f3ff;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #4c1d95;
+        text-align: center;
+    }
+
     /* Template selector styles */
     .template-selector {
         display: flex;
@@ -829,6 +888,50 @@
                         {% endif %}
                     </div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Mode d'API</label>
+                    <p class="help-text" style="margin-bottom: 0.5rem;">
+                        Choisissez le mode d'API en fonction de votre serveur LLM.
+                    </p>
+                    <div class="api-mode-selector" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label class="api-mode-option" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid #e5e7eb; border-radius: 8px; transition: all 0.2s; {% if llm_form.initial.llm_api_mode == 'openai_compatible' or not llm_form.initial.llm_api_mode %}border-color: #6366f1; background: #f5f3ff;{% endif %}">
+                            <input type="radio" name="llm_api_mode" value="openai_compatible" {% if llm_form.initial.llm_api_mode == 'openai_compatible' or not llm_form.initial.llm_api_mode %}checked{% endif %} style="width: 16px; height: 16px;">
+                            <div>
+                                <div style="font-weight: 500;">OpenAI Compatible</div>
+                                <div style="font-size: 0.75rem; color: #6b7280;">/v1/chat/completions</div>
+                            </div>
+                        </label>
+                        <label class="api-mode-option" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid #e5e7eb; border-radius: 8px; transition: all 0.2s; {% if llm_form.initial.llm_api_mode == 'ollama_native' %}border-color: #6366f1; background: #f5f3ff;{% endif %}">
+                            <input type="radio" name="llm_api_mode" value="ollama_native" {% if llm_form.initial.llm_api_mode == 'ollama_native' %}checked{% endif %} style="width: 16px; height: 16px;">
+                            <div>
+                                <div style="font-weight: 500;">Ollama Native</div>
+                                <div style="font-size: 0.75rem; color: #6b7280;">/api/chat</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Taille du contexte (tokens)</label>
+                    <p class="help-text" style="margin-bottom: 0.5rem;">
+                        Taille totale du contexte (prompt + reponse). Pour Ollama, utilise num_ctx.
+                    </p>
+                    <div class="context-slider-container">
+                        <input type="range" name="llm_max_tokens" id="llm_max_tokens"
+                               min="2048" max="32768" step="1024"
+                               value="{{ llm_form.initial.llm_max_tokens|default:8192 }}"
+                               class="context-slider">
+                        <div class="context-labels">
+                            <span>2K</span>
+                            <span>8K</span>
+                            <span>16K</span>
+                            <span>24K</span>
+                            <span>32K</span>
+                        </div>
+                        <div class="context-value" id="context-value">
+                            <strong id="context-display">{{ llm_form.initial.llm_max_tokens|default:8192 }}</strong> tokens
+                        </div>
+                    </div>
+                </div>
                 <button type="submit" class="btn-save">Enregistrer</button>
             </form>
         </div>
@@ -934,5 +1037,35 @@
             this.classList.add('selected');
         });
     });
+
+    // API mode selector interactivity
+    document.querySelectorAll('.api-mode-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.api-mode-option').forEach(o => {
+                o.style.borderColor = '#e5e7eb';
+                o.style.background = 'transparent';
+            });
+            this.style.borderColor = '#6366f1';
+            this.style.background = '#f5f3ff';
+        });
+    });
+
+    // Context size slider interactivity
+    const contextSlider = document.getElementById('llm_max_tokens');
+    const contextDisplay = document.getElementById('context-display');
+
+    function formatTokens(value) {
+        if (value >= 1000) {
+            return (value / 1000).toFixed(0) + 'K';
+        }
+        return value;
+    }
+
+    if (contextSlider && contextDisplay) {
+        // Update display on input
+        contextSlider.addEventListener('input', function() {
+            contextDisplay.textContent = formatTokens(parseInt(this.value));
+        });
+    }
 </script>
 {% endblock %}

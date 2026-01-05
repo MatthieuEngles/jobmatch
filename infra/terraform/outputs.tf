@@ -122,6 +122,25 @@ data "google_project" "current" {
 }
 
 # -----------------------------------------------------------------------------
+# Secret Manager Outputs
+# -----------------------------------------------------------------------------
+
+output "secret_django_secret_key" {
+  description = "Secret Manager secret ID for Django secret key"
+  value       = google_secret_manager_secret.django_secret_key.secret_id
+}
+
+output "secret_postgres_password" {
+  description = "Secret Manager secret ID for PostgreSQL password"
+  value       = google_secret_manager_secret.postgres_password.secret_id
+}
+
+output "secret_bigquery_gold_sa_key" {
+  description = "Secret Manager secret ID for BigQuery Gold SA key"
+  value       = google_secret_manager_secret.bigquery_gold_sa_key.secret_id
+}
+
+# -----------------------------------------------------------------------------
 # Summary Output
 # -----------------------------------------------------------------------------
 
@@ -149,15 +168,19 @@ output "summary" {
       Silver Dataset: ${google_bigquery_dataset.silver.dataset_id}
       Gold Dataset:   ${google_bigquery_dataset.gold.dataset_id}
 
-    GitHub Actions Secrets:
+    GitHub Actions Variables (set in repo settings):
       GCP_PROJECT_ID:                  ${var.project_id}
       GCP_WORKLOAD_IDENTITY_PROVIDER:  projects/${data.google_project.current.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github.workload_identity_pool_id}/providers/${google_iam_workload_identity_pool_provider.github.workload_identity_pool_provider_id}
-      GCP_SERVICE_ACCOUNT:             ${google_service_account.terraform.email}
+      GCP_DEPLOY_SERVICE_ACCOUNT:      ${google_service_account.deploy.email}
+      VM_NAME:                         ${google_compute_instance.main.name}
 
     Next Steps:
-      1. Point your domain to ${google_compute_address.static.address}
-      2. SSH into the VM and deploy your application
-      3. Configure Caddyfile with your domain for HTTPS
+      1. Add secrets to GCP Secret Manager:
+         - postgres-password
+         - django-secret-key
+         - bigquery-gold-sa-key (JSON key file content)
+      2. Set GitHub repository variables (above)
+      3. Push to main branch to trigger deployment
 
     ============================================================
   EOT

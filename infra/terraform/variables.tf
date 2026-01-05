@@ -9,18 +9,19 @@
 variable "project_id" {
   description = "GCP Project ID"
   type        = string
+  default     = "job-match-v0"
 }
 
 variable "region" {
   description = "GCP Region"
   type        = string
-  default     = "europe-west9"
+  default     = "europe-west1"
 }
 
 variable "zone" {
   description = "GCP Zone"
   type        = string
-  default     = "europe-west9-a"
+  default     = "europe-west1-b"
 }
 
 variable "environment" {
@@ -93,6 +94,22 @@ variable "domain" {
   description = "Domain name for the application (optional)"
   type        = string
   default     = ""
+}
+
+# -----------------------------------------------------------------------------
+# BigQuery Cross-Project Configuration (Mohamed's project with offers)
+# -----------------------------------------------------------------------------
+
+variable "bigquery_gold_project_id" {
+  description = "GCP Project ID for BigQuery Gold (cross-project access)"
+  type        = string
+  default     = "jobmatch-482415"
+}
+
+variable "bigquery_gold_dataset" {
+  description = "BigQuery Gold dataset name for offers"
+  type        = string
+  default     = "jobmatch_gold"
 }
 
 variable "ssh_allowed_ips" {

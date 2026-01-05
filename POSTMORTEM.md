@@ -2079,3 +2079,4 @@ git checkout dev && git pull && git branch -d feature/ma-branche
   - [ ] Tester écriture/lecture BigQuery
 - [ ] **Déploiement initial VM** : SSH, clone repo, docker-compose up
 - [ ] **Configurer domaine + HTTPS** : Caddy avec Let's Encrypt
+- [ ] **Intégration LLM Google** : support Gemini/Vertex AI comme provider LLM alternatif (cv-ingestion, ai-assistant)

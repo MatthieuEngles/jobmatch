@@ -9,6 +9,7 @@
 variable "project_id" {
   description = "GCP Project ID"
   type        = string
+  default     = "job-match-v0"
 }
 
 variable "region" {

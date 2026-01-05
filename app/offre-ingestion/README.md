@@ -13,12 +13,13 @@ Toute la documentation se trouve dans `docs/`:
 ## 🚀 Quick Start
 
 ```bash
-# Build depuis la racine du projet
-cd /home/mohamede.madiouni/jobmatch
-docker build -f app/offre-ingestion/Dockerfile -t offre-ingestion-pipeline:latest .
-
-# Exécuter le pipeline complet
+# Build et exécution du pipeline complet
 cd app/offre-ingestion
+
+# Build de l'image
+docker compose build
+
+# Exécuter le pipeline
 docker compose run --rm offre-ingestion fetch 2025-12-31
 docker compose run --rm offre-ingestion silver 2025-12-31
 docker compose run --rm offre-ingestion gold 2025-12-31

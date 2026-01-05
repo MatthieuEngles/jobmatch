@@ -2,6 +2,149 @@
 
 ## 📅 Sessions
 
+### 2026-01-05 (36) - Implémentation Workflows CI/CD Multi-Environnement
+
+**Contexte:** Suite de la session 35. Implémentation concrète des workflows GitHub Actions pour une architecture multi-environnement (staging/prod) avec gestion sécurisée des secrets via GCP Secret Manager.
+
+**Réalisations:**
+
+- **Refonte terraform.yml** : Workflow multi-environnement automatisé
+  - Détection automatique d'environnement : `main` → prod, `staging` → staging
+  - Plan + Apply automatique sur push vers main/staging
+  - Plan only sur PR (commentaire dans la PR)
+  - Déclenchement manuel avec choix environnement/action
+  - **Mise à jour GitHub Variables** après apply : `GCS_BUCKET_PROD`, `VM_NAME_STAGING`, etc.
+  - Changement `secrets.GCP_*` → `vars.GCP_*` (identifiants, pas sensibles)
+
+- **Refonte deploy.yml** : Déploiement sécurisé sans secrets
+  - Support branches main et staging
+  - Plus d'écriture de secrets dans .env
+  - Seules variables dans .env : `ENVIRONMENT=prod` et `GCP_PROJECT_ID`
+  - Applications lisent secrets directement depuis Secret Manager à runtime
+  - VM_NAME dynamique depuis GitHub Variables (set par Terraform)
+  - Branch checkout adapté à l'environnement
+
+- **Documentation mise à jour** : `docs/multi_environnement_gestion.md`
+  - Architecture Secret Manager avec lecture directe (jamais sur disque)
+  - Code module `app/shared/secrets.py` pour lecture secrets
+  - Workflows détaillés avec Option B (Terraform séparé)
+  - Checklist 7 phases pour implémentation
+
+**Décisions techniques clés:**
+
+| Décision | Justification |
+|----------|---------------|
+| Secrets JAMAIS sur disque | Principe "gros projet à risque" - secrets lus at runtime |
+| GitHub Variables vs Secrets | Terraform outputs (buckets, VM names) = non-sensibles → Variables |
+| Workflows séparés | terraform.yml pour infra, deploy.yml pour apps |
+| Auto-apply on push | Simplifie le flow - "si c'est à jour, au moins c'est automatique" |
+| Workload Identity | Pas de credentials dans CI/CD |
+
+**Architecture finale workflows:**
+
+```
+push to main/staging (infra changes)
+       ↓
+  terraform.yml
+       ↓
+  plan → apply → update GitHub Variables
+                        ↓
+              GCS_BUCKET_PROD, VM_NAME_PROD, etc.
+
+push to main/staging (app changes)
+       ↓
+   deploy.yml
+       ↓
+  reads GitHub Variables ← set by terraform.yml
+       ↓
+  SSH to VM → git pull → docker compose up
+       ↓
+  Apps read secrets from Secret Manager at runtime
+```
+
+**Fichiers modifiés:**
+- `.github/workflows/terraform.yml` : Refonte complète multi-env
+- `.github/workflows/deploy.yml` : Refonte sans secrets, multi-env
+- `docs/multi_environnement_gestion.md` : Architecture Secret Manager
+
+**GitHub Variables à créer (via Settings > Variables):**
+- `GCP_WORKLOAD_IDENTITY_PROVIDER` : projects/xxx/locations/global/...
+- `GCP_SERVICE_ACCOUNT` : terraform@project.iam.gserviceaccount.com
+- `GCP_PROJECT_ID` : job-match-v0
+- Les autres (GCS_BUCKET_*, VM_NAME_*, etc.) seront créées par Terraform
+
+**Prochaines étapes:**
+1. Créer les GitHub Variables dans le repo
+2. Créer les secrets dans GCP Secret Manager (`jobmatch-{env}-{secret}`)
+3. Implémenter `app/shared/secrets.py`
+4. Ajouter Terraform outputs (gcs_bucket, vm_name, etc.)
+5. Créer branche staging et tester le flow complet
+
+---
+
+### 2026-01-05 (35) - Design Multi-Environnement Staging + Documentation Gestion Secrets
+
+**Contexte:** Conception d'une architecture multi-environnement (local/dev/staging/prod) pour JobMatch avec focus sur la gestion des secrets et la détection d'environnement par les services.
+
+**Réalisations:**
+
+- **Documentation Multi-Environnement** : Création de `docs/multi_environnement_gestion.md`
+  - 3 approches pour la détection d'environnement (ENV_MODE global, variables explicites, hybride)
+  - Analyse d'impact par service (GUI, offre-ingestion, cv-ingestion, ai-assistant, matching)
+  - Panorama complet de 9 techniques de gestion de secrets
+  - Recommandations basées sur les principes 12-Factor App
+  - Workflows CI/CD avec GitHub Environments et GCP Secret Manager
+
+- **Documentation Docker Compose** : Création de `docs/docker_compose_guide.md`
+  - Guide d'utilisation en français
+  - Section V1 vs V2 avec bug connu (panic slice bounds)
+
+- **Audit Dockerfile Matching** : Créé `matthieu_perso/audit_matching_dockerfile.md`
+  - 3 problèmes identifiés : contexte de build, incohérence ports, chemins modules
+
+- **Documentation Sécurité** : Création de `docs/SECURITY_NOTES.md`
+  - Faux positifs Bandit B608 (SQL injection) documentés
+
+- **Fixes mineurs** :
+  - `app/gui/services/offers_db.py` ligne 240 : Ajout `from e` (ruff B904)
+  - Script accès GCP : `infra/scripts/add_gcp_access.sh` + `emails.txt`
+
+**Problèmes identifiés (non résolus - discussion only):**
+
+- **ENV_MODE seulement dans GUI** : Les autres services n'ont pas de notion d'environnement
+- **Datasets hardcodés** : `offre-ingestion/transform_offers_to_bigquery_silver.py` ligne 91
+  ```python
+  DATASET_ID = "jobmatch_silver"  # HARDCODED - doit être variable d'environnement
+  ```
+- **deploy.yml incomplet** : Génère .env sans variables GCP (buckets, datasets)
+
+**Décisions techniques prises:**
+
+- **Approche Hybride (Option C)** : ENV_MODE pour comportement + variables explicites pour ressources
+- **GCP Secret Manager** : Recommandé pour secrets (audit, rotation, versioning)
+- **Terraform outputs** : Pour noms de ressources non-sensibles (buckets, datasets)
+- **Workload Identity Federation** : Déjà en place, pas de secrets GCP à gérer
+- **États Terraform séparés** : Un state par environnement (staging/prod)
+- **VM staging séparée** : Option A retenue
+- **Branche staging** : Depuis dev, pas depuis main
+
+**Fichiers créés:**
+- `docs/multi_environnement_gestion.md` : Documentation principale (~800 lignes)
+- `docs/docker_compose_guide.md` : Guide Docker Compose en français
+- `docs/SECURITY_NOTES.md` : Faux positifs Bandit
+- `matthieu_perso/audit_matching_dockerfile.md` : Audit Dockerfile
+- `infra/scripts/add_gcp_access.sh` : Script accès GCP équipe
+- `infra/scripts/emails.txt` : Template emails
+
+**Prochaines étapes (à implémenter plus tard):**
+1. Ajouter ENV_MODE à tous les services
+2. Paramétrer datasets/buckets via variables d'environnement dans offre-ingestion
+3. Configurer GitHub Environments (staging/production)
+4. Créer infrastructure staging avec Terraform
+5. Mettre à jour deploy.yml pour multi-environnement
+
+---
+
 ### 2025-12-30 (34) - Top Offres : Correction Ajout Candidatures + Documentation Architecture
 
 **Contexte:** Correction des bugs dans le flux d'ajout d'offres aux candidatures et création de la documentation technique d'architecture du système Top Offres.

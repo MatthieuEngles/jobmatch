@@ -1,6 +1,8 @@
 services:
   offre-ingestion:
-    build: .
+    build:
+      context: ../..
+      dockerfile: app/offre-ingestion/Dockerfile
     image: offre-ingestion-pipeline:latest
     env_file:
       - .env

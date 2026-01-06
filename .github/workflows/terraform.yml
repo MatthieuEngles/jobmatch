@@ -139,9 +139,11 @@ jobs:
           import_if_missing "google_compute_address.static" "projects/$PROJECT_ID/regions/$REGION/addresses/jobmatch-static-ip"
 
           # Firewall rules
-          import_if_missing "google_compute_firewall.ssh" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-ssh"
-          import_if_missing "google_compute_firewall.http" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-http"
-          import_if_missing "google_compute_firewall.https" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-https"
+          import_if_missing "google_compute_firewall.allow_ssh" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-ssh"
+          import_if_missing "google_compute_firewall.allow_http" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-http"
+          import_if_missing "google_compute_firewall.allow_https" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-https"
+          import_if_missing "google_compute_firewall.allow_icmp" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-icmp"
+          import_if_missing "google_compute_firewall.allow_internal" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-internal"
 
           # BigQuery
           import_if_missing "google_bigquery_dataset.silver" "projects/$PROJECT_ID/datasets/jobmatch_silver"

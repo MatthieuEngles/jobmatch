@@ -141,6 +141,20 @@ resource "google_project_iam_member" "deploy_os_login" {
   member  = "serviceAccount:${google_service_account.deploy.email}"
 }
 
+# Deploy SA - OS Admin Login (for sudo access via SSH)
+resource "google_project_iam_member" "deploy_os_admin_login" {
+  project = var.project_id
+  role    = "roles/compute.osAdminLogin"
+  member  = "serviceAccount:${google_service_account.deploy.email}"
+}
+
+# Deploy SA - IAP Tunnel Resource Accessor (for SSH via IAP tunnel)
+resource "google_project_iam_member" "deploy_iap_tunnel" {
+  project = var.project_id
+  role    = "roles/iap.tunnelResourceAccessor"
+  member  = "serviceAccount:${google_service_account.deploy.email}"
+}
+
 # Deploy SA - Compute Viewer (to list VMs and get zones)
 resource "google_project_iam_member" "deploy_compute_viewer" {
   project = var.project_id

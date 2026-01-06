@@ -2,6 +2,202 @@
 
 ## 📅 Sessions
 
+### 2026-01-06 (39-40) - Configuration Production HTTPS + Fix CI/CD Permissions
+
+**Contexte:** Suite session 38. Configuration du déploiement production avec HTTPS via Caddy/Let's Encrypt, Redis caching, et correction des erreurs de permissions CI/CD.
+
+**Réalisations:**
+
+- **Configuration HTTPS avec Caddy**
+  - Caddyfile conditionnel dans `vm.tf` : HTTPS si domaine configuré, HTTP sinon
+  - Support domaine `jobmatch.molp.fr` + accès IP `35.189.200.57:80`
+  - Automatic TLS via Let's Encrypt pour le domaine
+  - Headers sécurité : `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+
+- **Configuration Production docker-compose.prod.yml**
+  - Redis cache avec `REDIS_URL=redis://redis:6379`
+  - CSRF/CORS config : `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `ALLOWED_HOSTS`
+  - BigQuery Vector Search pour matching : `MATCHING_METHOD=bigquery`
+  - Credentials montés depuis `/opt/jobmatch/secrets/bigquery-gold-key.json`
+
+- **Fix CI/CD Workflow (deploy-prod.yml)**
+  - Hardcode VM zone `europe-west1-b` au lieu de `gcloud compute instances list`
+  - Suppression `gcloud compute config-ssh` (nécessite `compute.projects.get`)
+  - Fallback IP statique si describe échoue
+
+- **Documentation** : `docs/mise-en-prod.md` créé avec architecture et troubleshooting
+
+**Problèmes rencontrés et solutions:**
+
+| Problème | Solution |
+|----------|----------|
+| `compute.instances.list` permission denied | Hardcoder zone (europe-west1-b) au lieu de lister |
+| `compute.projects.get` permission denied (config-ssh) | Supprimer `gcloud compute config-ssh` - gcloud ssh gère les clés automatiquement |
+| Caddy startup script runs only on VM creation | Pour VM existante, modifier Caddyfile manuellement via SSH |
+| Pre-commit blocks commits to main | Créer PR depuis dev branch, merge via GitHub |
+
+**Décisions techniques:**
+
+| Décision | Justification |
+|----------|---------------|
+| Hardcode zone plutôt que IAM | Plus simple que d'ajouter `compute.viewer` qui donne trop d'accès |
+| Pas de config-ssh | gcloud ssh génère les clés à la volée, évite permission supplémentaire |
+| HTTPS optionnel (basé sur var.domain) | Permet déploiement rapide sans DNS configuré |
+| Redis TTL 15min pour matching | Balance entre fraîcheur et performance |
+
+**Fichiers clés modifiés:**
+- `.github/workflows/deploy-prod.yml` : fix permissions, hardcode zone
+- `docker-compose.prod.yml` : Redis, CSRF/CORS, BigQuery matching config
+- `infra/terraform/vm.tf` : Caddy HTTPS config conditionnel
+- `infra/terraform/terraform.tfvars` : `domain = "jobmatch.molp.fr"`
+- `docs/mise-en-prod.md` : documentation déploiement
+
+**État actuel:**
+- ✅ Configuration HTTPS prête (activée quand DNS configuré)
+- ✅ docker-compose.prod.yml configuré pour production
+- ✅ PR #55 créée pour fix CI (merge en attente)
+- ⏳ Configurer DNS OVH : jobmatch.molp.fr → 35.189.200.57
+- ⏳ Après DNS : mettre à jour Caddyfile sur VM pour activer HTTPS
+
+**Apprentissage clé:** Le service account `deploy-sa` a des permissions minimales. Pour le CI/CD, éviter les commandes qui nécessitent des permissions larges (`instances.list`, `projects.get`) - hardcoder les valeurs connues à la place.
+
+---
+
+### 2026-01-06 (38) - Intégration Matching BigQuery + Connexion GUI
+
+**Contexte:** Suite session 37. Import des ressources Terraform existantes, extension disque VM, et intégration du nouveau service de matching BigQuery Vector Search de Maxime avec la GUI.
+
+**Réalisations:**
+
+- **Terraform state recovery** : Import de toutes les ressources GCP existantes
+  - 16+ ressources importées (VM, service accounts, buckets, datasets, secrets, workload identity)
+  - Commandes `terraform import` pour chaque ressource existante
+  - State synchronisé avec l'infra réelle
+
+- **Extension disque VM** : 50GB → 250GB (quota max europe-west1)
+  - `gcloud compute disks resize` sans détruire la VM
+  - `growpart` + `resize2fs` pour étendre le filesystem
+  - Variables Terraform mises à jour (`vm_disk_size = 250`)
+
+- **Intégration Matching BigQuery Vector Search** (code Maxime)
+  - Test du service matching avec BigQuery (700k+ embeddings)
+  - Ajout variables BigQuery dans docker-compose.yml pour matching
+  - Variables ajoutées : `MATCHING_METHOD`, `DATASET_ID`, `TABLE_*_EMBEDDINGS_ID`
+  - Création `.env` variables : `GCP_KEY_PATH_EMB`, `GCP_PROJECT_ID_EMB`
+
+- **Connexion GUI au vrai Matcher** (plus de mock)
+  - Ajout `ingestion_date` à `MatchResult` dataclass
+  - `RealMatchingService` récupère maintenant `ingestion_date` de l'API
+  - `BigQueryOffersDB.get_offers_by_ids()` avec partition pruning par date
+  - `top_offers.py` propage les dates pour optimiser les requêtes BQ Gold
+  - `USE_MOCK_MATCHING=false` dans .env
+
+**Problèmes rencontrés et solutions:**
+
+| Problème | Solution |
+|----------|----------|
+| Terraform "Already Exists" pour toutes ressources | Import manuel avec `terraform import <resource> <id>` |
+| Quota SSD 250GB max en europe-west1 | Limiter à 250GB, demander augmentation quota si besoin |
+| Disque VM: `forces replacement` si taille change | Utiliser `gcloud compute disks resize` hors Terraform |
+| Matching: variables BQ manquantes dans container | Ajouter dans docker-compose.yml environment |
+| Matching Dockerfile: COPY .env not found | Supprimer le COPY, variables via docker-compose |
+| GUI hardcoded `ingestion_date = "2025-10-01"` | Passage dynamique des dates depuis matcher |
+
+**Flow final GUI ↔ Matching ↔ BigQuery:**
+
+```
+1. GUI génère embeddings CV (sentence_transformers)
+2. GUI → Matcher API: POST /api/match {title_embedding, cv_embedding}
+3. Matcher → BigQuery: VECTOR_SEARCH sur 700k+ embeddings (Mohamed)
+4. Matcher → GUI: [{offer_id, score, ingestion_date}, ...]
+5. GUI → BigQuery Gold: SELECT avec partition pruning (ingestion_date)
+6. GUI affiche les offres matchées
+```
+
+**Fichiers clés modifiés:**
+
+- `docker-compose.yml` : variables BigQuery pour matching
+- `app/gui/services/matching.py` : `ingestion_date` dans MatchResult
+- `app/gui/services/offers_db.py` : partition pruning BigQuery
+- `app/gui/services/top_offers.py` : propagation dates
+- `app/matching/Dockerfile` : suppression COPY .env
+- `infra/terraform/variables.tf` : `vm_disk_size = 250`
+- `.env` : `USE_MOCK_MATCHING=false`, credentials matching
+
+**État actuel:**
+
+- ✅ Terraform state synchronisé avec GCP
+- ✅ VM disque 250GB (240GB utilisables)
+- ✅ Matching BigQuery Vector Search opérationnel
+- ✅ GUI connectée au vrai matcher (plus de mock)
+- ✅ Partition pruning pour requêtes BigQuery Gold
+
+---
+
+### 2026-01-06 (37) - Déploiement Production GCP + Corrections CI/CD
+
+**Contexte:** Suite de la session 36. Déploiement réel de l'infrastructure Terraform sur GCP et correction des nombreux problèmes CI/CD rencontrés.
+
+**Réalisations:**
+
+- **Infrastructure Terraform appliquée** sur GCP europe-west1
+  - VM `jobmatch-vm` créée avec IP statique `35.189.200.57`
+  - BigQuery datasets silver/gold (recreation forcée pour changement de région)
+  - Secret Manager configuré (django-secret-key, postgres-password, bigquery-gold-sa-key)
+  - Workload Identity Federation pour GitHub Actions
+
+- **Corrections workflow CD** (`cd.yml`)
+  - Fix context Docker : `context: .` + `file: ./app/${{ matrix.service }}/Dockerfile`
+  - Les Dockerfiles utilisent des chemins depuis la racine du repo (`shared/`, `app/service/`)
+
+- **Corrections workflow Terraform** (`terraform.yml`)
+  - Ajout `default = "job-match-v0"` à `var.project_id` pour éviter prompt interactif
+  - Simplification : toujours `prod` (pas de staging pour l'instant)
+
+- **Corrections IAM**
+  - Ajout `roles/compute.viewer` à `deploy-sa` pour lister les VMs (`compute.instances.list`)
+  - Permission ajoutée via gcloud + dans Terraform pour persistence
+
+- **Corrections pre-commit**
+  - `SKIP: no-commit-to-branch` dans CI pour permettre les PR merges vers main
+  - Les commits directs restent bloqués en local
+
+**Problèmes rencontrés et solutions:**
+
+| Problème | Solution |
+|----------|----------|
+| GitHub Actions: "must specify workload_identity_provider or credentials_json" | Configurer des **Variables** (pas Secrets) : `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT` |
+| Terraform plan bloqué 8min demandant `var.project_id` | Ajouter `default = "job-match-v0"` dans variables.tf |
+| Terraform state lock après annulation workflow | `terraform force-unlock -force <LOCK_ID>` avec bon prefix backend |
+| Docker build "file not found" pour shared/ | `context: .` au lieu de `./app/service`, + `file: ./app/service/Dockerfile` |
+| "compute.instances.list permission denied" | Ajouter `roles/compute.viewer` à deploy-sa |
+| Terraform "Already Exists" erreurs | State staging vs prod différent - utiliser toujours `prod` prefix |
+| Pre-commit "no-commit-to-branch" bloque merges CI | `SKIP: no-commit-to-branch` dans le workflow CI |
+
+**Décisions techniques:**
+
+| Décision | Justification |
+|----------|---------------|
+| Toujours prefix `prod` pour Terraform | Pas de staging configuré, évite confusion entre states |
+| Variables GitHub vs Secrets | Les identifiants Workload Identity ne sont pas sensibles |
+| `compute.viewer` pour deploy-sa | Nécessaire pour `gcloud compute instances list` |
+| BigQuery `europe-west1` | Cohérence avec le reste de l'infrastructure |
+
+**Fichiers clés modifiés:**
+- `.github/workflows/cd.yml` : context + file pour Docker builds
+- `.github/workflows/terraform.yml` : simplification prod-only
+- `.github/workflows/ci.yml` : SKIP no-commit-to-branch
+- `infra/terraform/variables.tf` : default project_id
+- `infra/terraform/iam.tf` : compute.viewer pour deploy-sa
+
+**État actuel:**
+- ✅ Infrastructure GCP déployée (VM, networking, storage, BigQuery, secrets)
+- ✅ Workflows CI corrigés
+- ⏳ CD Docker builds à tester après merge
+- ⏳ Deploy workflow à tester avec la VM
+
+---
+
 ### 2026-01-05 (36) - Implémentation Workflows CI/CD Multi-Environnement
 
 **Contexte:** Suite de la session 35. Implémentation concrète des workflows GitHub Actions pour une architecture multi-environnement (staging/prod) avec gestion sécurisée des secrets via GCP Secret Manager.
@@ -1782,6 +1978,17 @@ git add -A && git commit -m "message"
 - **Branches protégées** : main uniquement (dev autorisé pour permettre les merges)
 
 ## 🧠 Apprentissages clés
+- **Terraform import** : Quand state est désynchronisé, importer les ressources existantes avec `terraform import <resource> <gcp_id>`
+- **Resize disque GCP** : `gcloud compute disks resize` + `growpart` + `resize2fs` pour agrandir sans détruire la VM
+- **Quota SSD GCP** : europe-west1 limité à 250GB par défaut, demander augmentation si besoin de plus
+- **BigQuery partition pruning** : Filtrer par `ingestion_date` réduit drastiquement les coûts de scan
+- **Variables env Docker** : Passer via docker-compose.yml `environment:` plutôt que COPY .env dans Dockerfile
+- **GitHub Variables vs Secrets** : Workload Identity Provider et Service Account emails ne sont pas sensibles → utiliser Variables
+- **Docker build context** : Si Dockerfile utilise `COPY shared/`, le context doit être `.` (racine), pas `./app/service`
+- **Terraform state lock** : `terraform force-unlock -force <ID>` après annulation de workflow CI
+- **Terraform variables interactives** : Toujours mettre des `default` pour éviter que CI bloque sur prompt
+- **IAM GCP** : `compute.instanceAdmin.v1` ne suffit pas pour lister les VMs, il faut aussi `compute.viewer`
+- **Pre-commit en CI** : `SKIP: no-commit-to-branch` pour permettre les merges tout en bloquant les commits directs locaux
 - Le projet a deux versions : V1 (matching simple) et V2 (matching + personnalisation CV)
 - POC structuré en 4 domaines : Gestion Compte (DE:0), Import CV (DE:1), Ingestion Offres (DE:2), Smart Match (DE:2)
 - Priorités MoSCoW définies dans les User Stories
@@ -1870,6 +2077,17 @@ git add -A && git commit -m "message"
 - **ATS optimization** : L'intitulé du CV doit être très proche du titre de l'offre, et reprendre les mots-clés exacts (pas de synonymes)
 
 ## ⚠️ Pièges à éviter
+- **GCP CI/CD permissions minimales** : `deploy-sa` n'a pas `compute.instances.list` ni `compute.projects.get` → hardcoder zone/IP connues
+- **gcloud compute config-ssh** : Nécessite `compute.projects.get`, inutile car `gcloud compute ssh` gère les clés automatiquement
+- **Caddy startup script** : S'exécute seulement à la création VM → pour VM existante, modifier Caddyfile manuellement
+- **Terraform disk size change** : Changer `vm_disk_size` force la destruction de la VM → utiliser `gcloud compute disks resize` à la place
+- **Hardcoded dates BigQuery** : Ne jamais hardcoder `ingestion_date` dans les requêtes, la passer dynamiquement
+- **COPY .env dans Dockerfile** : Échoue si .env n'existe pas ou est gitignored → passer variables via docker-compose
+- **GitHub Actions Secrets vs Variables** : `${{ secrets.XXX }}` pour les sensibles, `${{ vars.XXX }}` pour les non-sensibles (Workload Identity)
+- **Terraform state prefix** : Le backend GCS utilise un prefix par environnement, attention à ne pas mélanger staging/prod
+- **Docker build context + Dockerfile** : Si les fichiers sont à la racine, utiliser `context: .` et `file: ./app/service/Dockerfile`
+- **Terraform `Already Exists`** : Si les ressources existent déjà, le state n'est pas synchronisé - faire un import ou utiliser le même state
+- **Pre-commit `no-commit-to-branch`** : Bloque aussi les merges en CI → ajouter `SKIP` dans le workflow
 - Ne pas oublier la conformité RGPD (tâche assignée à Maxime)
 - Gentleman Agreement à signer avant de continuer
 - **Vibecoding** : ne jamais modifier les zones de l'équipe classique (offre-ingestion, matching)

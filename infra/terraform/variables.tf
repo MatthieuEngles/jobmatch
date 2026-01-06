@@ -49,7 +49,7 @@ variable "vm_machine_type" {
 variable "vm_disk_size" {
   description = "Boot disk size in GB"
   type        = number
-  default     = 50
+  default     = 250 # Max quota SSD in europe-west1 is 250GB
 }
 
 variable "vm_disk_type" {

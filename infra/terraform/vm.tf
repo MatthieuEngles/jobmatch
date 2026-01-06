@@ -95,15 +95,42 @@ resource "google_compute_instance" "main" {
     mkdir -p /opt/jobmatch/secrets
     chown -R 1000:1000 /opt/jobmatch
 
-    # Create Caddy config placeholder
-    cat > /etc/caddy/Caddyfile <<'CADDYFILE'
-    # JobMatch Caddyfile
-    # Replace :80 with your domain for automatic HTTPS
+    # Create Caddy config with domain support
+    DOMAIN="${var.domain}"
 
-    :80 {
-        reverse_proxy localhost:8085
+    if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "" ]; then
+      # Domain configured - enable HTTPS with automatic certificate
+      cat > /etc/caddy/Caddyfile <<CADDYFILE
+# JobMatch Caddyfile with HTTPS
+
+# Main domain with automatic HTTPS
+$DOMAIN {
+    reverse_proxy localhost:8085
+    encode gzip
+
+    header {
+        # Security headers
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
     }
-    CADDYFILE
+}
+
+# Also allow access via IP on port 80 (no HTTPS)
+:80 {
+    reverse_proxy localhost:8085
+}
+CADDYFILE
+    else
+      # No domain - HTTP only
+      cat > /etc/caddy/Caddyfile <<'CADDYFILE'
+# JobMatch Caddyfile (HTTP only - no domain configured)
+
+:80 {
+    reverse_proxy localhost:8085
+}
+CADDYFILE
+    fi
 
     # Reload Caddy
     systemctl reload caddy
@@ -156,6 +183,9 @@ resource "google_compute_instance" "main" {
     # Embeddings
     EMBEDDINGS_PROVIDER=sentence-transformers
     EMBEDDINGS_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+
+    # Domain configuration (for CSRF/CORS)
+    DOMAIN=${var.domain}
     ENVFILE
 
     chmod 600 "$ENV_FILE"

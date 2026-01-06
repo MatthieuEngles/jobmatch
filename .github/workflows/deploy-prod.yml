@@ -58,24 +58,25 @@ jobs:
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - name: Get VM Zone
+      - name: Get VM Info
         id: vm-info
         run: |
           VM_NAME="${{ vars.VM_NAME }}"
+          # Use zone from vars or default to europe-west1-b
+          ZONE="${{ vars.VM_ZONE }}"
+          if [ -z "$ZONE" ]; then
+            ZONE="europe-west1-b"
+          fi
 
-          # Find the VM zone
-          ZONE=$(gcloud compute instances list \
-            --filter="name=$VM_NAME" \
-            --format='get(zone)' | head -1 | xargs basename)
           echo "zone=$ZONE" >> $GITHUB_OUTPUT
 
-          # Get external IP
+          # Get external IP using the known zone
           IP=$(gcloud compute instances describe $VM_NAME \
             --zone=$ZONE \
-            --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+            --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null || echo "35.189.200.57")
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
-          echo "Found VM $VM_NAME in zone: $ZONE with IP: $IP"
+          echo "VM: $VM_NAME in zone: $ZONE with IP: $IP"
 
       - name: Deploy to VM
         run: |

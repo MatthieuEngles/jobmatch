@@ -107,6 +107,64 @@ jobs:
         working-directory: infra/terraform
         run: terraform validate -no-color
 
+      # Import existing resources if they're not in state
+      - name: Import Existing Resources
+        working-directory: infra/terraform
+        run: |
+          echo "Checking and importing existing GCP resources..."
+
+          PROJECT_ID="job-match-v0"
+          REGION="europe-west1"
+
+          # Function to import if not in state
+          import_if_missing() {
+            RESOURCE=$1
+            ID=$2
+            if ! terraform state show "$RESOURCE" > /dev/null 2>&1; then
+              echo "Importing $RESOURCE..."
+              terraform import "$RESOURCE" "$ID" || echo "Import failed for $RESOURCE (may not exist)"
+            else
+              echo "$RESOURCE already in state"
+            fi
+          }
+
+          # Service Accounts
+          import_if_missing "google_service_account.vm" "projects/$PROJECT_ID/serviceAccounts/jobmatch-vm-sa@$PROJECT_ID.iam.gserviceaccount.com"
+          import_if_missing "google_service_account.terraform" "projects/$PROJECT_ID/serviceAccounts/terraform-sa@$PROJECT_ID.iam.gserviceaccount.com"
+          import_if_missing "google_service_account.deploy" "projects/$PROJECT_ID/serviceAccounts/deploy-sa@$PROJECT_ID.iam.gserviceaccount.com"
+
+          # Network
+          import_if_missing "google_compute_network.main" "projects/$PROJECT_ID/global/networks/jobmatch-vpc"
+          import_if_missing "google_compute_subnetwork.main" "projects/$PROJECT_ID/regions/$REGION/subnetworks/jobmatch-subnet"
+          import_if_missing "google_compute_address.static" "projects/$PROJECT_ID/regions/$REGION/addresses/jobmatch-static-ip"
+
+          # Firewall rules
+          import_if_missing "google_compute_firewall.ssh" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-ssh"
+          import_if_missing "google_compute_firewall.http" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-http"
+          import_if_missing "google_compute_firewall.https" "projects/$PROJECT_ID/global/firewalls/jobmatch-allow-https"
+
+          # BigQuery
+          import_if_missing "google_bigquery_dataset.silver" "projects/$PROJECT_ID/datasets/jobmatch_silver"
+          import_if_missing "google_bigquery_dataset.gold" "projects/$PROJECT_ID/datasets/jobmatch_gold"
+
+          # Storage
+          import_if_missing "google_storage_bucket.bronze" "$PROJECT_ID-bronze"
+          import_if_missing "google_storage_bucket.backups" "$PROJECT_ID-backups"
+
+          # Secrets
+          import_if_missing "google_secret_manager_secret.django_secret_key" "projects/$PROJECT_ID/secrets/django-secret-key"
+          import_if_missing "google_secret_manager_secret.postgres_password" "projects/$PROJECT_ID/secrets/postgres-password"
+          import_if_missing "google_secret_manager_secret.bigquery_gold_sa_key" "projects/$PROJECT_ID/secrets/bigquery-gold-sa-key"
+
+          # Workload Identity Pool
+          import_if_missing "google_iam_workload_identity_pool.github" "$PROJECT_ID/github-pool"
+          import_if_missing "google_iam_workload_identity_pool_provider.github" "$PROJECT_ID/github-pool/github-provider"
+
+          # VM
+          import_if_missing "google_compute_instance.main" "projects/$PROJECT_ID/zones/europe-west1-b/instances/jobmatch-vm"
+
+          echo "Import check complete"
+
       # Plan with environment-specific variables
       - name: Terraform Plan
         id: plan

@@ -84,10 +84,7 @@ jobs:
           ZONE="${{ steps.vm-info.outputs.zone }}"
           PROJECT_ID="${{ vars.GCP_PROJECT_ID }}"
 
-          # Configure SSH
-          gcloud compute config-ssh --quiet
-
-          # Create deployment script
+          # Create deployment script (no config-ssh needed, gcloud ssh handles it)
           cat > /tmp/deploy.sh << 'DEPLOY_EOF'
           #!/bin/bash
           set -e

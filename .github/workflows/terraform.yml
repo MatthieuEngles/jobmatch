@@ -116,13 +116,13 @@ jobs:
           PROJECT_ID="job-match-v0"
           REGION="europe-west1"
 
-          # Function to import if not in state
+          # Function to import if not in state (using -lock=false to avoid lock issues in CI)
           import_if_missing() {
             RESOURCE=$1
             ID=$2
             if ! terraform state show "$RESOURCE" > /dev/null 2>&1; then
               echo "Importing $RESOURCE..."
-              terraform import "$RESOURCE" "$ID" || echo "Import failed for $RESOURCE (may not exist)"
+              terraform import -lock=false "$RESOURCE" "$ID" || echo "Import failed for $RESOURCE (may not exist)"
             else
               echo "$RESOURCE already in state"
             fi

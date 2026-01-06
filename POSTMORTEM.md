@@ -2,6 +2,57 @@
 
 ## 📅 Sessions
 
+### 2026-01-06 (41) - Terraform State Sync + IAM SSH Permissions
+
+**Contexte:** Suite session 39-40. Résolution des erreurs Terraform "Already Exists" et des permissions SSH pour le workflow de déploiement.
+
+**Réalisations:**
+
+- **Auto-import Terraform dans CI/CD**
+  - Ajout étape "Import Existing Resources" dans `terraform.yml`
+  - Fonction `import_if_missing()` qui vérifie le state avant d'importer
+  - Import automatique de 20+ ressources GCP existantes
+
+- **Fix permissions SSH pour deploy-sa**
+  - Ajout `roles/compute.osAdminLogin` (sudo via SSH)
+  - Ajout `roles/iap.tunnelResourceAccessor` (SSH via IAP tunnel)
+  - Permissions ajoutées via gcloud (immédiat) + Terraform (persistence)
+
+- **Correction noms ressources firewall**
+  - Terraform resource: `allow_ssh` (pas `ssh`)
+  - GCP name: `jobmatch-vpc-allow-ssh` (pas `jobmatch-allow-ssh`)
+
+**Problèmes rencontrés et solutions:**
+
+| Problème | Solution |
+|----------|----------|
+| Terraform "Already Exists" sur toutes ressources | Auto-import dans workflow CI avant plan |
+| `compute.instances.get` permission denied (SSH) | Ajouter `osAdminLogin` + `iap.tunnelResourceAccessor` |
+| Import firewall échoue "resource does not exist" | Corriger noms: `allow_ssh` pas `ssh`, `jobmatch-vpc-allow-*` |
+| State désynchronisé entre runs | Backend GCS avec prefix `prod` pour persistence |
+
+**Ressources auto-importées:**
+- Service accounts: vm-sa, terraform-sa, deploy-sa
+- Network: VPC, subnet, static IP
+- Firewall: allow_ssh, allow_http, allow_https, allow_icmp, allow_internal
+- BigQuery: silver, gold datasets
+- Storage: bronze, backups buckets
+- Secrets: django-secret-key, postgres-password, bigquery-gold-sa-key
+- Workload Identity: pool + provider
+- VM: jobmatch-vm
+
+**Fichiers clés modifiés:**
+- `.github/workflows/terraform.yml` : auto-import step
+- `infra/terraform/iam.tf` : osAdminLogin, iap.tunnelResourceAccessor
+
+**État actuel:**
+- ✅ Auto-import Terraform fonctionnel
+- ✅ IAM permissions pour SSH ajoutées
+- ✅ PR #58 créée (dev → main)
+- ⏳ Merger PR et tester workflow complet
+
+---
+
 ### 2026-01-06 (39-40) - Configuration Production HTTPS + Fix CI/CD Permissions
 
 **Contexte:** Suite session 38. Configuration du déploiement production avec HTTPS via Caddy/Let's Encrypt, Redis caching, et correction des erreurs de permissions CI/CD.
@@ -2077,6 +2128,9 @@ git add -A && git commit -m "message"
 - **ATS optimization** : L'intitulé du CV doit être très proche du titre de l'offre, et reprendre les mots-clés exacts (pas de synonymes)
 
 ## ⚠️ Pièges à éviter
+- **Terraform import resource names** : Les noms Terraform (`allow_ssh`) ≠ noms courts (`ssh`), et les noms GCP utilisent le préfixe réseau (`jobmatch-vpc-allow-ssh`)
+- **SSH via Workload Identity** : Nécessite `osAdminLogin` + `iap.tunnelResourceAccessor` en plus de `osLogin`
+- **Terraform state CI/CD** : Le state GCS peut être vide/désynchronisé → auto-import avant plan
 - **GCP CI/CD permissions minimales** : `deploy-sa` n'a pas `compute.instances.list` ni `compute.projects.get` → hardcoder zone/IP connues
 - **gcloud compute config-ssh** : Nécessite `compute.projects.get`, inutile car `gcloud compute ssh` gère les clés automatiquement
 - **Caddy startup script** : S'exécute seulement à la création VM → pour VM existante, modifier Caddyfile manuellement

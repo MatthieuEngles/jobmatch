@@ -167,14 +167,14 @@ services:
     env_file:
       - .env
     volumes:
-      - ${GCP_KEY_PATH}:/secrets/gcp/key.json:ro
+      - ${GCP_KEY_PATH_EMB}:/secrets/gcp/key.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp/key.json
       - DATABASE_URL=${DATABASE_URL}
       - CV_INGESTION_URL=${CV_INGESTION_URL}
       - OFFRE_INGESTION_URL=${OFFRE_INGESTION_URL}
       - JOB_OFFERS_DB_PATH=${JOB_OFFERS_DB_PATH}
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID_DTB}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID_EMB}
       - MATCHING_PORT=${MATCHING_PORT}
     depends_on:
       - cv-ingestion

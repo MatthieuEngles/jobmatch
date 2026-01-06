@@ -17,7 +17,7 @@ COPY app/matching /app/matching
 #RUN pip install --no-cache-dir -r /app/matching/requirements.txt
 RUN pip install -r /app/matching/requirements.txt
 
-EXPOSE 8086
+EXPOSE $MATCHING_PORT
 
 WORKDIR /app/matching
 RUN pip install -e .
@@ -25,4 +25,4 @@ RUN pip install -e .
 # Copy .env file
 COPY app/matching/.env /app/matching/.env
 
-CMD ["python", "-m", "uvicorn", "matcher.main:app", "--host", "0.0.0.0", "--port", "8086", "--reload"]
+CMD python -m uvicorn matcher.main:app --host 0.0.0.0 --port ${MATCHING_PORT} --reload

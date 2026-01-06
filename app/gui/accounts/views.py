@@ -316,7 +316,11 @@ def cv_upload_view(request):
                     data["llm_endpoint"] = llm_config.llm_endpoint
                     data["llm_model"] = llm_config.llm_model
                     data["llm_api_key"] = llm_config.llm_api_key
-                    logger.info(f"Using custom LLM config for user {user.id}")
+                    data["llm_api_mode"] = llm_config.llm_api_mode
+                    data["llm_max_tokens"] = llm_config.llm_max_tokens
+                    logger.info(
+                        f"Using custom LLM config for user {user.id}, mode: {llm_config.llm_api_mode}, max_tokens: {llm_config.llm_max_tokens}"
+                    )
             except UserLLMConfig.DoesNotExist:
                 pass  # No custom config, use server defaults
 
@@ -1137,7 +1141,7 @@ def _build_user_context(user, coaching_type: str = "star") -> dict:
 def _get_user_llm_config(user) -> dict | None:
     """Get user's custom LLM config if they are Premium+ and have it enabled.
 
-    Returns dict with llm_endpoint, llm_model, llm_api_key or None.
+    Returns dict with llm_endpoint, llm_model, llm_api_key, llm_api_mode, llm_max_tokens or None.
     """
     if user.subscription_tier in ("free", "basic"):
         return None
@@ -1148,6 +1152,8 @@ def _get_user_llm_config(user) -> dict | None:
                 "llm_endpoint": llm_config.llm_endpoint,
                 "llm_model": llm_config.llm_model,
                 "llm_api_key": llm_config.llm_api_key,
+                "llm_api_mode": llm_config.llm_api_mode,
+                "llm_max_tokens": llm_config.llm_max_tokens,
             }
     except UserLLMConfig.DoesNotExist:
         pass

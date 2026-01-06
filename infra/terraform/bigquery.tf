@@ -7,13 +7,11 @@
 # -----------------------------------------------------------------------------
 
 resource "google_bigquery_dataset" "silver" {
-  dataset_id  = "jobmatch_silver"
-  project     = var.project_id
-  location    = var.region
-  description = "Silver layer - Transformed job offers data"
-
-  # Default table expiration: none (keep forever)
-  # default_table_expiration_ms = null
+  dataset_id                 = "jobmatch_silver"
+  project                    = var.project_id
+  location                   = var.region
+  description                = "Silver layer - Transformed job offers data"
+  delete_contents_on_destroy = true
 
   labels = var.labels
 
@@ -25,10 +23,11 @@ resource "google_bigquery_dataset" "silver" {
 # -----------------------------------------------------------------------------
 
 resource "google_bigquery_dataset" "gold" {
-  dataset_id  = "jobmatch_gold"
-  project     = var.project_id
-  location    = var.region
-  description = "Gold layer - Aggregated data and KPIs"
+  dataset_id                 = "jobmatch_gold"
+  project                    = var.project_id
+  location                   = var.region
+  description                = "Gold layer - Aggregated data and KPIs"
+  delete_contents_on_destroy = true
 
   labels = var.labels
 

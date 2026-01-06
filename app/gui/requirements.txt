@@ -16,6 +16,9 @@ python-dotenv>=1.0
 # Google Cloud Storage (prod)
 django-storages[google]>=1.14
 
+# BigQuery (for Gold table access)
+google-cloud-bigquery>=3.0
+
 # HTTP client for microservices
 requests>=2.31
 

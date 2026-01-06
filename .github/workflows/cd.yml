@@ -47,23 +47,24 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./app/${{ matrix.service }}
+          context: .
+          file: ./app/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    environment: staging
-    steps:
-      - name: Deploy to staging
-        run: |
-          echo "TODO: Add staging deployment steps"
-          # kubectl apply -f k8s/staging/
-          # or docker-compose up -d
+  # deploy-staging:
+  #   name: Deploy to Staging
+  #   runs-on: ubuntu-latest
+  #   needs: build-and-push
+  #   if: github.ref == 'refs/heads/main'
+  #   environment: staging
+  #   steps:
+  #     - name: Deploy to staging
+  #       run: |
+  #         echo "TODO: Add staging deployment steps"
+  #         # kubectl apply -f k8s/staging/
+  #         # or docker-compose up -d
 
   deploy-production:
     name: Deploy to Production

@@ -19,10 +19,8 @@ class HomeView(TemplateView):
             # Import here to avoid circular imports
             from accounts.models import Application
 
-            # Get the 3 most recent applications for the user
-            recent_applications = Application.objects.filter(user=self.request.user).select_related("imported_offer")[
-                :3
-            ]
+            # Get all applications for the user (scrollable list)
+            recent_applications = Application.objects.filter(user=self.request.user).select_related("imported_offer")
 
             context["recent_applications"] = recent_applications
             context["applications_count"] = Application.objects.filter(user=self.request.user).count()

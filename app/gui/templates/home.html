@@ -529,6 +529,7 @@
         justify-content: center;
         text-align: center;
         padding: 10px;
+        min-height: 0;
     }
 
     .top-offers-results {
@@ -537,7 +538,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        max-height: 350px;
+        min-height: 0;
         padding-right: 5px;
     }
 
@@ -561,6 +562,7 @@
         padding: 12px;
         border: 1px solid #e2e8f0;
         transition: all 0.2s ease;
+        flex-shrink: 0;
     }
 
     .offer-item:hover {
@@ -572,6 +574,7 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
+        gap: 10px;
         margin-bottom: 6px;
     }
 
@@ -580,6 +583,9 @@
         font-size: 0.95rem;
         color: var(--dark);
         line-height: 1.3;
+        flex: 1;
+        min-width: 0;
+        word-wrap: break-word;
     }
 
     .offer-score {
@@ -591,6 +597,7 @@
         border-radius: 20px;
         white-space: nowrap;
         flex-shrink: 0;
+        margin-left: auto;
     }
 
     .offer-company {
@@ -608,6 +615,8 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
         margin-bottom: 8px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
     }
 
     .offer-profiles {
@@ -856,6 +865,46 @@
         grid-row: span 3;
     }
 
+    /* Make top-offers-card content fill the card */
+    #top-offers-card {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #top-offers-card .card-header-row {
+        flex-shrink: 0;
+    }
+
+    #top-offers-card .top-offers-results,
+    #top-offers-card .top-offers-state {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    /* Make applications-card content fill the card */
+    #applications-card {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #applications-card .card-header {
+        flex-shrink: 0;
+    }
+
+    #applications-card .applications-preview {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    #applications-card .action-arrow {
+        flex-shrink: 0;
+        margin-top: auto;
+    }
+
     .action-icon {
         width: 44px;
         height: 44px;
@@ -996,7 +1045,8 @@
         flex-direction: column;
         gap: 10px;
         flex: 1;
-        overflow: hidden;
+        overflow-y: auto;
+        min-height: 0;
     }
 
     .application-mini-card {
@@ -1004,6 +1054,7 @@
         border-radius: 10px;
         padding: 12px;
         border-left: 3px solid var(--primary);
+        flex-shrink: 0;
     }
 
     .app-mini-header {
@@ -1137,7 +1188,7 @@
                 </a>
 
                 <!-- Column 2: Suivi des candidatures (tall) -->
-                <div class="action-card tall" style="cursor: default;">
+                <div class="action-card tall" id="applications-card" style="cursor: default;">
                     <div class="card-header">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

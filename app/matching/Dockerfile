@@ -4,9 +4,8 @@ WORKDIR /app
 
 RUN pip install --upgrade pip
 
-# Install torch (adjust CPU/CUDA version as needed)
-#RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install torch CPU-only (lighter, no CUDA dependencies)
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Copy shared package and install with embeddings support
 COPY shared /app/shared

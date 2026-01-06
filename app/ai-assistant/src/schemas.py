@@ -18,6 +18,8 @@ class LLMConfigRequest(BaseModel):
     llm_endpoint: str | None = None
     llm_model: str | None = None
     llm_api_key: str | None = None
+    llm_api_mode: str | None = None  # "openai_compatible" or "ollama_native"
+    llm_max_tokens: int | None = None
 
 
 class UserContext(BaseModel):

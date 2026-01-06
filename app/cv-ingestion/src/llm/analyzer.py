@@ -61,6 +61,7 @@ class OpenAIProvider(LLMProvider):
         api_key: str | None = None,
         endpoint: str | None = None,
         model: str | None = None,
+        max_tokens: int | None = None,
     ):
         from openai import OpenAI
 
@@ -74,6 +75,7 @@ class OpenAIProvider(LLMProvider):
             base_url=actual_endpoint if actual_endpoint else None,
         )
         self._model = actual_model
+        self._max_tokens = max_tokens or settings.LLM_MAX_TOKENS
 
     def supports_vision(self) -> bool:
         """Check if current model supports vision."""
@@ -95,7 +97,7 @@ class OpenAIProvider(LLMProvider):
             ],
             response_format={"type": "json_object"},
             temperature=0.1,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_tokens=self._max_tokens,
         )
         return response.choices[0].message.content
 
@@ -123,7 +125,7 @@ class OpenAIProvider(LLMProvider):
                 {"role": "user", "content": content},
             ],
             temperature=0.1,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_tokens=self._max_tokens,
         )
         return response.choices[0].message.content
 
@@ -147,6 +149,7 @@ class AnthropicProvider(LLMProvider):
         api_key: str | None = None,
         endpoint: str | None = None,
         model: str | None = None,
+        max_tokens: int | None = None,
     ):
         from anthropic import Anthropic
 
@@ -158,6 +161,7 @@ class AnthropicProvider(LLMProvider):
         base_url = actual_endpoint if actual_endpoint else None
         self.client = Anthropic(api_key=actual_key, base_url=base_url)
         self._model = actual_model
+        self._max_tokens = max_tokens or settings.LLM_MAX_TOKENS
 
     def supports_vision(self) -> bool:
         """Check if current model supports vision."""
@@ -172,7 +176,7 @@ class AnthropicProvider(LLMProvider):
     def analyze(self, system_prompt: str, user_prompt: str) -> str:
         response = self.client.messages.create(
             model=self._model,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_tokens=self._max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -200,7 +204,7 @@ class AnthropicProvider(LLMProvider):
 
         response = self.client.messages.create(
             model=self._model,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_tokens=self._max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": content}],
         )
@@ -218,18 +222,22 @@ class OllamaProvider(LLMProvider):
         api_key: str | None = None,
         endpoint: str | None = None,
         model: str | None = None,
+        max_tokens: int | None = None,
     ):
         from openai import OpenAI
 
         # Use provided values or fall back to settings
         actual_endpoint = endpoint or settings.LLM_ENDPOINT or "http://localhost:11434/v1"
         actual_model = model or settings.LLM_MODEL
+        # Use provided API key, or settings, or default "ollama" for local instances
+        actual_key = api_key or settings.LLM_API_KEY or "ollama"
 
         self.client = OpenAI(
-            api_key="ollama",  # Ollama doesn't need a real key
-            base_url=actual_endpoint,
+            api_key=actual_key,
+            base_url=actual_endpoint if actual_endpoint.endswith("/v1") else f"{actual_endpoint}/v1",
         )
         self._model = actual_model
+        self._max_tokens = max_tokens or settings.LLM_MAX_TOKENS
 
     def supports_vision(self) -> bool:
         """Check if current model supports vision."""
@@ -281,6 +289,209 @@ class OllamaProvider(LLMProvider):
         return response.choices[0].message.content
 
 
+class GeminiProvider(LLMProvider):
+    """Google Gemini via Vertex AI provider (uses service account authentication)."""
+
+    # Gemini models with vision support
+    VISION_MODELS = {
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash-002",
+        "gemini-1.5-pro",
+        "gemini-1.5-pro-001",
+        "gemini-1.5-pro-002",
+        "gemini-2.0-flash-exp",
+    }
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+    ):
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+
+        # Use provided values or fall back to settings
+        actual_model = model or settings.LLM_MODEL or "gemini-1.5-flash-002"
+
+        # Get project and location from settings or environment
+        project_id = getattr(settings, "GCP_PROJECT_ID", None)
+        location = getattr(settings, "GCP_LOCATION", "europe-west1")
+
+        # Initialize Vertex AI (uses ADC - Application Default Credentials)
+        vertexai.init(project=project_id, location=location)
+
+        self._model_name = actual_model
+        self._model = GenerativeModel(actual_model)
+        self._max_tokens = max_tokens or settings.LLM_MAX_TOKENS
+
+        logger.info(f"Initialized Vertex AI Gemini: project={project_id}, location={location}, model={actual_model}")
+
+    def supports_vision(self) -> bool:
+        """Check if current model supports vision."""
+        # All Gemini 1.5+ models support vision
+        model_lower = self._model_name.lower()
+        if self._model_name in self.VISION_MODELS:
+            return True
+        if "gemini-1.5" in model_lower or "gemini-2" in model_lower:
+            return True
+        return getattr(settings, "LLM_SUPPORTS_VISION", False)
+
+    def analyze(self, system_prompt: str, user_prompt: str) -> str:
+        """Send prompts to Gemini and return raw response text."""
+        from vertexai.generative_models import GenerationConfig
+
+        # Gemini uses a combined prompt format
+        full_prompt = f"{system_prompt}\n\n{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
+
+        generation_config = GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=self._max_tokens,
+            response_mime_type="application/json",
+        )
+
+        response = self._model.generate_content(
+            full_prompt,
+            generation_config=generation_config,
+        )
+        return response.text
+
+    def analyze_images(self, system_prompt: str, user_prompt: str, images: list[bytes]) -> str:
+        """Analyze images using Gemini Vision."""
+        from vertexai.generative_models import GenerationConfig, Part
+
+        # Build content parts
+        full_prompt = f"{system_prompt}\n\n{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
+        content_parts = [full_prompt]
+
+        # Add images as Part objects
+        for img_bytes in images:
+            content_parts.append(Part.from_data(img_bytes, mime_type="image/png"))
+
+        generation_config = GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=self._max_tokens,
+        )
+
+        response = self._model.generate_content(
+            content_parts,
+            generation_config=generation_config,
+        )
+        return response.text
+
+
+class OllamaNativeProvider(LLMProvider):
+    """Ollama provider using native /api/chat endpoint."""
+
+    # Ollama models with vision support
+    VISION_MODELS = {"llava", "llava:7b", "llava:13b", "bakllava", "llava-llama3"}
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+    ):
+        import httpx
+
+        # Use provided values or fall back to settings
+        actual_endpoint = endpoint or settings.LLM_ENDPOINT or "http://localhost:11434"
+        actual_model = model or settings.LLM_MODEL
+        actual_key = api_key or settings.LLM_API_KEY
+
+        # Remove /v1 suffix if present (we use native API)
+        if actual_endpoint.endswith("/v1"):
+            actual_endpoint = actual_endpoint[:-3]
+
+        self._endpoint = actual_endpoint.rstrip("/")
+        self._model = actual_model
+        self._api_key = actual_key
+        self._max_tokens = max_tokens or settings.LLM_MAX_TOKENS
+
+        # Build headers
+        self._headers = {"Content-Type": "application/json"}
+        if actual_key:
+            self._headers["Authorization"] = f"Bearer {actual_key}"
+
+        self._client = httpx.Client(timeout=120.0)
+
+    def supports_vision(self) -> bool:
+        """Check if current model supports vision."""
+        model_lower = self._model.lower()
+        if self._model in self.VISION_MODELS:
+            return True
+        if "llava" in model_lower or "bakllava" in model_lower:
+            return True
+        return getattr(settings, "LLM_SUPPORTS_VISION", False)
+
+    def analyze(self, system_prompt: str, user_prompt: str) -> str:
+        """Send messages to Ollama native API and return response."""
+        enhanced_user_prompt = f"{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
+
+        url = f"{self._endpoint}/api/chat"
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": enhanced_user_prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.1, "num_ctx": self._max_tokens},
+        }
+
+        logger.info("=== LLM CALL (Ollama Native) ===")
+        logger.info(f"Endpoint: {url}")
+        logger.info(f"Model: {self._model}")
+        logger.info(f"Context size (num_ctx): {self._max_tokens}")
+        logger.info(f"System prompt ({len(system_prompt)} chars): {system_prompt[:500]}...")
+        logger.info(f"User prompt ({len(enhanced_user_prompt)} chars): {enhanced_user_prompt[:300]}...")
+
+        response = self._client.post(url, json=payload, headers=self._headers)
+        response.raise_for_status()
+
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+
+        logger.info(f"Response ({len(content)} chars): {content[:300]}...")
+        return content
+
+    def analyze_images(self, system_prompt: str, user_prompt: str, images: list[bytes]) -> str:
+        """Analyze images using Ollama native Vision API."""
+        enhanced_user_prompt = f"{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON, no other text."
+
+        # Encode images as base64
+        base64_images = [base64.b64encode(img).decode("utf-8") for img in images]
+
+        url = f"{self._endpoint}/api/chat"
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": enhanced_user_prompt,
+                    "images": base64_images,
+                },
+            ],
+            "stream": False,
+            "options": {"temperature": 0.1, "num_ctx": self._max_tokens},
+        }
+
+        logger.info("=== Vision LLM CALL (Ollama Native) ===")
+        logger.info(f"Endpoint: {url}")
+        logger.info(f"Model: {self._model}")
+        logger.info(f"Images: {len(images)}")
+
+        response = self._client.post(url, json=payload, headers=self._headers)
+        response.raise_for_status()
+
+        data = response.json()
+        return data.get("message", {}).get("content", "")
+
+
 class LLMConfig:
     """Configuration for LLM provider, can override environment settings."""
 
@@ -289,10 +500,15 @@ class LLMConfig:
         endpoint: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
+        api_mode: str | None = None,
+        max_tokens: int | None = None,
     ):
         self.endpoint = endpoint
         self.model = model
         self.api_key = api_key
+        # api_mode: "openai_compatible" or "ollama_native"
+        self.api_mode = api_mode or "openai_compatible"
+        self.max_tokens = max_tokens
 
 
 def get_llm_provider(config: LLMConfig | None = None) -> LLMProvider:
@@ -302,40 +518,54 @@ def get_llm_provider(config: LLMConfig | None = None) -> LLMProvider:
         config: Optional LLM configuration that overrides environment settings.
                 If None, uses settings from environment variables.
     """
+    # Extract config values
+    api_key = config.api_key if config else None
+    endpoint = config.endpoint if config else None
+    model = config.model if config else None
+    api_mode = config.api_mode if config else "openai_compatible"
+    max_tokens = config.max_tokens if config else None
+
     # Determine which type of provider to use
-    # If custom config with endpoint provided, use openai_compatible type
+    # If custom config with endpoint provided, use the api_mode to decide
     if config and config.endpoint:
-        llm_type = "openai_compatible"
-        api_key = config.api_key
-        endpoint = config.endpoint
-        model = config.model
-    else:
-        llm_type = settings.LLM_TYPE.lower()
-        api_key = config.api_key if config else None
-        endpoint = config.endpoint if config else None
-        model = config.model if config else None
+        if api_mode == "ollama_native":
+            logger.info(f"Using Ollama Native API mode for endpoint: {endpoint}")
+            return OllamaNativeProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
+        else:
+            logger.info(f"Using OpenAI-compatible API mode for endpoint: {endpoint}")
+            return OpenAIProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
+
+    # Use environment settings
+    llm_type = settings.LLM_TYPE.lower()
 
     if llm_type == "openai":
         actual_key = api_key or settings.LLM_API_KEY
         if not actual_key:
             raise ValueError("LLM_API_KEY is required for OpenAI")
-        return OpenAIProvider(api_key=api_key, endpoint=endpoint, model=model)
+        return OpenAIProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
 
     elif llm_type == "anthropic":
         actual_key = api_key or settings.LLM_API_KEY
         if not actual_key:
             raise ValueError("LLM_API_KEY is required for Anthropic")
-        return AnthropicProvider(api_key=api_key, endpoint=endpoint, model=model)
+        return AnthropicProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
 
     elif llm_type == "ollama":
-        return OllamaProvider(endpoint=endpoint, model=model)
+        # For Ollama from env, respect api_mode if provided in config
+        if api_mode == "ollama_native":
+            return OllamaNativeProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
+        return OllamaProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
 
     elif llm_type == "openai_compatible":
         # Generic OpenAI-compatible endpoint (vLLM, LocalAI, user custom, etc.)
         actual_endpoint = endpoint or settings.LLM_ENDPOINT
         if not actual_endpoint:
             raise ValueError("LLM_ENDPOINT is required for openai_compatible")
-        return OpenAIProvider(api_key=api_key, endpoint=endpoint, model=model)
+        return OpenAIProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
+
+    elif llm_type == "gemini" or llm_type == "google":
+        # Google Gemini API
+        return GeminiProvider(api_key=api_key, endpoint=endpoint, model=model, max_tokens=max_tokens)
 
     else:
         raise ValueError(f"Unknown LLM_TYPE: {llm_type}")

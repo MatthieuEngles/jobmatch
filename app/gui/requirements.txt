@@ -4,6 +4,9 @@ django>=5.0
 # Database
 psycopg2-binary>=2.9
 
+# Cache
+django-redis>=5.4
+
 # Server
 gunicorn>=21.0
 

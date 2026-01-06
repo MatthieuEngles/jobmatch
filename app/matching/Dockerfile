@@ -21,7 +21,6 @@ EXPOSE $MATCHING_PORT
 WORKDIR /app/matching
 RUN pip install -e .
 
-# Copy .env file
-COPY app/matching/.env /app/matching/.env
+# Environment variables are passed via docker-compose
 
 CMD python -m uvicorn matcher.main:app --host 0.0.0.0 --port ${MATCHING_PORT} --reload

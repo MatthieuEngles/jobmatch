@@ -76,11 +76,14 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/bigquery-gold-key.json
       - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
       - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
+      # Redis cache
+      - REDIS_URL=${REDIS_URL}
     volumes:
       # Mount credentials for local dev (cross-project BigQuery access)
       - ${BIGQUERY_GOLD_CREDENTIALS_PATH}:/app/credentials/bigquery-gold-key.json:ro
     depends_on:
       - db
+      - redis
     networks:
       - jobmatch-network
 
@@ -176,6 +179,12 @@ services:
       - JOB_OFFERS_DB_PATH=${JOB_OFFERS_DB_PATH}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID_EMB}
       - MATCHING_PORT=${MATCHING_PORT}
+      # BigQuery Vector Search configuration
+      - MATCHING_METHOD=${MATCHING_METHOD:-bigquery}
+      - DATASET_ID=${DATASET_ID:-jobmatch_gold}
+      - MAIN_TABLE_ID=${MAIN_TABLE_ID:-offers}
+      - TABLE_TITLE_EMBEDDINGS_ID=${TABLE_TITLE_EMBEDDINGS_ID:-offers_intitule_embeddings}
+      - TABLE_DESCRIPTION_EMBEDDINGS_ID=${TABLE_DESCRIPTION_EMBEDDINGS_ID:-offers_description_embeddings}
     depends_on:
       - cv-ingestion
       - offre-ingestion

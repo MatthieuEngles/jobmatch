@@ -2,6 +2,67 @@
 
 ## 📅 Sessions
 
+### 2026-01-06 (39-40) - Configuration Production HTTPS + Fix CI/CD Permissions
+
+**Contexte:** Suite session 38. Configuration du déploiement production avec HTTPS via Caddy/Let's Encrypt, Redis caching, et correction des erreurs de permissions CI/CD.
+
+**Réalisations:**
+
+- **Configuration HTTPS avec Caddy**
+  - Caddyfile conditionnel dans `vm.tf` : HTTPS si domaine configuré, HTTP sinon
+  - Support domaine `jobmatch.molp.fr` + accès IP `35.189.200.57:80`
+  - Automatic TLS via Let's Encrypt pour le domaine
+  - Headers sécurité : `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+
+- **Configuration Production docker-compose.prod.yml**
+  - Redis cache avec `REDIS_URL=redis://redis:6379`
+  - CSRF/CORS config : `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `ALLOWED_HOSTS`
+  - BigQuery Vector Search pour matching : `MATCHING_METHOD=bigquery`
+  - Credentials montés depuis `/opt/jobmatch/secrets/bigquery-gold-key.json`
+
+- **Fix CI/CD Workflow (deploy-prod.yml)**
+  - Hardcode VM zone `europe-west1-b` au lieu de `gcloud compute instances list`
+  - Suppression `gcloud compute config-ssh` (nécessite `compute.projects.get`)
+  - Fallback IP statique si describe échoue
+
+- **Documentation** : `docs/mise-en-prod.md` créé avec architecture et troubleshooting
+
+**Problèmes rencontrés et solutions:**
+
+| Problème | Solution |
+|----------|----------|
+| `compute.instances.list` permission denied | Hardcoder zone (europe-west1-b) au lieu de lister |
+| `compute.projects.get` permission denied (config-ssh) | Supprimer `gcloud compute config-ssh` - gcloud ssh gère les clés automatiquement |
+| Caddy startup script runs only on VM creation | Pour VM existante, modifier Caddyfile manuellement via SSH |
+| Pre-commit blocks commits to main | Créer PR depuis dev branch, merge via GitHub |
+
+**Décisions techniques:**
+
+| Décision | Justification |
+|----------|---------------|
+| Hardcode zone plutôt que IAM | Plus simple que d'ajouter `compute.viewer` qui donne trop d'accès |
+| Pas de config-ssh | gcloud ssh génère les clés à la volée, évite permission supplémentaire |
+| HTTPS optionnel (basé sur var.domain) | Permet déploiement rapide sans DNS configuré |
+| Redis TTL 15min pour matching | Balance entre fraîcheur et performance |
+
+**Fichiers clés modifiés:**
+- `.github/workflows/deploy-prod.yml` : fix permissions, hardcode zone
+- `docker-compose.prod.yml` : Redis, CSRF/CORS, BigQuery matching config
+- `infra/terraform/vm.tf` : Caddy HTTPS config conditionnel
+- `infra/terraform/terraform.tfvars` : `domain = "jobmatch.molp.fr"`
+- `docs/mise-en-prod.md` : documentation déploiement
+
+**État actuel:**
+- ✅ Configuration HTTPS prête (activée quand DNS configuré)
+- ✅ docker-compose.prod.yml configuré pour production
+- ✅ PR #55 créée pour fix CI (merge en attente)
+- ⏳ Configurer DNS OVH : jobmatch.molp.fr → 35.189.200.57
+- ⏳ Après DNS : mettre à jour Caddyfile sur VM pour activer HTTPS
+
+**Apprentissage clé:** Le service account `deploy-sa` a des permissions minimales. Pour le CI/CD, éviter les commandes qui nécessitent des permissions larges (`instances.list`, `projects.get`) - hardcoder les valeurs connues à la place.
+
+---
+
 ### 2026-01-06 (38) - Intégration Matching BigQuery + Connexion GUI
 
 **Contexte:** Suite session 37. Import des ressources Terraform existantes, extension disque VM, et intégration du nouveau service de matching BigQuery Vector Search de Maxime avec la GUI.
@@ -2016,6 +2077,9 @@ git add -A && git commit -m "message"
 - **ATS optimization** : L'intitulé du CV doit être très proche du titre de l'offre, et reprendre les mots-clés exacts (pas de synonymes)
 
 ## ⚠️ Pièges à éviter
+- **GCP CI/CD permissions minimales** : `deploy-sa` n'a pas `compute.instances.list` ni `compute.projects.get` → hardcoder zone/IP connues
+- **gcloud compute config-ssh** : Nécessite `compute.projects.get`, inutile car `gcloud compute ssh` gère les clés automatiquement
+- **Caddy startup script** : S'exécute seulement à la création VM → pour VM existante, modifier Caddyfile manuellement
 - **Terraform disk size change** : Changer `vm_disk_size` force la destruction de la VM → utiliser `gcloud compute disks resize` à la place
 - **Hardcoded dates BigQuery** : Ne jamais hardcoder `ingestion_date` dans les requêtes, la passer dynamiquement
 - **COPY .env dans Dockerfile** : Échoue si .env n'existe pas ou est gitignored → passer variables via docker-compose

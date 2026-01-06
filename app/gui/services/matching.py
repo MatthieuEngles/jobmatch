@@ -24,6 +24,7 @@ class MatchResult:
 
     offer_id: str
     score: float
+    ingestion_date: str | None = None  # For BigQuery partition pruning
 
 
 class MatchingService(ABC):
@@ -76,7 +77,14 @@ class RealMatchingService(MatchingService):
             response.raise_for_status()
             data = response.json()
 
-            return [MatchResult(offer_id=m["offer_id"], score=m["score"]) for m in data.get("matches", [])]
+            return [
+                MatchResult(
+                    offer_id=m["offer_id"],
+                    score=m["score"],
+                    ingestion_date=m.get("ingestion_date"),
+                )
+                for m in data.get("matches", [])
+            ]
 
         except requests.RequestException as e:
             logger.error(f"Matching service error: {e}")

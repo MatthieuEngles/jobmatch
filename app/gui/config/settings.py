@@ -276,6 +276,30 @@ CORS_ALLOW_HEADERS = [
 
 
 # =============================================================================
+# Redis Cache Configuration
+# =============================================================================
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+            "RETRY_ON_TIMEOUT": True,
+        },
+        "KEY_PREFIX": "jobmatch",
+    }
+}
+
+# Cache timeouts (in seconds)
+CACHE_TTL_MATCHING_RESULTS = 60 * 15  # 15 minutes for matching results
+CACHE_TTL_OFFER_DETAILS = 60 * 60  # 1 hour for offer details
+
+
+# =============================================================================
 # DRF Spectacular (OpenAPI/Swagger)
 # =============================================================================
 SPECTACULAR_SETTINGS = {

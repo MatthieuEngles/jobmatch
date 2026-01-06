@@ -74,6 +74,10 @@ secrets.json
 service-account.json
 jobmatch-482415-*.json
 
+# Private documentation (DO NOT COMMIT)
+**/PRIVATE_*.md
+PRIVATE_*.md
+
 # Database
 *.sqlite
 *.sqlite3

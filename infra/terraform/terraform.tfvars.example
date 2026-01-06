@@ -36,6 +36,7 @@ subnet_name  = "jobmatch-subnet"
 subnet_cidr  = "10.0.0.0/24"
 
 # Domain (optional - leave empty for IP-only access)
+# Example: "jobmatch.molp.fr"
 domain = ""
 
 # SSH allowed IPs (restrict in production!)

@@ -6,3 +6,5 @@ sentence-transformers
 sqlalchemy
 uvicorn
 httpx
+python-dotenv
+google-cloud-bigquery

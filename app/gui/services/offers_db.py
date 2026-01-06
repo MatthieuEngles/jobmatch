@@ -49,12 +49,18 @@ class OffersDB(ABC):
     """Abstract base class for offers database implementations."""
 
     @abstractmethod
-    def get_offers_by_ids(self, offer_ids: list[str]) -> dict[str, OfferDetails]:
+    def get_offers_by_ids(
+        self,
+        offer_ids: list[str],
+        ingestion_dates: dict[str, str] | None = None,
+    ) -> dict[str, OfferDetails]:
         """
         Get offer details for a list of offer IDs.
 
         Args:
             offer_ids: List of offer IDs to retrieve
+            ingestion_dates: Optional dict mapping offer_id to ingestion_date
+                           for BigQuery partition pruning optimization
 
         Returns:
             Dictionary mapping offer_id to OfferDetails
@@ -87,8 +93,12 @@ class SQLiteOffersDB(OffersDB):
         """
         self.db_path = Path(db_path)
 
-    def get_offers_by_ids(self, offer_ids: list[str]) -> dict[str, OfferDetails]:
-        """Get offer details from SQLite database."""
+    def get_offers_by_ids(
+        self,
+        offer_ids: list[str],
+        ingestion_dates: dict[str, str] | None = None,
+    ) -> dict[str, OfferDetails]:
+        """Get offer details from SQLite database (ignores ingestion_dates)."""
         if not offer_ids:
             return {}
 
@@ -244,11 +254,17 @@ class BigQueryOffersDB(OffersDB):
                 ) from e
         return self._client
 
-    def get_offers_by_ids(self, offer_ids: list[str]) -> dict[str, OfferDetails]:
+    def get_offers_by_ids(
+        self,
+        offer_ids: list[str],
+        ingestion_dates: dict[str, str] | None = None,
+    ) -> dict[str, OfferDetails]:
         """Get offer details from BigQuery Gold.
 
         Note: BigQuery Gold schema only has: id, intitule, description, ingestion_date, created_at
         No separate tables for entreprise, lieu, salaire, etc.
+
+        Uses ingestion_dates for partition pruning optimization when available.
         """
         if not offer_ids:
             return {}
@@ -256,27 +272,77 @@ class BigQueryOffersDB(OffersDB):
         try:
             from google.cloud import bigquery
 
-            # Query directly from offers table (no joins - simplified Gold schema)
-            query = f"""
-                SELECT id, intitule, description
-                FROM `{self.project_id}.{self.dataset}.offers`
-                WHERE id IN UNNEST(@offer_ids) AND ingestion_date = "2025-10-01"
-            """  # nosec B608 - project/dataset from config, offer_ids parameterized
+            # Build query with partition pruning if dates available
+            if ingestion_dates:
+                # Group offer_ids by ingestion_date for efficient querying
+                dates_to_ids: dict[str, list[str]] = {}
+                for oid in offer_ids:
+                    date = ingestion_dates.get(oid)
+                    if date:
+                        dates_to_ids.setdefault(date, []).append(oid)
+                    else:
+                        # Fallback for offers without date
+                        dates_to_ids.setdefault("__no_date__", []).append(oid)
 
-            job_config = bigquery.QueryJobConfig(
-                query_parameters=[bigquery.ArrayQueryParameter("offer_ids", "STRING", offer_ids)]
-            )
+                results = {}
 
-            results = {}
-            for row in self.client.query(query, job_config=job_config):
-                results[row.id] = OfferDetails(
-                    id=row.id,
-                    intitule=row.intitule or "Sans titre",
-                    entreprise=None,  # Not available in Gold schema
-                    description=row.description,
+                for date, ids in dates_to_ids.items():
+                    if date == "__no_date__":
+                        # Query without date filter (full scan for these)
+                        query = f"""
+                            SELECT id, intitule, description
+                            FROM `{self.project_id}.{self.dataset}.offers`
+                            WHERE id IN UNNEST(@offer_ids)
+                        """  # nosec B608 - project/dataset from config
+                    else:
+                        # Query with partition pruning
+                        query = f"""
+                            SELECT id, intitule, description
+                            FROM `{self.project_id}.{self.dataset}.offers`
+                            WHERE id IN UNNEST(@offer_ids)
+                            AND ingestion_date = @ingestion_date
+                        """  # nosec B608 - project/dataset from config
+
+                    job_config = bigquery.QueryJobConfig(
+                        query_parameters=[
+                            bigquery.ArrayQueryParameter("offer_ids", "STRING", ids),
+                            bigquery.ScalarQueryParameter("ingestion_date", "STRING", date),
+                        ]
+                        if date != "__no_date__"
+                        else [bigquery.ArrayQueryParameter("offer_ids", "STRING", ids)]
+                    )
+
+                    for row in self.client.query(query, job_config=job_config):
+                        results[row.id] = OfferDetails(
+                            id=row.id,
+                            intitule=row.intitule or "Sans titre",
+                            entreprise=None,  # Not available in Gold schema
+                            description=row.description,
+                        )
+
+                return results
+            else:
+                # No dates provided - query without partition filter
+                query = f"""
+                    SELECT id, intitule, description
+                    FROM `{self.project_id}.{self.dataset}.offers`
+                    WHERE id IN UNNEST(@offer_ids)
+                """  # nosec B608 - project/dataset from config, offer_ids parameterized
+
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[bigquery.ArrayQueryParameter("offer_ids", "STRING", offer_ids)]
                 )
 
-            return results
+                results = {}
+                for row in self.client.query(query, job_config=job_config):
+                    results[row.id] = OfferDetails(
+                        id=row.id,
+                        intitule=row.intitule or "Sans titre",
+                        entreprise=None,  # Not available in Gold schema
+                        description=row.description,
+                    )
+
+                return results
 
         except Exception as e:
             logger.error(f"BigQuery error getting offers: {e}")

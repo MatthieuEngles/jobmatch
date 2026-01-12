@@ -1,0 +1,44 @@
+# =============================================================================
+# Terraform .gitignore
+# =============================================================================
+
+# Local .terraform directories
+.terraform/
+.terraform.lock.hcl
+
+# Terraform state files (stored in GCS backend)
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Variable files (may contain secrets)
+terraform.tfvars
+*.tfvars
+!terraform.tfvars.example
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Plan files
+*.tfplan
+tfplan
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Service account keys (NEVER commit these!)
+*.json
+!package.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

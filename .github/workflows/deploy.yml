@@ -1,0 +1,225 @@
+# =============================================================================
+# Application Deployment Workflow
+# =============================================================================
+# Builds Docker images and deploys to the GCP VM
+# Multi-environment: staging (from staging branch) and prod (from main branch)
+#
+# IMPORTANT: This workflow does NOT manage secrets.
+# Applications read secrets directly from GCP Secret Manager at runtime.
+# See: docs/multi_environnement_gestion.md
+# =============================================================================
+
+name: Deploy
+
+on:
+  push:
+
+    branches:
+      - main
+      # - staging  # TODO: Enable when staging environment is ready
+    paths:
+      - 'app/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: # Allow manual trigger
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          # - staging  # TODO: Enable when staging environment is ready
+          - prod
+      service:
+        description: 'Service to deploy (all, gui, ai-assistant, cv-ingestion, etc.)'
+        required: false
+        default: 'all'
+
+permissions:
+  contents: read
+  id-token: write # Required for Workload Identity Federation
+
+env:
+  GCP_REGION: europe-west1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Deploy to VM
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Determine environment from branch or manual input
+      - name: Determine Environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "name=prod" >> $GITHUB_OUTPUT
+          else
+            echo "name=staging" >> $GITHUB_OUTPUT
+          fi
+
+          ENV_NAME=$(cat $GITHUB_OUTPUT | grep name | cut -d= -f2)
+          echo "Deploying to: $ENV_NAME"
+
+      # Set environment-specific variables
+      - name: Set Environment Variables
+        id: vars
+        run: |
+          ENV="${{ steps.env.outputs.name }}"
+          ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+
+          # Get VM name from GitHub Variables (set by Terraform)
+          # Fallback to default naming convention if not set
+          VM_NAME="${{ vars[format('VM_NAME_{0}', env.ENV_UPPER)] }}"
+          if [[ -z "$VM_NAME" ]]; then
+            VM_NAME="jobmatch-vm-${ENV}"
+          fi
+          echo "vm_name=$VM_NAME" >> $GITHUB_OUTPUT
+
+          # Branch to pull on VM
+          if [[ "$ENV" == "prod" ]]; then
+            echo "branch=main" >> $GITHUB_OUTPUT
+          else
+            echo "branch=staging" >> $GITHUB_OUTPUT
+          fi
+
+          echo "VM: $VM_NAME, Branch: $(cat $GITHUB_OUTPUT | grep branch | cut -d= -f2)"
+        env:
+          ENV_UPPER: ${{ steps.env.outputs.name == 'prod' && 'PROD' || 'STAGING' }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Get VM Zone and IP
+        id: vm-info
+        run: |
+          VM_NAME="${{ steps.vars.outputs.vm_name }}"
+
+          # Find the VM in any zone of the region
+          ZONE=$(gcloud compute instances list \
+            --filter="name=$VM_NAME AND zone~${{ env.GCP_REGION }}" \
+            --format='get(zone)' | head -1 | xargs basename)
+          echo "zone=$ZONE" >> $GITHUB_OUTPUT
+
+          IP=$(gcloud compute instances describe $VM_NAME \
+            --zone=$ZONE \
+            --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+          echo "Found VM $VM_NAME in zone: $ZONE with IP: $IP"
+
+      - name: Deploy via SSH
+        run: |
+          VM_NAME="${{ steps.vars.outputs.vm_name }}"
+          BRANCH="${{ steps.vars.outputs.branch }}"
+          ENV="${{ steps.env.outputs.name }}"
+
+          # Add SSH key
+          gcloud compute config-ssh --quiet
+
+          # Create deployment script
+          # NOTE: No secrets are written to disk.
+          # Applications read secrets directly from GCP Secret Manager at runtime.
+          cat > deploy.sh << EOF
+          #!/bin/bash
+          set -e
+
+          echo "=== JobMatch Deployment ==="
+          echo "Environment: $ENV"
+          echo "Timestamp: \$(date)"
+
+          cd /opt/jobmatch
+
+          # Pull latest code from the appropriate branch
+          echo "Pulling latest code from $BRANCH..."
+          git fetch origin
+          git checkout $BRANCH
+          git pull origin $BRANCH
+
+          # Set environment variable for Secret Manager
+          # Applications will use this to determine which secrets to read
+          echo "ENVIRONMENT=$ENV" > .env
+          echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> .env
+
+          # IMPORTANT: Force rebuild to ensure new code is deployed
+          # Without --no-cache or --pull, Docker may use cached layers
+          # and the new code won't be deployed.
+          # See: doc_support_contexte/POSTMORTEM_miniterraform.md
+
+          echo "Building services (with --no-cache to force rebuild)..."
+          docker compose build --no-cache --pull
+
+          echo "Stopping old containers..."
+          docker compose down
+
+          echo "Starting new containers..."
+          docker compose up -d
+
+          # Wait for services to be healthy
+          echo "Waiting for services..."
+          sleep 10
+
+          # Show status
+          echo "=== Service Status ==="
+          docker compose ps
+
+          echo "=== Deployment Complete ==="
+          EOF
+
+          # Copy and execute
+          gcloud compute scp deploy.sh $VM_NAME:/tmp/deploy.sh --zone=${{ steps.vm-info.outputs.zone }}
+          gcloud compute ssh $VM_NAME --zone=${{ steps.vm-info.outputs.zone }} --command="chmod +x /tmp/deploy.sh && sudo /tmp/deploy.sh"
+
+      - name: Health Check
+        run: |
+          echo "Checking application health..."
+          IP=${{ steps.vm-info.outputs.ip }}
+          ENV="${{ steps.env.outputs.name }}"
+
+          # Wait for services to start
+          sleep 15
+
+          # Check GUI
+          if curl -sf "http://${IP}:8085/health/" > /dev/null 2>&1; then
+            echo "GUI: OK"
+          else
+            echo "GUI: Starting (may take a moment)"
+          fi
+
+          # Check AI Assistant
+          if curl -sf "http://${IP}:8084/health" > /dev/null 2>&1; then
+            echo "AI Assistant: OK"
+          else
+            echo "AI Assistant: Starting (may take a moment)"
+          fi
+
+          echo "Deployment to $ENV completed. App available at: http://${IP}"
+
+      - name: Post Deployment Summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ steps.env.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **VM**: ${{ steps.vars.outputs.vm_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP**: ${{ steps.vm-info.outputs.ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Zone**: ${{ steps.vm-info.outputs.zone }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ steps.vars.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

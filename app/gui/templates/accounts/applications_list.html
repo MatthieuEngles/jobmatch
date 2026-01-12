@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+
+{% block title %}Mes candidatures - JobMatch{% endblock %}
+
+{% block extra_css %}
+<style>
+    .applications-container {
+        max-width: min(1200px, 95vw);
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .applications-header {
+        margin-bottom: 2rem;
+    }
+
+    .applications-header h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+    }
+
+    .applications-header p {
+        color: #6b7280;
+    }
+
+    /* Status filters */
+    .status-filters {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+
+    .status-filter {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 1px solid #e5e7eb;
+        background: white;
+        color: #6b7280;
+        font-size: 0.875rem;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .status-filter:hover {
+        border-color: #6366f1;
+        color: #6366f1;
+    }
+
+    .status-filter.active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: white;
+    }
+
+    .status-filter .count {
+        margin-left: 0.25rem;
+        opacity: 0.7;
+    }
+
+    /* Cards grid */
+    .applications-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    /* Application card */
+    .application-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .application-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .card-company {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6366f1;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+    }
+
+    .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .card-body {
+        padding: 1rem 1.25rem;
+    }
+
+    .card-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        font-size: 0.8125rem;
+        color: #6b7280;
+    }
+
+    .card-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .card-meta-item svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Status badge */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .status-added {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .status-in_progress {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .status-applied {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .status-interview {
+        background: #e0e7ff;
+        color: #4f46e5;
+    }
+
+    .status-accepted {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .status-rejected {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    /* Progress indicators */
+    .card-progress {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .progress-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        color: #9ca3af;
+    }
+
+    .progress-item.completed {
+        color: #059669;
+    }
+
+    .progress-item svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .card-footer {
+        padding: 0.75rem 1.25rem;
+        background: #f9fafb;
+        border-top: 1px solid #f3f4f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-date {
+        font-size: 0.75rem;
+        color: #9ca3af;
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .card-action {
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .card-action-primary {
+        background: #6366f1;
+        color: white;
+    }
+
+    .card-action-primary:hover {
+        background: #4f46e5;
+    }
+
+    .card-action-secondary {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .card-action-secondary:hover {
+        background: #e5e7eb;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="applications-container">
+    <div class="applications-header">
+        <h1>Mes candidatures</h1>
+        <p>Suivez l'etat de vos candidatures en temps reel</p>
+    </div>
+
+    <!-- Status filters -->
+    <div class="status-filters">
+        <a href="{% url 'accounts:applications_list' %}" class="status-filter {% if current_filter == 'all' %}active{% endif %}">
+            Toutes <span class="count">({{ status_counts.all }})</span>
+        </a>
+        <a href="?status=added" class="status-filter {% if current_filter == 'added' %}active{% endif %}">
+            Ajoutees <span class="count">({{ status_counts.added }})</span>
+        </a>
+        <a href="?status=in_progress" class="status-filter {% if current_filter == 'in_progress' %}active{% endif %}">
+            En cours <span class="count">({{ status_counts.in_progress }})</span>
+        </a>
+        <a href="?status=applied" class="status-filter {% if current_filter == 'applied' %}active{% endif %}">
+            Envoyees <span class="count">({{ status_counts.applied }})</span>
+        </a>
+        <a href="?status=interview" class="status-filter {% if current_filter == 'interview' %}active{% endif %}">
+            Entretiens <span class="count">({{ status_counts.interview }})</span>
+        </a>
+        <a href="?status=accepted" class="status-filter {% if current_filter == 'accepted' %}active{% endif %}">
+            Acceptees <span class="count">({{ status_counts.accepted }})</span>
+        </a>
+        <a href="?status=rejected" class="status-filter {% if current_filter == 'rejected' %}active{% endif %}">
+            Refusees <span class="count">({{ status_counts.rejected }})</span>
+        </a>
+    </div>
+
+    {% if applications %}
+    <div class="applications-grid">
+        {% for app in applications %}
+        <div class="application-card">
+            <div class="card-header">
+                <div class="card-company">{{ app.imported_offer.company|default:"Entreprise inconnue" }}</div>
+                <h3 class="card-title">{{ app.imported_offer.title }}</h3>
+            </div>
+
+            <div class="card-body">
+                <div class="card-meta">
+                    {% if app.imported_offer.location %}
+                    <span class="card-meta-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        {{ app.imported_offer.location }}
+                    </span>
+                    {% endif %}
+                    {% if app.imported_offer.contract_type %}
+                    <span class="card-meta-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        {{ app.imported_offer.contract_type }}
+                    </span>
+                    {% endif %}
+                    {% if app.imported_offer.remote_type %}
+                    <span class="card-meta-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        {{ app.imported_offer.remote_type }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <span class="status-badge status-{{ app.status }}">
+                    {{ app.get_status_display }}
+                </span>
+
+                <div class="card-progress">
+                    <span class="progress-item {% if app.has_cv %}completed{% endif %}">
+                        {% if app.has_cv %}
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        {% else %}
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                        </svg>
+                        {% endif %}
+                        CV
+                    </span>
+                    <span class="progress-item {% if app.has_cover_letter %}completed{% endif %}">
+                        {% if app.has_cover_letter %}
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        {% else %}
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                        </svg>
+                        {% endif %}
+                        Lettre
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <span class="card-date">
+                    Ajoutee le {{ app.created_at|date:"d/m/Y" }}
+                </span>
+                <div class="card-actions">
+                    <a href="{% url 'accounts:application_detail' app.id %}" class="card-action card-action-primary">Voir</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <h3>Aucune candidature</h3>
+        <p>Importez des offres d'emploi avec l'extension navigateur pour commencer</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

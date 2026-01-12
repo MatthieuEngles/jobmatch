@@ -1,0 +1,55 @@
+# =============================================================================
+# JobMatch V0 - Terraform Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to git (it may contain secrets)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Required Variables
+# -----------------------------------------------------------------------------
+
+# GCP Project ID
+project_id = "job-match-v0"
+
+# -----------------------------------------------------------------------------
+# Optional Variables (defaults shown)
+# -----------------------------------------------------------------------------
+
+# GCP Region
+region = "europe-west1"  # Belgium (more availability than Paris)
+
+# Environment name
+environment = "prod"
+
+# VM Configuration
+vm_name         = "jobmatch-vm"
+vm_machine_type = "e2-standard-2" # "e2-medium" # 2 vCPU, 4GB RAM (~25 EUR/month)
+
+vm_disk_size    = 50          # GB
+vm_disk_type    = "pd-balanced"
+vm_image        = "ubuntu-os-cloud/ubuntu-2204-lts"
+
+# Network Configuration
+network_name = "jobmatch-vpc"
+subnet_name  = "jobmatch-subnet"
+subnet_cidr  = "10.0.0.0/24"
+
+# Domain (optional - leave empty for IP-only access)
+# Example: "jobmatch.molp.fr"
+domain = ""
+
+# SSH allowed IPs (restrict in production!)
+# Example: ["1.2.3.4/32", "5.6.7.8/32"]
+ssh_allowed_ips = ["0.0.0.0/0"]
+
+# GitHub Configuration (for Workload Identity Federation)
+github_org  = "MatthieuEngles"
+github_repo = "jobmatch"
+
+# Labels
+labels = {
+  project     = "jobmatch"
+  environment = "prod"
+  managed_by  = "terraform"
+}

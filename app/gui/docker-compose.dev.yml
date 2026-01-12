@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  gui:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV_MODE=dev
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-not-for-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - POSTGRES_DB=jobmatch
+      - POSTGRES_USER=jobmatch
+      - POSTGRES_PASSWORD=jobmatch
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      - db
+    networks:
+      - jobmatch-dev
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=jobmatch
+      - POSTGRES_USER=jobmatch
+      - POSTGRES_PASSWORD=jobmatch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - jobmatch-dev
+
+networks:
+  jobmatch-dev:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

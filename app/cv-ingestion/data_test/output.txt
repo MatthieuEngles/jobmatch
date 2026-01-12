@@ -1,0 +1,59 @@
+============================================================
+CV-INGESTION INTEGRATION TEST
+============================================================
+
+[1/2] Testing PDF extraction...
+
+[2/2] Testing LLM analysis...
+Extracted 3775 chars from PDF
+
+Sending to LLM for analysis...
+Using: ollama / gemma3:4b
+Endpoint: http://llm.molp.fr/v1
+
+Extracted 22 lines from CV:
+--------------------------------------------------
+
+[SUMMARY] (1 items)
+  - Co-fondateur, Responsable technique Expert en IA et machine learning avec plus de six ans d’expérience, j’ai développé des solutions innovantes pour l’évaluation environnementale et la gestion énergétique
+
+[EXPERIENCE] (3 items)
+  - Reveleo (01/2019 –07/2024)
+Start-up spécialisée dans l'évaluation environnementale et la data science appliquée à l'immobilier. desbâtiments.
+  - Ecole Polytechnique Exécutive (2020)
+• Gestion et suivi de stagiaires sur des projets d’analyse de données et machine learning
+  - Sunsquare(11/2006 –12/2020 –Revente)
+Bureau d’études fluides spécialisé en maitrise de l’énergie et développement durable dans le secteur du bâtiment.
+
+[SKILL_HARD] (10 items)
+  - Machine Learning & IA
+  - XgBoost
+  - Unet-PyTorch
+  - SciKitLearn
+  - LLM-LangGraph
+  - Postgresql, Pandas, Scikit Learn
+  - Hadoop, Dask, Ray
+  - Pytorch, LLM, LangGraph
+  - Flask/Django
+  - Git, CI/CD, Docker
+
+[EDUCATION] (1 items)
+  - ISAE ENSMA (2004)
+Ingénieur énergéticien
+
+[SKILL_SOFT] (3 items)
+  - Management d’équipes
+  - Gestion de projets
+  - Formation
+
+[LANGUAGE] (3 items)
+  - Français
+  - Anglais
+  - Espagnol
+
+[INTEREST] (1 items)
+  - Running, Code(CodingGame, Kaggle, développement de techno autour de l’IA, création d’un cluster de calcul distribué), DIY mécatronique (conception et impression 3D, Arduino, Raspberry pi)
+
+============================================================
+ALL TESTS PASSED!
+============================================================

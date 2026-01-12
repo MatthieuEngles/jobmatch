@@ -1,0 +1,38 @@
+# Fichiers sensibles
+.env
+.env.*
+*.env
+
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Data files
+data/
+*.json
+*.csv
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

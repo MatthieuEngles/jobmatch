@@ -1,0 +1,43 @@
+# Django
+django>=5.0
+
+# Database
+psycopg2-binary>=2.9
+
+# Cache
+django-redis>=5.4
+
+# Server
+gunicorn>=21.0
+
+# Static files
+whitenoise>=6.6
+
+# Environment
+python-dotenv>=1.0
+
+# Google Cloud Storage (prod)
+django-storages[google]>=1.14
+
+# BigQuery (for Gold table access)
+google-cloud-bigquery>=3.0
+
+# HTTP client for microservices
+requests>=2.31
+
+# Image processing
+Pillow>=10.0
+
+# REST API
+djangorestframework>=3.14
+djangorestframework-simplejwt>=5.3
+
+# CORS headers for browser extension
+django-cors-headers>=4.3
+
+# API documentation (OpenAPI/Swagger)
+drf-spectacular>=0.27
+
+# Markdown rendering
+markdown>=3.5
+bleach>=6.0

@@ -1,0 +1,171 @@
+# =============================================================================
+# JobMatch Production Docker Compose for VM
+# Uses pre-built images from registry.molp.fr
+# =============================================================================
+
+services:
+  gui:
+    image: registry.molp.fr/jobmatch/gui:latest
+    ports:
+      - "8085:8080"
+    environment:
+      - ENV_MODE=production
+      - DEBUG=false
+      # PostgreSQL
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=jobmatch
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=jobmatch
+      # Service URLs (internal docker network)
+      - CV_INGESTION_URL=http://cv-ingestion:8081
+      - MATCHING_URL=http://matching:8086
+      - AI_ASSISTANT_URL=http://ai-assistant:8084
+      - MATCHING_SERVICE_URL=http://matching:8086
+      # BigQuery cross-project Gold access
+      - USE_MOCK_MATCHING=false
+      - USE_SQLITE_OFFERS=false
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - BIGQUERY_GOLD_PROJECT_ID=${BIGQUERY_GOLD_PROJECT_ID}
+      - BIGQUERY_GOLD_CROSS_PROJECT_DATASET=${BIGQUERY_GOLD_CROSS_PROJECT_DATASET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/bigquery-gold-key.json
+      # Embeddings
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER:-sentence-transformers}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL:-paraphrase-multilingual-MiniLM-L12-v2}
+      # Redis cache
+      - REDIS_URL=redis://redis:6379
+      # CSRF/CORS for production
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://jobmatch.molp.fr,http://35.189.200.57}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://jobmatch.molp.fr}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-jobmatch.molp.fr,35.189.200.57,localhost}
+    volumes:
+      # BigQuery Gold SA key (mount from VM secrets directory)
+      - /opt/jobmatch/secrets/bigquery-gold-key.json:/app/credentials/bigquery-gold-key.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  cv-ingestion:
+    image: registry.molp.fr/jobmatch/cv-ingestion:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - DEBUG=false
+      # LLM Configuration (Gemini via Vertex AI - uses ADC)
+      - LLM_TYPE=gemini
+      - LLM_MODEL=${LLM_MODEL:-gemini-1.5-flash-002}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
+      # GCP Configuration for Vertex AI
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION:-europe-west1}
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  ai-assistant:
+    image: registry.molp.fr/jobmatch/ai-assistant:latest
+    ports:
+      - "8084:8084"
+    environment:
+      - DEBUG=false
+      # LLM Configuration (Gemini via Vertex AI - uses ADC)
+      - LLM_TYPE=gemini
+      - LLM_MODEL=${LLM_MODEL:-gemini-1.5-flash-002}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
+      # GCP Configuration for Vertex AI
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION:-europe-west1}
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  matching:
+    image: registry.molp.fr/jobmatch/matching:latest
+    ports:
+      - "8086:8086"
+    environment:
+      - DEBUG=false
+      - CV_INGESTION_URL=http://cv-ingestion:8081
+      # BigQuery Vector Search configuration
+      - MATCHING_METHOD=bigquery
+      - GCP_PROJECT_ID=${BIGQUERY_GOLD_PROJECT_ID}
+      - DATASET_ID=${BIGQUERY_GOLD_CROSS_PROJECT_DATASET:-jobmatch_gold}
+      - MAIN_TABLE_ID=offers
+      - TABLE_TITLE_EMBEDDINGS_ID=offers_intitule_embeddings
+      - TABLE_DESCRIPTION_EMBEDDINGS_ID=offers_description_embeddings
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/bigquery-gold-key.json
+    volumes:
+      # BigQuery Gold SA key (same key as GUI uses)
+      - /opt/jobmatch/secrets/bigquery-gold-key.json:/app/credentials/bigquery-gold-key.json:ro
+    depends_on:
+      cv-ingestion:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=jobmatch
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=jobmatch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobmatch -d jobmatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - jobmatch-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  jobmatch-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

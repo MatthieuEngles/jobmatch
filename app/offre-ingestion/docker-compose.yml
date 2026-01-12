@@ -1,0 +1,31 @@
+services:
+  offre-ingestion:
+    build:
+      context: ../..
+      dockerfile: app/offre-ingestion/Dockerfile
+    image: offre-ingestion-pipeline:latest
+    env_file:
+      - .env
+    volumes:
+      # Monter les credentials GCP de manière sécurisée
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/credentials/gcp-key.json:ro
+    environment:
+      # Pointer vers les credentials montés
+      GOOGLE_APPLICATION_CREDENTIALS: /app/credentials/gcp-key.json
+    # Pas de commande par défaut, on la spécifie à l'exécution
+    command: ["echo", "Utilisez: docker-compose run offre-ingestion <commande>"]
+
+  # Service pour fetch
+  fetch:
+    extends: offre-ingestion
+    profiles: ["manual"]
+
+  # Service pour silver
+  silver:
+    extends: offre-ingestion
+    profiles: ["manual"]
+
+  # Service pour gold
+  gold:
+    extends: offre-ingestion
+    profiles: ["manual"]

@@ -1,0 +1,116 @@
+# Dependencies
+node_modules/
+vendor/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env.local
+.env.*.local
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+*.egg-info/
+.eggs/
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.nyc_output/
+
+# Docker
+docker-compose.override.yml
+
+# Secrets & credentials
+*.pem
+*.key
+credentials.json
+secrets.json
+service-account.json
+jobmatch-482415-*.json
+
+# Private documentation (DO NOT COMMIT)
+**/PRIVATE_*.md
+PRIVATE_*.md
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache
+.cache/
+*.cache
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Documentation (local only)
+POSTMORTEM.md
+TREE.md
+LAUNCH.md
+docs/
+doc_support_contexte/
+
+# Python version
+.python-version
+
+# Data
+data/
+
+emails.txt
+
+# Personal folder
+matthieu_perso/

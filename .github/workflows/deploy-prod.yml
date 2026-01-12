@@ -1,0 +1,178 @@
+# =============================================================================
+# Production Deployment Workflow
+# =============================================================================
+# Deploys to GCP VM using docker-compose.prod.yml
+# Uses Workload Identity Federation for authentication (no secrets needed)
+#
+# Prerequisites:
+# 1. Run Terraform to create infrastructure:
+#    cd infra/terraform && terraform apply
+# 2. Set GitHub repository variables (from terraform output):
+#    - GCP_PROJECT_ID
+#    - GCP_WORKLOAD_IDENTITY_PROVIDER
+#    - GCP_SERVICE_ACCOUNT (deploy-sa@...)
+#    - VM_NAME (jobmatch-vm)
+# 3. Add secrets to GCP Secret Manager:
+#    - postgres-password
+#    - django-secret-key
+#    - bigquery-gold-sa-key
+# =============================================================================
+
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'shared/**'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy-prod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_REGION: europe-west9
+
+jobs:
+  deploy:
+    name: Deploy to Production VM
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Get VM Info
+        id: vm-info
+        run: |
+          VM_NAME="${{ vars.VM_NAME }}"
+          # Use zone from vars or default to europe-west1-b
+          ZONE="${{ vars.VM_ZONE }}"
+          if [ -z "$ZONE" ]; then
+            ZONE="europe-west1-b"
+          fi
+
+          echo "zone=$ZONE" >> $GITHUB_OUTPUT
+
+          # Get external IP using the known zone
+          IP=$(gcloud compute instances describe $VM_NAME \
+            --zone=$ZONE \
+            --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null || echo "35.189.200.57")
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+          echo "VM: $VM_NAME in zone: $ZONE with IP: $IP"
+
+      - name: Deploy to VM
+        run: |
+          VM_NAME="${{ vars.VM_NAME }}"
+          ZONE="${{ steps.vm-info.outputs.zone }}"
+          PROJECT_ID="${{ vars.GCP_PROJECT_ID }}"
+
+          # Create deployment script (no config-ssh needed, gcloud ssh handles it)
+          cat > /tmp/deploy.sh << 'DEPLOY_EOF'
+          #!/bin/bash
+          set -e
+
+          echo "=== JobMatch Production Deployment ==="
+          echo "Timestamp: $(date)"
+
+          cd /opt/jobmatch
+
+          # Fetch secrets from GCP Secret Manager
+          echo "Fetching secrets..."
+          ./fetch-secrets.sh
+
+          # Pull latest code
+          echo "Pulling latest code..."
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+          # Build and deploy with docker-compose.prod.yml
+          echo "Building services..."
+          docker compose -f docker-compose.prod.yml build --pull
+
+          echo "Stopping old containers..."
+          docker compose -f docker-compose.prod.yml down --remove-orphans
+
+          echo "Starting new containers..."
+          docker compose -f docker-compose.prod.yml up -d
+
+          # Wait for services
+          echo "Waiting for services to start..."
+          sleep 20
+
+          # Show status
+          echo "=== Service Status ==="
+          docker compose -f docker-compose.prod.yml ps
+
+          # Basic health checks
+          echo "=== Health Checks ==="
+          for port in 8085 8081 8084 8086; do
+            if curl -sf "http://localhost:$port/health" > /dev/null 2>&1 || \
+               curl -sf "http://localhost:$port/health/" > /dev/null 2>&1; then
+              echo "Port $port: OK"
+            else
+              echo "Port $port: Starting..."
+            fi
+          done
+
+          echo "=== Deployment Complete ==="
+          DEPLOY_EOF
+
+          # Copy script to VM and execute
+          gcloud compute scp /tmp/deploy.sh $VM_NAME:/tmp/deploy.sh --zone=$ZONE
+          gcloud compute ssh $VM_NAME --zone=$ZONE --command="chmod +x /tmp/deploy.sh && sudo /tmp/deploy.sh"
+
+      - name: Health Check
+        run: |
+          IP="${{ steps.vm-info.outputs.ip }}"
+
+          echo "Waiting for services to be ready..."
+          sleep 10
+
+          # Check GUI (main entry point)
+          echo "Checking GUI at http://${IP}..."
+          for i in {1..5}; do
+            if curl -sf "http://${IP}/health/" > /dev/null 2>&1; then
+              echo "GUI is healthy!"
+              break
+            fi
+            echo "Attempt $i/5 - waiting..."
+            sleep 5
+          done
+
+          echo ""
+          echo "Application URL: http://${IP}"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| **VM** | ${{ vars.VM_NAME }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Zone** | ${{ steps.vm-info.outputs.zone }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **IP** | ${{ steps.vm-info.outputs.ip }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URL**: http://${{ steps.vm-info.outputs.ip }}" >> $GITHUB_STEP_SUMMARY

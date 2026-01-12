@@ -1,0 +1,450 @@
+{% extends 'base.html' %}
+
+{% block title %}Nos offres - JobMatch{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pricing-container {
+        max-width: min(1200px, 95vw);
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    @media (min-width: 1920px) {
+        .pricing-container {
+            max-width: min(1600px, 85vw);
+        }
+    }
+
+    @media (min-width: 2560px) {
+        .pricing-container {
+            max-width: min(2000px, 80vw);
+        }
+    }
+
+    .pricing-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .pricing-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+    }
+
+    .pricing-header p {
+        color: #6b7280;
+        font-size: 1.1rem;
+    }
+
+    .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+        .pricing-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .pricing-grid {
+            grid-template-columns: 1fr;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+    }
+
+    .pricing-card {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s;
+        position: relative;
+    }
+
+    .pricing-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .pricing-card.popular {
+        border-color: #6366f1;
+        background: linear-gradient(135deg, #f5f3ff 0%, white 100%);
+        transform: scale(1.05);
+    }
+
+    .pricing-card.popular:hover {
+        transform: scale(1.05) translateY(-5px);
+    }
+
+    .popular-badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.35rem 1rem;
+        border-radius: 20px;
+    }
+
+    .plan-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+    }
+
+    .plan-price {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #6366f1;
+        margin-bottom: 0.25rem;
+    }
+
+    .plan-period {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+    }
+
+    .features-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1.5rem 0;
+        text-align: left;
+    }
+
+    .features-list li {
+        font-size: 0.9rem;
+        color: #374151;
+        padding: 0.5rem 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .features-list li svg {
+        width: 18px;
+        height: 18px;
+        color: #10b981;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .features-list li.disabled {
+        color: #9ca3af;
+    }
+
+    .features-list li.disabled svg {
+        color: #d1d5db;
+    }
+
+    .btn-select {
+        width: 100%;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-select.primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+    }
+
+    .btn-select.primary:hover {
+        opacity: 0.9;
+        transform: translateY(-2px);
+    }
+
+    .btn-select.secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-select.secondary:hover {
+        background: #e5e7eb;
+    }
+
+    .btn-select.current {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+        cursor: default;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #6366f1;
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .back-link svg {
+        width: 16px;
+        height: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pricing-container">
+    <a href="{% url 'accounts:settings' %}" class="back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Retour aux parametres
+    </a>
+
+    <div class="pricing-header">
+        <h1>Choisissez votre formule</h1>
+        <p>Trouvez le plan qui correspond a vos besoins</p>
+    </div>
+
+    <div class="pricing-grid">
+        <!-- Free Plan -->
+        <div class="pricing-card">
+            <div class="plan-name">Gratuit</div>
+            <div class="plan-price">0 EUR</div>
+            <div class="plan-period">pour toujours</div>
+            <ul class="features-list">
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    1 CV importe
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    5 matchs/mois
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Extraction LLM basique
+                </li>
+                <li class="disabled">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Alertes email
+                </li>
+                <li class="disabled">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    LLM personnalise
+                </li>
+            </ul>
+            {% if user.is_authenticated and user.subscription_tier == 'free' %}
+            <span class="btn-select current">Plan actuel</span>
+            {% else %}
+            <a href="{% url 'accounts:settings' %}" class="btn-select secondary">Selectionner</a>
+            {% endif %}
+        </div>
+
+        <!-- Basic Plan -->
+        <div class="pricing-card">
+            <div class="plan-name">Basic</div>
+            <div class="plan-price">9 EUR</div>
+            <div class="plan-period">par mois</div>
+            <ul class="features-list">
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    3 CVs importes
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    50 matchs/mois
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Extraction LLM avancee
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Alertes email
+                </li>
+                <li class="disabled">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    LLM personnalise
+                </li>
+            </ul>
+            {% if user.is_authenticated and user.subscription_tier == 'basic' %}
+            <span class="btn-select current">Plan actuel</span>
+            {% else %}
+            <a href="{% url 'accounts:settings' %}" class="btn-select secondary">Selectionner</a>
+            {% endif %}
+        </div>
+
+        <!-- Premium Plan -->
+        <div class="pricing-card popular">
+            <span class="popular-badge">POPULAIRE</span>
+            <div class="plan-name">Premium</div>
+            <div class="plan-price">29 EUR</div>
+            <div class="plan-period">par mois</div>
+            <ul class="features-list">
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    CVs illimites
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Matchs illimites
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    LLM Vision (PDF images)
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Alertes temps reel
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    LLM personnalise
+                </li>
+            </ul>
+            {% if user.is_authenticated and user.subscription_tier == 'premium' %}
+            <span class="btn-select current">Plan actuel</span>
+            {% else %}
+            <a href="{% url 'accounts:settings' %}" class="btn-select primary">Selectionner</a>
+            {% endif %}
+        </div>
+
+        <!-- Head Hunter Plan -->
+        <div class="pricing-card">
+            <div class="plan-name">Head Hunter</div>
+            <div class="plan-price">79 EUR</div>
+            <div class="plan-period">par mois</div>
+            <ul class="features-list">
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Tout Premium +
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Multi-profils (10)
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Acces API
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Rapport analytique
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Support prioritaire
+                </li>
+            </ul>
+            {% if user.is_authenticated and user.subscription_tier == 'headhunter' %}
+            <span class="btn-select current">Plan actuel</span>
+            {% else %}
+            <a href="{% url 'accounts:settings' %}" class="btn-select secondary">Selectionner</a>
+            {% endif %}
+        </div>
+
+        <!-- Enterprise Plan -->
+        <div class="pricing-card">
+            <div class="plan-name">Entreprise</div>
+            <div class="plan-price">Sur devis</div>
+            <div class="plan-period">personnalise</div>
+            <ul class="features-list">
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Tout Head Hunter +
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Profils illimites
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    SSO / SAML
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    SLA garanti
+                </li>
+                <li>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Account manager dedie
+                </li>
+            </ul>
+            {% if user.is_authenticated and user.subscription_tier == 'enterprise' %}
+            <span class="btn-select current">Plan actuel</span>
+            {% else %}
+            <a href="mailto:contact@jobmatch.fr" class="btn-select secondary">Nous contacter</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

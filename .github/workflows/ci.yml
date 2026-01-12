@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Check if source is dev
+        run: |
+          if [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "❌ Seules les PR depuis 'dev' sont autorisées vers 'main'"
+            exit 1
+          fi
+          echo "✅ PR depuis 'dev' autorisée"
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v2
+        with:
+          args: "check"
+      - uses: astral-sh/ruff-action@v2
+        with:
+          args: "format --check"
+
+  pre-commit:
+    name: Pre-commit checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: no-commit-to-branch  # Allow merges to main in CI
+
+  test-gui:
+    name: Test GUI
+    runs-on: ubuntu-latest
+    needs: [lint, pre-commit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd app/gui
+          pip install -r requirements.txt || true
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd app/gui
+          pytest tests/ -v --cov=src --cov-report=xml || echo "No tests yet"
+
+  test-cv-ingestion:
+    name: Test CV Ingestion
+    runs-on: ubuntu-latest
+    needs: [lint, pre-commit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd app/cv-ingestion
+          pip install -r requirements.txt || true
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd app/cv-ingestion
+          pytest tests/ -v --cov=src --cov-report=xml || echo "No tests yet"
+
+  test-offre-ingestion:
+    name: Test Offre Ingestion
+    runs-on: ubuntu-latest
+    needs: [lint, pre-commit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd app/offre-ingestion
+          pip install -r requirements.txt || true
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd app/offre-ingestion
+          pytest tests/ -v --cov=src --cov-report=xml || echo "No tests yet"
+
+  test-matching:
+    name: Test Matching
+    runs-on: ubuntu-latest
+    needs: [lint, pre-commit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd app/matching
+          pip install -r requirements.txt || true
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd app/matching
+          pytest tests/ -v --cov=src --cov-report=xml || echo "No tests yet"

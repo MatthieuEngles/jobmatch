@@ -1,0 +1,292 @@
+# =============================================================================
+# Terraform CI/CD Workflow
+# =============================================================================
+# Multi-environment: staging (from staging branch) and prod (from main branch)
+# - Push to main/staging: plan + apply automatically
+# - PR to main/staging: plan only (comment on PR)
+# - Manual trigger: choose environment and action
+# =============================================================================
+
+name: Terraform
+
+on:
+  push:
+
+    branches:
+      - main
+      # - staging  # TODO: Enable when staging environment is ready
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+
+    branches:
+      - main
+      # - staging  # TODO: Enable when staging environment is ready
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          # - staging  # TODO: Enable when staging environment is ready
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  contents: read
+  id-token: write # Required for Workload Identity Federation
+  pull-requests: write # To post plan comments on PRs
+
+env:
+  TF_VERSION: '1.6.0'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Terraform Plan + Apply
+  # ---------------------------------------------------------------------------
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+
+    # Set outputs for use in dependent jobs
+    outputs:
+      environment: ${{ steps.env.outputs.name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Determine environment - always prod (no staging)
+      - name: Determine Environment
+        id: env
+        run: |
+          echo "name=prod" >> $GITHUB_OUTPUT
+          echo "Environment: prod"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      # Initialize with environment-specific backend
+      - name: Terraform Init
+        id: init
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -backend-config="prefix=${{ steps.env.outputs.name }}"
+
+      - name: Terraform Validate
+        id: validate
+        working-directory: infra/terraform
+        run: terraform validate -no-color
+
+      # Import existing resources if they're not in state
+      - name: Import Existing Resources
+        working-directory: infra/terraform
+        run: |
+          echo "Checking and importing existing GCP resources..."
+
+          PROJECT_ID="job-match-v0"
+          REGION="europe-west1"
+
+          # Function to import if not in state (using -lock=false to avoid lock issues in CI)
+          import_if_missing() {
+            RESOURCE=$1
+            ID=$2
+            if ! terraform state show "$RESOURCE" > /dev/null 2>&1; then
+              echo "Importing $RESOURCE..."
+              terraform import -lock=false "$RESOURCE" "$ID" || echo "Import failed for $RESOURCE (may not exist)"
+            else
+              echo "$RESOURCE already in state"
+            fi
+          }
+
+          # Service Accounts
+          import_if_missing "google_service_account.vm" "projects/$PROJECT_ID/serviceAccounts/jobmatch-vm-sa@$PROJECT_ID.iam.gserviceaccount.com"
+          import_if_missing "google_service_account.terraform" "projects/$PROJECT_ID/serviceAccounts/terraform-sa@$PROJECT_ID.iam.gserviceaccount.com"
+          import_if_missing "google_service_account.deploy" "projects/$PROJECT_ID/serviceAccounts/deploy-sa@$PROJECT_ID.iam.gserviceaccount.com"
+
+          # Network
+          import_if_missing "google_compute_network.main" "projects/$PROJECT_ID/global/networks/jobmatch-vpc"
+          import_if_missing "google_compute_subnetwork.main" "projects/$PROJECT_ID/regions/$REGION/subnetworks/jobmatch-subnet"
+          import_if_missing "google_compute_address.static" "projects/$PROJECT_ID/regions/$REGION/addresses/jobmatch-static-ip"
+
+          # Firewall rules
+          import_if_missing "google_compute_firewall.allow_ssh" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-ssh"
+          import_if_missing "google_compute_firewall.allow_http" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-http"
+          import_if_missing "google_compute_firewall.allow_https" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-https"
+          import_if_missing "google_compute_firewall.allow_icmp" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-icmp"
+          import_if_missing "google_compute_firewall.allow_internal" "projects/$PROJECT_ID/global/firewalls/jobmatch-vpc-allow-internal"
+
+          # BigQuery
+          import_if_missing "google_bigquery_dataset.silver" "projects/$PROJECT_ID/datasets/jobmatch_silver"
+          import_if_missing "google_bigquery_dataset.gold" "projects/$PROJECT_ID/datasets/jobmatch_gold"
+
+          # Storage
+          import_if_missing "google_storage_bucket.bronze" "$PROJECT_ID-bronze"
+          import_if_missing "google_storage_bucket.backups" "$PROJECT_ID-backups"
+
+          # Secrets
+          import_if_missing "google_secret_manager_secret.django_secret_key" "projects/$PROJECT_ID/secrets/django-secret-key"
+          import_if_missing "google_secret_manager_secret.postgres_password" "projects/$PROJECT_ID/secrets/postgres-password"
+          import_if_missing "google_secret_manager_secret.bigquery_gold_sa_key" "projects/$PROJECT_ID/secrets/bigquery-gold-sa-key"
+
+          # Workload Identity Pool
+          import_if_missing "google_iam_workload_identity_pool.github" "$PROJECT_ID/github-pool"
+          import_if_missing "google_iam_workload_identity_pool_provider.github" "$PROJECT_ID/github-pool/github-provider"
+
+          # VM
+          import_if_missing "google_compute_instance.main" "projects/$PROJECT_ID/zones/europe-west1-b/instances/jobmatch-vm"
+
+          echo "Import check complete"
+
+      # Plan with environment-specific variables
+      - name: Terraform Plan
+        id: plan
+        working-directory: infra/terraform
+        run: |
+          terraform plan -no-color -out=tfplan \
+            -var="environment=${{ steps.env.outputs.name }}"
+        continue-on-error: true
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ steps.env.outputs.name }}
+          path: infra/terraform/tfplan
+          retention-days: 5
+
+      # Post plan as PR comment (only on PRs)
+      - name: Post Plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `### Terraform Plan for \`${{ steps.env.outputs.name }}\`
+
+            | Check | Status |
+            |-------|--------|
+            | Format | \`${{ steps.fmt.outcome }}\` |
+            | Init | \`${{ steps.init.outcome }}\` |
+            | Validate | \`${{ steps.validate.outcome }}\` |
+            | Plan | \`${{ steps.plan.outcome }}\` |
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            *Triggered by: @${{ github.actor }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      # ---------------------------------------------------------------------------
+      # Apply (only on push or manual apply)
+      # ---------------------------------------------------------------------------
+      - name: Terraform Apply
+        id: apply
+        if: |
+          (github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve tfplan
+
+      # Update GitHub Variables with Terraform outputs
+      - name: Update GitHub Variables
+        if: |
+          (github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+        working-directory: infra/terraform
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ENV="${{ steps.env.outputs.name }}"
+          ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+
+          echo "Updating GitHub Variables for $ENV environment..."
+
+          # Get Terraform outputs (silently fail if output doesn't exist)
+          GCS_BUCKET=$(terraform output -raw gcs_bucket 2>/dev/null || echo "")
+          BQ_SILVER=$(terraform output -raw bigquery_silver_dataset 2>/dev/null || echo "")
+          BQ_GOLD=$(terraform output -raw bigquery_gold_dataset 2>/dev/null || echo "")
+          VM_NAME=$(terraform output -raw vm_name 2>/dev/null || echo "")
+
+          # Update GitHub repository variables
+          if [[ -n "$GCS_BUCKET" ]]; then
+            gh variable set "GCS_BUCKET_${ENV_UPPER}" --body "$GCS_BUCKET"
+            echo "Updated GCS_BUCKET_${ENV_UPPER}=$GCS_BUCKET"
+          fi
+
+          if [[ -n "$BQ_SILVER" ]]; then
+            gh variable set "BQ_SILVER_${ENV_UPPER}" --body "$BQ_SILVER"
+            echo "Updated BQ_SILVER_${ENV_UPPER}=$BQ_SILVER"
+          fi
+
+          if [[ -n "$BQ_GOLD" ]]; then
+            gh variable set "BQ_GOLD_${ENV_UPPER}" --body "$BQ_GOLD"
+            echo "Updated BQ_GOLD_${ENV_UPPER}=$BQ_GOLD"
+          fi
+
+          if [[ -n "$VM_NAME" ]]; then
+            gh variable set "VM_NAME_${ENV_UPPER}" --body "$VM_NAME"
+            echo "Updated VM_NAME_${ENV_UPPER}=$VM_NAME"
+          fi
+
+          echo "GitHub Variables updated for $ENV environment"
+
+      - name: Save Outputs to Artifact
+        if: |
+          (github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+        working-directory: infra/terraform
+        run: terraform output -json > terraform-outputs-${{ steps.env.outputs.name }}.json
+
+      - name: Upload Outputs
+        if: |
+          (github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ steps.env.outputs.name }}
+          path: infra/terraform/terraform-outputs-${{ steps.env.outputs.name }}.json
+          retention-days: 30

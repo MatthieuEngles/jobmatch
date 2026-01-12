@@ -1,5 +1,7 @@
 # JobMatch
 
+**Version en ligne : [jobmatch.molp.fr](https://jobmatch.molp.fr)**
+
 Plateforme intelligente de matching CV/offres d'emploi avec generation automatique de CV et lettres de motivation personnalises.
 
 ## Architecture
